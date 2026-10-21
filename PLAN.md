@@ -1,6 +1,6 @@
 # Loom implementation plan
 
-Status: revised for Exasol Personal and Next.js; implementation remains paused. Updated: 2026-10-21.
+Status: implementation resumed; M0 is partially implemented and live Exasol checks remain blocked by setup. Updated: 2026-10-21.
 
 ## Objective
 
@@ -8,7 +8,15 @@ Deliver a working data-request desk that a team lead can describe, refine, and s
 
 The user has accepted coordination pain as a promising problem. This is product direction, not evidence of willingness to pay or measured time savings. Validate those through user exercises with synthetic data; the event submission excludes employer/proprietary data.
 
-Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.md](ARCHITECTURE.md) together. Milestones are ordered by dependencies, not calendar promises. Every checkbox below represents future work.
+Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.md](ARCHITECTURE.md) together. Milestones are ordered by dependencies, not calendar promises. Checked tasks have a verified implementation; unchecked tasks include partial work awaiting the stated acceptance checks. No milestone is complete yet. See [RUNBOOK.md](RUNBOOK.md) for the current build.
+
+## Current checkpoint
+
+- Basic queue, search/status filters, intake, details, description editing, owner/priority/due-date/status controls, comments, and activity UI implemented.
+- Signed local synthetic sessions, scoped SQL reads, versioned commands, atomic receipt/history/audit/outbox code, migrations, seed/check scripts, and a named Exasol summary query implemented.
+- TypeScript, lint, production build, 15 unit/service tests, and four browser tests passed. Service tests use a scripted SQL boundary and are not real Exasol verification.
+- Live SQL checks pending: installed launcher 2.2.0 rejects Linux local deployment; current Linux starter kit requires missing Podman. Installation attempt needs interactive sudo. See RUNBOOK for the exact next steps.
+- No agent, generation/publication, CSV import/export, knowledge lifecycle, or production identity yet. M0 and M1 remain incomplete.
 
 ## Delivery rules
 
@@ -22,14 +30,14 @@ Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.m
 
 ## M0 — Exasol compatibility and Next.js foundation
 
-Dependencies: documentation revision complete; application implementation resumes only after the requested pause ends.
+Dependencies: documentation revision complete; user resumed implementation on 2026-10-21.
 
 - [ ] Verify the current local Personal starter kit on Linux/Podman, edition terms, hardware needs, and actual database/launcher versions. Do not provision cloud resources by default.
 - [ ] Test the official TypeScript driver with supported Node LTS, TLS trust/hostname checks, prepared value bindings, explicit transactions, rollback, affected-row reporting, and connection cleanup.
 - [ ] Test exact numeric/UTC/JSON-text mappings and empty-string/null behavior against the real database.
 - [ ] Prove enabled primary/composite keys reject invalid inserts; do not assume UNIQUE/CHECK, JSONB, RLS, row locks, or PostgreSQL queue syntax.
 - [ ] Verify command receipt replay, rollback after a partial command, collision retry, and reconciliation after an ambiguous commit response.
-- [ ] Set up pnpm, TypeScript, Next.js App Router, and Node Route Handlers with server-only Exasol access. Keep the UI basic and easy to redesign.
+- [x] Set up pnpm, TypeScript, Next.js App Router, and Node Route Handlers with server-only Exasol access. Keep the UI basic and easy to redesign.
 - [ ] Prove distinct mutation routes share one process-wide coordinator in the production Node build. No replicas or serverless deployment in this baseline.
 - [ ] Define ToolSpec, action/proposal/event/error contracts and the owner/operator/requester/viewer matrix.
 - [ ] Seed two workspaces and synthetic role identities. Verify API and repository isolation, including direct forged requests.

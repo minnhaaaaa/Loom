@@ -1,6 +1,6 @@
 # Loom technical stack
 
-Status: revised for ExaThon India 2026; implementation remains paused. Reviewed: 2026-10-21.
+Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live database compatibility unverified. Reviewed: 2026-10-21.
 
 **Exasol Personal is the required and selected primary data platform. Next.js App Router is the recommended application framework.** This replaces the earlier React/Vite + Fastify + PostgreSQL/Supabase design. The frontend stays basic for a later redesign.
 
@@ -17,7 +17,7 @@ See [README.md](README.md) for the problem and contest requirements, [PLAN.md](P
 | The official [TypeScript driver](https://github.com/exasol/exasol-driver-ts) supports encrypted Node connections, prepared statements, and local file import. | Keep the TypeScript backend; isolate the driver behind a repository adapter. |
 | [Constraint guidance](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm) distinguishes supported keys from unsupported UNIQUE/CHECK constraints. | Use enabled primary keys for command receipts and membership identities; validate business rules in the application. |
 
-The general getting-started index contains older platform wording. Use the dedicated Personal page, current developer hub, and selected release documentation; record the tested release during M0. Free database software does not imply free cloud infrastructure. No installer, database deployment, account creation, or cloud provisioning was performed for this revision.
+The general getting-started index contains older platform wording. Use the dedicated Personal page, current developer hub, and selected release documentation; record the tested release during M0. Free database software does not imply free cloud infrastructure. The earlier research revision performed no installation. During implementation, a local launcher attempt failed on Linux; current starter-kit preflight requires missing Podman. No database/cloud deployment was completed. See RUNBOOK.
 
 ## Selected baseline
 
@@ -44,7 +44,7 @@ The general getting-started index contains older platform wording. Use the dedic
 | Observability | Pino, Exasol-backed run/query/execution metadata | Query ID, parameters digest, data revision, row count, latency, run ID, review outcome. |
 | Delivery | Local Exasol Personal plus one self-hosted Next.js Node process | Reproducible synthetic-data demo. Horizontal replicas and serverless deployment are outside the first concurrency contract. |
 
-These are engineering selections, not verified implementation results. Exasol is optimized for analytics; the initial write workload is deliberately small and serialized. Do not claim production OLTP throughput from a successful demo.
+This table describes the target stack; implemented components and verification limits are recorded in RUNBOOK. TanStack, React Hook Form, jose, AI SDK, Pino, and Promptfoo are not installed yet; the first basic UI uses React state/native controls and local sessions use Node HMAC. Exasol is optimized for analytics; the initial write workload is deliberately small and serialized. Do not claim production OLTP throughput from a successful demo.
 
 ## What changes from the previous stack
 
@@ -111,7 +111,7 @@ exasol/
 scripts/               Future setup/check/seed entry points
 ```
 
-This layout is proposed; it is not present yet. Store no real credentials or employer data in it.
+The web, contracts, domain, db-exasol, analytics, migration, and script directories now exist. Agent/evaluation packages are future work. Store no real credentials or employer data in the repository.
 
 ## Configuration contract
 
@@ -128,7 +128,7 @@ This layout is proposed; it is not present yet. Store no real credentials or emp
 | `LLM_PROVIDER`, `LLM_MODEL`, provider credential | Backend only, selected through fixture evaluation. |
 | Run/upload/query limits | Bounded result rows, deadlines, retries, and model spend. |
 
-Create a redacted `.env.example` only when implementation resumes. Do not copy local credentials into documentation. Retire the earlier `DATABASE_URL_*`, `SUPABASE_*`, and embedding-specific variables from the selected baseline.
+A redacted `.env.example` is now provided. `LOOM_SESSION_SECRET` signs local synthetic sessions; `LOOM_ALLOW_DEMO_PRODUCTION` explicitly permits loopback-only synthetic sign-in in a production build. OIDC, model, storage, and pool configuration rows remain future contracts. Do not copy local credentials into documentation. Retire the earlier `DATABASE_URL_*`, `SUPABASE_*`, and embedding-specific variables from the selected baseline.
 
 ## Deployment and edition gates
 

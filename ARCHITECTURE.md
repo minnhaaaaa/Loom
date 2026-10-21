@@ -1,10 +1,10 @@
 # Loom architecture
 
-Status: revised for Exasol Personal and Next.js; application implementation remains paused. Research reviewed: 2026-10-21.
+Status: implementation resumed; this document combines implemented foundation and planned later capabilities. Research reviewed: 2026-10-21.
 
 Loom is a shared internal-tool workspace. The first workflow is a data-request desk: collect requirements, clarify missing details, retrieve team guidance, propose ownership, and track resolution. The design preserves a reusable request-and-review engine while limiting the first product to one workflow family.
 
-No application or infrastructure described here is implemented yet. [TECH_STACK.md](TECH_STACK.md) selects the proposed dependencies; [PLAN.md](PLAN.md) defines delivery and acceptance checks.
+The Next.js manual desk and Exasol adapter are implemented, but live Exasol verification is pending setup. Agent, generated-tool publication, knowledge lifecycle, and durable runner sections remain proposed. [RUNBOOK.md](RUNBOOK.md) distinguishes actual behavior from future design. [TECH_STACK.md](TECH_STACK.md) selects the proposed dependencies; [PLAN.md](PLAN.md) defines delivery and acceptance checks.
 
 ## 1. Research method and limits
 
@@ -405,7 +405,7 @@ Required integration scenarios include two-workspace isolation; own-request rest
 
 Correlate API request, workspace, run, step, proposal, command, and outbox IDs. Track queue age, retries, validation failures, blocked/stale proposals, review time, provider usage, and completed work. Keep credentials and full private content out of ordinary logs; observability exports require the same data-handling review as any other third-party service.
 
-Deploy one self-hosted Next.js Node process alongside local Exasol Personal for the synthetic event demo. Verify connection limits, TLS trust, health/readiness, graceful shutdown, explicit migrations, and backup/restore. No installation or deployment has been performed during this documentation revision. Keep any future licensed shared environment separate. Database audits are append-only to ordinary product roles, not cryptographically immutable against database administrators. Retention and deletion must cover uploaded sources, derived chunks, cached context, and provider/log copies where applicable.
+Deploy one self-hosted Next.js Node process alongside local Exasol Personal for the synthetic event demo. Verify connection limits, TLS trust, health/readiness, graceful shutdown, explicit migrations, and backup/restore. The implementation setup attempt found the installed local launcher does not support Linux and the current Linux starter kit requires missing Podman; no database deployment completed. Keep any future licensed shared environment separate. Database audits are append-only to ordinary product roles, not cryptographically immutable against database administrators. Retention and deletion must cover uploaded sources, derived chunks, cached context, and provider/log copies where applicable.
 
 ## 17. Architecture decisions and expansion triggers
 

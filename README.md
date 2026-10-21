@@ -6,7 +6,16 @@ The first product is a **data-request desk for internal analytics teams**. It he
 
 **Hackathon track:** Track 04 — The Work Behind the Work.
 
-**Project status:** Implementation paused while revising the design for Exasol Personal and Next.js. No application, database, agent runtime, or deployment has been implemented yet. The documents below describe intended behavior, not available features.
+**Project status:** Implementation underway. The basic Next.js request desk, scoped Exasol adapter, manual command endpoints, and test suites are in place. The UI runs as a read-only synthetic preview until Exasol is configured. Live SQL verification remains blocked by local setup; agent and tool-generation features are still planned. See [RUNBOOK.md](RUNBOOK.md) for setup and current limitations.
+
+## Run the current build
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open http://localhost:3000. Search/filter sample requests, inspect details, and preview intake. To enable real saves, configure Exasol and follow the migration, seed, and database checks in [RUNBOOK.md](RUNBOOK.md). There is no substitute persistence backend.
 
 ## Build and challenge requirements
 
@@ -66,6 +75,7 @@ Related market references include [YC's Company Brain request](https://www.linke
 
 | Document | Purpose |
 | --- | --- |
+| [RUNBOOK.md](RUNBOOK.md) | Actual setup commands, supported behavior, verification, and current blockers. |
 | [TECH_STACK.md](TECH_STACK.md) | Selected technologies, tradeoffs, proposed repository layout, and dependency evaluation rules. |
 | [PLAN.md](PLAN.md) | Prioritized milestones, implementation tasks, acceptance criteria, evaluation, and demo. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System boundaries, data model, protocols, failure handling, and research/repository evidence. |
