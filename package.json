@@ -16,19 +16,23 @@
     "test:e2e": "playwright test",
     "db:check": "tsx --env-file-if-exists=.env scripts/db-check.ts",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/db-migrate.ts",
-    "db:seed": "tsx --env-file-if-exists=.env scripts/db-seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env scripts/db-seed.ts",
+    "test:db": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run --config vitest.database.config.ts",
+    "format": "prettier --write apps packages scripts tests *.ts *.mjs *.json *.yaml",
+    "format:check": "prettier --check apps packages scripts tests *.ts *.mjs *.json *.yaml"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
-    "eslint": "^9.39.0",
-    "eslint-config-next": "16.4.2",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.0",
-    "tsx": "^4.21.0",
-    "vitest": "5.0.5",
     "@playwright/test": "^1.58.0",
     "@types/node": "^24.0.0",
-    "@types/ws": "^8.18.0"
+    "@types/ws": "^8.18.0",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "16.4.2",
+    "prettier": "3.9.9",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "vitest": "5.0.5"
   },
   "type": "module"
 }

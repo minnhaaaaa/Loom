@@ -1,8 +1,75 @@
-import { personas, workspaceId, type RequestRecord } from './index';
+import { personas, workspaceId, type RequestRecord } from "./index";
 // Public, synthetic examples only. Used for read-only preview and explicit database seeding.
 export const sampleRequests: RequestRecord[] = [
-  { id:'10000000-0000-4000-8000-000000000001', title:'Weekly acquisition funnel', businessQuestion:'Where did new customers drop off between signup and their first order?', reportingPeriod:'Last 4 complete weeks', dataset:'Product events and orders', requesterId:personas[2].id, requesterName:'Meera', ownerId:personas[1].id, ownerName:'Rohan', priority:'high', status:'in_progress', dueAt:'2026-10-24', createdAt:'2026-10-18T09:00:00.000Z' },
-  { id:'10000000-0000-4000-8000-000000000002', title:'Returns by product category', businessQuestion:'Which categories account for the largest share of returns?', reportingPeriod:'', dataset:'', requesterId:personas[2].id, requesterName:'Meera', ownerId:null, ownerName:null, priority:'normal', status:'needs_info', dueAt:null, createdAt:'2026-10-19T10:30:00.000Z' },
-  { id:'10000000-0000-4000-8000-000000000003', title:'Refresh the operations scorecard', businessQuestion:'Update the daily fulfillment and delivery measures for the operations review.', reportingPeriod:'Yesterday', dataset:'Fulfillment events', requesterId:personas[0].id, requesterName:'Ananya', ownerId:personas[0].id, ownerName:'Ananya', priority:'normal', status:'ready', dueAt:'2026-10-23', createdAt:'2026-10-20T08:00:00.000Z' },
-  { id:'10000000-0000-4000-8000-000000000004', title:'Support response time by channel', businessQuestion:'Compare first response time across email and chat.', reportingPeriod:'September 2026', dataset:'Support tickets', requesterId:personas[2].id, requesterName:'Meera', ownerId:null, ownerName:null, priority:'low', status:'new', dueAt:null, createdAt:'2026-10-21T08:00:00.000Z' },
-].map(r => ({...r, workspaceId, version:1, updatedAt:r.createdAt} as RequestRecord));
+  {
+    id: "10000000-0000-4000-8000-000000000001",
+    title: "Weekly acquisition funnel",
+    businessQuestion:
+      "Where did new customers drop off between signup and their first order?",
+    reportingPeriod: "Last 4 complete weeks",
+    dataset: "Product events and orders",
+    requesterId: personas[2].id,
+    requesterName: "Meera",
+    ownerId: personas[1].id,
+    ownerName: "Rohan",
+    priority: "high",
+    status: "in_progress",
+    dueAt: "2026-10-24",
+    createdAt: "2026-10-18T09:00:00.000Z",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000002",
+    title: "Returns by product category",
+    businessQuestion:
+      "Which categories account for the largest share of returns?",
+    reportingPeriod: "",
+    dataset: "",
+    requesterId: personas[2].id,
+    requesterName: "Meera",
+    ownerId: null,
+    ownerName: null,
+    priority: "normal",
+    status: "needs_info",
+    dueAt: null,
+    createdAt: "2026-10-19T10:30:00.000Z",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000003",
+    title: "Refresh the operations scorecard",
+    businessQuestion:
+      "Update the daily fulfillment and delivery measures for the operations review.",
+    reportingPeriod: "Yesterday",
+    dataset: "Fulfillment events",
+    requesterId: personas[0].id,
+    requesterName: "Ananya",
+    ownerId: personas[0].id,
+    ownerName: "Ananya",
+    priority: "normal",
+    status: "ready",
+    dueAt: "2026-10-23",
+    createdAt: "2026-10-20T08:00:00.000Z",
+  },
+  {
+    id: "10000000-0000-4000-8000-000000000004",
+    title: "Support response time by channel",
+    businessQuestion: "Compare first response time across email and chat.",
+    reportingPeriod: "September 2026",
+    dataset: "Support tickets",
+    requesterId: personas[2].id,
+    requesterName: "Meera",
+    ownerId: null,
+    ownerName: null,
+    priority: "low",
+    status: "new",
+    dueAt: null,
+    createdAt: "2026-10-21T08:00:00.000Z",
+  },
+].map(
+  (r) =>
+    ({
+      ...r,
+      workspaceId,
+      version: 1,
+      updatedAt: r.createdAt,
+    }) as RequestRecord,
+);
