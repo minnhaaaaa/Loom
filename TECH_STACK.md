@@ -1,151 +1,145 @@
 # Loom technical stack
 
-Status: proposed implementation baseline. Reviewed: 2026-10-21. No dependencies are installed by this document.
+Status: revised for ExaThon India 2026; implementation remains paused. Reviewed: 2026-10-21.
 
-The stack serves one web application, one API, and a background worker built from a shared TypeScript codebase. PostgreSQL is the authoritative store. The first delivery should prove one request workflow before adding distributed infrastructure.
+**Exasol Personal is the required and selected primary data platform. Next.js App Router is the recommended application framework.** This replaces the earlier React/Vite + Fastify + PostgreSQL/Supabase design. The frontend stays basic for a later redesign.
 
-See [README.md](README.md) for product scope, [PLAN.md](PLAN.md) for build order, and [ARCHITECTURE.md](ARCHITECTURE.md) for data and authorization contracts.
+See [README.md](README.md) for the problem and contest requirements, [PLAN.md](PLAN.md) for implementation gates, and [ARCHITECTURE.md](ARCHITECTURE.md) for the system and research register.
+
+## Verified platform findings
+
+| Finding from primary sources | Consequence for Loom |
+| --- | --- |
+| The matching [ExaThon rules](https://www.exasol.com/events/exathon-india-2026/) require Exasol Personal as the data platform. | Core records and analytics must actually run on Exasol, with reproducible query evidence. |
+| [Personal documentation](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm) describes a free, fully functional edition for individual use with a single-user restriction. | Demo with synthetic personas; resolve applicable event/edition permissions before real shared use. A shared backend credential does not establish licensing permission. |
+| The current [developer hub](https://www.exasol.com/developers/) supports local Linux/WSL using Podman, alongside native macOS and Windows instructions. | Use the current local starter kit on this Linux workspace; do not assume Docker alone is the supported launcher path. |
+| [Transaction management](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm) documents serializable transactions, object-level locking, collision rollbacks, and default autocommit. | Batch small writes, explicitly control transaction scope, and test full-transaction retries. PostgreSQL row-lock/queue recipes cannot be copied. |
+| The official [TypeScript driver](https://github.com/exasol/exasol-driver-ts) supports encrypted Node connections, prepared statements, and local file import. | Keep the TypeScript backend; isolate the driver behind a repository adapter. |
+| [Constraint guidance](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm) distinguishes supported keys from unsupported UNIQUE/CHECK constraints. | Use enabled primary keys for command receipts and membership identities; validate business rules in the application. |
+
+The general getting-started index contains older platform wording. Use the dedicated Personal page, current developer hub, and selected release documentation; record the tested release during M0. Free database software does not imply free cloud infrastructure. No installer, database deployment, account creation, or cloud provisioning was performed for this revision.
 
 ## Selected baseline
 
-| Area | Selection | Purpose and reason |
+| Area | Selection | Purpose |
 | --- | --- | --- |
-| Language and runtime | TypeScript, a supported Node.js LTS release, pnpm workspaces | Share types and validation across web, API, and worker. Pin exact compatible versions during setup. |
-| Frontend | React and Vite; React Router in library mode | An authenticated workspace application with a separately deployable API; server-side rendering is not required for the MVP. |
-| UI primitives | Tailwind CSS and accessible Radix-based shadcn/ui components | Consistent forms, dialogs, menus, and review controls. Accessibility still needs application-level verification. |
-| Tables and server state | TanStack Table and TanStack Query | Filtering, row selection, pagination, cached queries, and refetch after authorized change notifications. |
-| Forms | React Hook Form and shared Zod schemas | Required fields and consistent validation messages. Server validation remains authoritative. |
-| Generated tool specification | Loom-owned, versioned `ToolSpec` validated with Zod | A small allowlisted component and action catalog, with no executable expressions. |
-| API | Fastify on Node.js | Typed HTTP endpoints, validation hooks, structured logging, and shared domain modules. |
-| Database | PostgreSQL hosted through Supabase | Transactions, constraints, JSONB extension fields, full-text search, and row-level security in one store. |
-| Database access | Drizzle ORM with `pg`; reviewed SQL migrations | Typed queries, explicit transactions, and custom SQL for RLS, compare-and-swap updates, and search. |
-| Authentication | Supabase Auth; server-side JWT verification using `jose` and the project's signing-key configuration | Avoid building an identity service. Database membership is checked independently of token validity. |
-| Authorization | Workspace membership and operation policies, plus PostgreSQL RLS | Enforce requester-owned records and internal team access. Agents use the initiating user's scope. |
-| Live collaboration | Supabase Realtime private workspace channels; authorized invalidation events and presence | Notify clients to refetch records through the API. Presence is ephemeral and never grants authority. |
-| File storage | Supabase Storage, private buckets | Store bounded CSV and plain-text/Markdown source uploads. Download URLs are short lived and permission checked. |
-| Model integration | Vercel AI SDK behind a Loom provider adapter | Provider-neutral model calls, validated structured output, and bounded tool use. No provider SDK in the browser. |
-| Agent control flow | Explicit persisted TypeScript state machine | Short, inspectable runs that generate proposals; no framework is necessary for the initial sequence. |
-| Background jobs | pg-boss in a separate PostgreSQL schema | Durable import, indexing, and agent jobs with retries without adding Redis. Domain writes still require idempotency. |
-| Retrieval | SQL filters and PostgreSQL full-text search first; pgvector when the retrieval gate justifies it | Exact record and policy lookup comes first. Semantic retrieval is an evaluated extension, not a prerequisite. |
-| Application tests | Vitest; API integration tests against real local PostgreSQL | Verify parsing, policy, state transitions, isolation, and concurrency rather than only mocks. |
-| Browser tests | Playwright | Verify the intake, review, conflict, and two-user collaboration flows. |
-| Agent evaluation | Versioned JSON fixtures and Promptfoo | Compare models/prompts on grounded recommendations and adversarial cases. Database assertions decide action correctness. |
-| Observability | Pino logs, persisted run metrics; OpenTelemetry instrumentation as deployment grows | Correlate requests, jobs, proposals, and commits without logging full private source contents by default. |
-| Delivery | Static web assets, Node API/worker containers, managed Supabase; GitHub Actions | Few runtime roles from one codebase. Hosting provider remains an implementation choice. |
+| Language/runtime | TypeScript, supported Node.js LTS, pnpm workspaces | Shared contracts and domain code. Pin compatible versions during implementation. |
+| Application framework | Next.js App Router with React and TypeScript | Basic queue, form, details, analytics, and review screens in one application. |
+| UI | Semantic HTML and a small plain-CSS token sheet initially | Accessible labels, keyboard focus, responsive layout; easy future redesign. Add primitives only as needed. |
+| Tables/forms/server state | TanStack Table/Query, React Hook Form, Zod | Reusable controls, validation, and authorized refetch. Server checks remain authoritative. |
+| HTTP/server boundary | Next.js Route Handlers in the Node.js runtime | Same-origin API, validated commands, identity checks, and structured errors. No separate Fastify server initially. |
+| Primary database | Exasol Personal | Requests, history, memberships, tool definitions, approved knowledge, proposals, execution receipts, audit, imports, and query evidence. |
+| Database driver | `@exasol/exasol-driver-ts` with Node `ws` | Server-only TLS connections and bound SQL values. Compatibility is an M0 gate. |
+| SQL/data access | Loom-owned Exasol repositories and reviewed versioned SQL | No assumed Drizzle/Prisma Exasol dialect. Separate data access from domain services. |
+| Analytics | Exasol SQL views and parameterized query registry | Backlog age, status duration, SLA risk, missing requirements, duplicate candidates, and owner workload. |
+| Authentication | Backend-verified identity contract using `jose` | Local-only synthetic demo identities; configured OIDC/JWT for an appropriately licensed shared deployment. No production bypass. |
+| Authorization | Explicit workspace/role predicates in the API and repository layer | Owner, operator, requester, viewer. No PostgreSQL RLS assumption and no browser DB credentials. |
+| Saved-record updates | Authorized polling/refetch initially | Basic working collaboration prototype without Supabase Realtime. SSE is optional after persistence works. |
+| Source files | Bounded upload staging on a private local volume; canonical text/metadata in Exasol | Keep raw files outside SQL where appropriate. Download access is checked by the API. No mandatory cloud storage. |
+| Model integration | Vercel AI SDK behind a provider adapter | Generate a bounded tool definition or reviewable suggestions; never unrestricted SQL or direct writes. |
+| Agent state | Explicit persisted steps and work items in Exasol | Bounded request-driven execution with resumable checkpoints; no pg-boss dependency or assumed durable background execution. |
+| Mutation concurrency | One write coordinator in one backend instance | Serialize local commands, membership changes, and run persistence; use database transactions and expected versions. Not a distributed lock. |
+| Retrieval | Typed rules, glossary keys, normalized term lookup over authorized Exasol rows | Small-corpus baseline; no PostgreSQL full-text indexes or pgvector. |
+| Tests/evaluation | Vitest, real Exasol integration fixtures, Playwright, Promptfoo | Verify real SQL, commit/rollback, isolation boundaries, retries, UI flow, and grounded suggestions. |
+| Observability | Pino, Exasol-backed run/query/execution metadata | Query ID, parameters digest, data revision, row count, latency, run ID, review outcome. |
+| Delivery | Local Exasol Personal plus one self-hosted Next.js Node process | Reproducible synthetic-data demo. Horizontal replicas and serverless deployment are outside the first concurrency contract. |
 
-These are engineering selections for Loom, not conclusions proven by the cited papers. Compatibility and deployment credentials must be verified at implementation time.
+These are engineering selections, not verified implementation results. Exasol is optimized for analytics; the initial write workload is deliberately small and serialized. Do not claim production OLTP throughput from a successful demo.
 
-## Why these choices
+## What changes from the previous stack
 
-### One language and a modular backend
+| Earlier assumption | Revised decision |
+| --- | --- |
+| Separate Vite frontend and Fastify API | Next.js pages/layouts and Node Route Handlers; shared domain modules remain independent of the framework. |
+| PostgreSQL as authoritative store | Exasol Personal stores canonical application records and performs analytical queries. No duplicate authoritative PostgreSQL store. |
+| Supabase database/Auth/Storage/Realtime bundle | Remove the bundle requirement. Identity, private upload staging, and saved-record refresh have explicit application contracts. |
+| Drizzle with `pg` and PostgreSQL migrations | Exasol driver adapter and `exasol/migrations` SQL history. |
+| JSONB/UUID/partial indexes/RLS policies | Portable scalar columns, canonical validated JSON text, explicit workspace checks, and Exasol-tested constraints. |
+| PostgreSQL full-text search and pgvector | Rule/key matching and bounded normalized text lookup; semantic retrieval deferred. |
+| pg-boss and `SKIP LOCKED` | Persisted work items plus one runner/coordinator; prove recovery before adding parallel workers. |
+| Transaction-local actor settings and per-row locks | Verified actor passed to every repository call; single write path and Exasol transaction/version checks. |
 
-The initial workflow does not require a Python service, graph database, orchestration cluster, or multi-agent framework. Keep tool definitions, requests, knowledge, proposals, and audit modules separate inside one backend. The worker imports the same application services; it does not implement another version of permissions or actions.
+Keep the earlier papers and repository comparisons as research history, but mark PostgreSQL-specific implementations as superseded or deferred.
 
-Fastify and Vite keep the client and long-lived worker independent. Use ordinary same-origin routing in production (`/api` to the API) and a development proxy locally. The browser uses an Auth-issued bearer token for API calls; never put tokens in URLs or logs. JWT refresh is handled by the auth client. Validate issuer, audience, expiry, algorithm, and signing key on the API. Use a strict origin policy and CSP; sanitize rendered user content.
+## Why Next.js for this build
 
-### A Loom specification before a general UI protocol
+This is an authenticated internal web application, so one framework for routing, pages, forms, and server endpoints reduces setup and deployment work. Use Server Components for authorized initial reads and Client Components for tables, filters, dialogs, and request forms. Keep the Exasol adapter in server-only modules. Every Route Handler and Server Action must authorize its operation independently; a protected page is not API authorization.
 
-Use stable component IDs and field keys. Labels can change without changing record identity. `ToolSpec` includes field definitions, fixed view descriptions, allowed workflow transitions, and references to server-owned action IDs.
+Select the Node.js runtime for Exasol access. The initial deployment is a self-hosted Node server, with private/user-specific responses uncached and no browser-side database connection. Validate that all mutation handlers share the same process-wide write coordinator; do not deploy multiple serverless instances and assume an in-memory mutex provides distributed serialization. M0 must test concurrent requests across distinct routes.
 
-[json-render](https://github.com/vercel-labs/json-render) and [A2UI](https://github.com/a2ui-project/a2ui) demonstrate catalog-based declarative UI patterns. Evaluate json-render as a renderer adapter in a short spike. Keep the stored Loom specification independent of either project's wire format. If an adapter cannot enforce bindings, authorization, and revision compatibility cleanly, implement the small fixed renderer directly. A2UI interoperability is deferred.
+Persist agent run/checkpoint state in Exasol and advance work within bounded authenticated requests. A crash or disconnect leaves a retryable step, not an assumed completed job. Do not treat `after()` or a detached promise as a durable queue. Add a separately managed runner only when longer or unattended jobs are required, with a new coordination design. See [Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), [Node deployment](https://nextjs.org/docs/app/getting-started/deploying), and [`after()` constraints](https://nextjs.org/docs/app/api-reference/functions/after).
 
-Provider-enforced structured output does not establish that fields, actions, or access decisions are semantically valid. Validate references and capabilities on the server before rendering or saving a draft.
+Use server-only environment variables for Exasol and model credentials. Cookie sessions require CSRF/origin checks on mutations, secure production cookies, and a deliberate session lifecycle. Never share cached data between identities or embed secrets in client bundles.
 
-### PostgreSQL as the business authority
+## Driver and transaction contract
 
-Supabase supplies managed PostgreSQL, Auth, Storage, and Realtime; it does not replace application action authorization. RLS is a second boundary, not a substitute for validating allowed fields or workflow transitions.
+Use the official [driver user guide](https://github.com/exasol/exasol-driver-ts/blob/main/doc/user_guide/user_guide.md). SQL values use prepared bindings. Schema/table/view names come only from code-owned identifiers. Never put Exasol credentials or the driver in the browser, even though the driver supports browser connections.
 
-The product roles are **owner**, **operator**, **requester**, and **viewer**. Owners manage the desk and publish knowledge; operators triage and review record changes; requesters submit and read their own work; viewers have authorized internal read-only access. The full operation matrix is in `ARCHITECTURE.md`.
+A multi-statement command exclusively owns one connection with autocommit disabled, commits only on complete success, and rolls back on failure. Do not assume independent pool queries share a transaction. M0 must verify explicit commit/rollback, affected-row reporting, SQL error classification, numeric precision, cancellation, and connection cleanup against the installed release.
 
-The API and worker use a non-owner, non-`BYPASSRLS` `loom_app` database role. A transaction-local verified actor context is set by trusted backend code. Tables use policies based on that actor and current database membership. Migrations run under a separate administrative identity. The queue uses its own `loom_queue` connection and schema; browser identities have no queue access. A separate `loom_delivery` role can execute narrow outbox claim/acknowledgment and recipient-resolution functions, without generic domain-table reads. No tenant-provided SQL is accepted.
+All mutation paths, including run persistence and membership changes, enter one bounded coordinator in the first single-instance deployment. Network/model calls happen outside it. Database collisions retry the complete idempotent transaction with a fresh snapshot and bounded backoff. An ambiguous commit outcome is reconciled by command ID before retrying. Extra backend instances or direct database writers are outside this baseline and require a new concurrency design.
 
-Browser domain writes go through the API. Do not expose generic insert/update grants on domain tables to Supabase's browser roles. Private Realtime authorization is backed by membership policies on `realtime.messages`; it sends identifiers and revisions, not sensitive record payloads. The API refetch applies current permissions again.
+Trust the configured CA and verify TLS/host identity. Do not copy documentation examples that disable certificate or hostname verification into the default runtime. Verify the certificate procedure supplied by the chosen local deployment in M0.
 
-See the [Supabase RLS documentation](https://supabase.com/docs/guides/database/postgres/row-level-security), [Realtime authorization](https://supabase.com/docs/guides/realtime/authorization), and [PostgreSQL row security documentation](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
+## Data representation and analytical value
 
-### Durable jobs without an orchestration service
+Use relational columns for request status, requester, owner, timestamps, and versions. Use canonical bounded JSON text for tool definitions and optional values, validated by Zod. Map IDs initially to `VARCHAR(36)`, revisions/counts to exact numeric types, and timestamps with an explicit tested UTC conversion. Validate all mappings against [Exasol data types](https://docs.exasol.com/db/latest/sql_references/data_types/datatypedetails.htm); account for empty-string/null behavior and serialization precision.
 
-[pg-boss](https://github.com/timgit/pg-boss) supports PostgreSQL-backed work and transactional enqueue patterns. Use an application outbox written in the same transaction as a domain change, then idempotently enqueue delivery work. This avoids assuming that separately committed API writes and queue writes are atomic.
+Use enabled primary keys and supported composite foreign keys where verified. Do not migrate disabled constraints and assume they enforce uniqueness. Status enums, readiness checks, role permissions, and field rules are code-owned validations. Enabled key behavior must be verified with deliberately invalid inserts.
 
-Model calls and file parsing happen outside database transactions. Persist their inputs and outcomes; hold row locks only during short state changes. Retries can repeat model calls and incur costs, so checkpoint completed steps and use bounded retries. A queue's delivery semantics do not guarantee exactly-once external effects.
+Exasol is central to both stored work and insight: ingest the synthetic backlog into staging, validate and normalize it, derive queue/owner metrics in SQL, and attach query evidence to the agent's explanation. Removing Exasol should break the real workflow rather than merely remove an optional chart.
 
-### Retrieval before graph infrastructure
-
-Start with active approved rules, glossary entries, exact record references, and full-text search restricted by workspace and visibility. Add pgvector only after a frozen retrieval set shows a meaningful gain. Keep embeddings rebuildable from canonical sources, with provider, dimensions, model version, and source revision recorded.
-
-[Graphiti](https://github.com/getzep/graphiti), [Mem0](https://github.com/mem0ai/mem0), and [Letta](https://github.com/letta-ai/letta-code) are references for memory design. Do not adopt all three or assume their benchmark results apply to Loom. A graph backend is reconsidered only when relational links and hybrid search fail a real relationship or historical-query evaluation.
-
-## Alternatives and decision triggers
-
-| Alternative | MVP decision | Reconsider when |
-| --- | --- | --- |
-| Next.js full-stack application | Not selected; the API and worker already require explicit backend lifecycles. | Server rendering or a team preference materially simplifies delivery. |
-| FastAPI/Python agent service | Deferred to avoid a second runtime and duplicated contracts. | A validated capability depends on a Python-only library. |
-| LangGraph.js | Reference for checkpoints and interrupts; no runtime dependency initially. | The agent requires branching, durable subflows, or repeated human pauses beyond the bounded sequence. |
-| Temporal | Reference for durable execution; deferred. | Long-running cross-system processes need stronger orchestration and compensation. |
-| Yjs / Automerge | Deferred. | Character-level simultaneous editing or offline document collaboration becomes a validated need. |
-| OpenFGA | Reference for relationship authorization; deferred. | Cross-workspace sharing and nested resource relationships outgrow membership policies. |
-| Neo4j / Graphiti service | Deferred. | Multi-hop and temporal retrieval failures justify the operational cost. |
-| Redis / BullMQ | Deferred; pg-boss uses the existing database. | Queue load and isolation requirements exceed the measured PostgreSQL budget. |
-| Forking an internal-tool platform | Not selected. Study Appsmith, ToolJet, and Budibase patterns. | A deliberate product and licensing evaluation favors extending an existing platform. |
-
-## Proposed repository layout
-
-This is a future structure, not a description of files already present.
+## Proposed layout
 
 ```text
 apps/
-  web/                 React workspace and fixed component registry
-  api/                 Fastify routes, authentication, application services
-  worker/              pg-boss handlers using shared services
+  web/
+    app/               Next.js pages/layouts and Node Route Handlers
+    components/        Basic React UI, ready for later redesign
+    server/            Identity, command coordinator, bounded run execution
 packages/
-  contracts/           ToolSpec, API inputs, proposal and event schemas
-  domain/              permissions, request transitions, knowledge rules
-  db/                  Drizzle schema, repositories, transaction context
-  agent/               context assembly, provider adapter, bounded run steps
-  ui/                  accessible application components
-  evaluation/          fixtures, deterministic assertions, model comparisons
-supabase/
-  migrations/          reviewed SQL, RLS, indexes, and storage/channel policies
-  seed.sql             synthetic fixtures only
-tests/
-  integration/         database, permissions, retries, concurrency
-  e2e/                 two-user browser journeys
+  contracts/           ToolSpec and API/action/event schemas
+  domain/              Permissions, transitions, knowledge applicability
+  db-exasol/           Driver adapter, scoped repositories, transactions
+  analytics/           Named query registry and metric/result contracts
+  agent/               Context assembly, bounded steps, provider adapter
+  evaluation/          Synthetic fixtures and deterministic assertions
+exasol/
+  migrations/          Reviewed Exasol DDL; one migration history
+  queries/             Reviewed analytical views/queries
+  fixtures/            Synthetic-only import data and expected outputs
+scripts/               Future setup/check/seed entry points
 ```
 
-Drizzle schema definitions and SQL migrations must describe the same state. Generate candidate migrations with Drizzle tooling, review/add RLS and custom SQL, and use one committed migration history under `supabase/migrations`. Do not run two competing migration systems against a deployed database.
+This layout is proposed; it is not present yet. Store no real credentials or employer data in it.
 
 ## Configuration contract
 
-| Configuration | Visibility | Purpose |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | Public | API origin or same-origin base path. |
-| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Public | Auth and private-channel connection; policies enforce access. |
-| `DATABASE_URL_APP` | API/worker only | Non-owner application database role. |
-| `DATABASE_URL_QUEUE` | Backend only | Queue-schema connection; no browser access. |
-| `DATABASE_URL_DELIVERY` | Dispatcher only | Narrow outbox claim/acknowledgment and authorized recipient-resolution functions. |
-| `DATABASE_URL_MIGRATIONS` | Migration job only | Administrative schema changes; never used by the app. |
-| `SUPABASE_JWT_ISSUER`, `SUPABASE_JWKS_URL`, `SUPABASE_JWT_AUDIENCE` | Backend | Explicit token verification configuration. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Restricted backend publisher only, if required | Storage/broadcast service operations; never general domain reads or model context. Prefer narrower server capabilities where available. |
-| `LLM_PROVIDER`, `LLM_MODEL`, provider API credential | Backend | One configured provider for the first pilot. Model choice follows fixture evaluation. |
-| `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | Indexing/retrieval only | Required only if the semantic-retrieval gate is passed. |
-| `APP_ORIGIN`, run budgets, upload limits | Backend | Explicit origin and resource boundaries. |
+| Configuration | Visibility/purpose |
+| --- | --- |
+| `EXASOL_HOST`, `EXASOL_PORT`, `EXASOL_SCHEMA` | Backend connection target and code-validated schema. |
+| `EXASOL_USER`, `EXASOL_PASSWORD` | Backend only; authorized Personal deployment credentials. |
+| `EXASOL_CA_FILE` | Backend path to trusted deployment CA material. |
+| `EXASOL_READ_POOL_SIZE`, `EXASOL_WRITE_CONCURRENCY` | Small evaluated read pool; write concurrency fixed to one initially. |
+| `LOOM_AUTH_MODE` | Explicit local-demo or configured identity-provider mode. Demo mode disabled for production. |
+| `OIDC_ISSUER`, `OIDC_JWKS_URL`, `OIDC_AUDIENCE` | Required when configured JWT identity is used. |
+| `APP_ORIGIN` | Same-origin Next.js application and permitted mutation origin; no Vite-specific variables. |
+| `UPLOAD_DIRECTORY` | Private local upload staging; outside public web assets. |
+| `LLM_PROVIDER`, `LLM_MODEL`, provider credential | Backend only, selected through fixture evaluation. |
+| Run/upload/query limits | Bounded result rows, deadlines, retries, and model spend. |
 
-Names are proposed. Create a redacted `.env.example` during implementation. Never inspect, copy, or commit local credentials to populate it.
+Create a redacted `.env.example` only when implementation resumes. Do not copy local credentials into documentation. Retire the earlier `DATABASE_URL_*`, `SUPABASE_*`, and embedding-specific variables from the selected baseline.
 
-## Dependency and release discipline
+## Deployment and edition gates
 
-1. Pick supported stable releases and verify their Node compatibility; repository default branches can contain future or preview APIs.
-2. Commit a lockfile, runtime version file, and container digest policy. Do not write unverified version numbers into this document.
-3. Confirm the license of the exact package or code copied. A public repository, its hosted product, and enterprise extensions can have different licenses and capabilities.
-4. Run the thin vertical slice before expanding dependencies. Document an adopted adapter or changed stack decision here and in architecture decisions.
-5. Use separate development and pilot environments. Confirm migrations, RLS, queue reconnects, Auth signing configuration, and private channel behavior in the pilot environment.
+- Prefer local Personal on the current Linux host using the documented Podman route. Record launcher, database, and driver versions and hardware actually tested.
+- No cloud account is needed for the local path. AWS/Azure are alternatives, not pre-authorized infrastructure creation or free compute.
+- Personal's individual/single-user terms must be distinguished from the future multi-user product. Use public/synthetic data and role personas for the event demonstration. Obtain applicable organizer/vendor clarification before an actual shared service; do not infer an exception from a shared SQL login.
+- Text AI, UDFs, MCP, and advanced deployment features are optional future spikes. Local/cloud availability differs; the core workflow must work with ordinary SQL and the supported driver.
+- If Node driver compatibility blocks M0, evaluate [PyExasol](https://github.com/exasol/pyexasol) behind a narrow adapter. Add Python only with a recorded reason; it is not the default.
 
-## Primary implementation references
+## Primary references
 
-- [React](https://react.dev/), [Vite](https://vite.dev/guide/), [Fastify](https://fastify.dev/docs/latest/), [Zod](https://zod.dev/), [Drizzle](https://orm.drizzle.team/docs/overview).
-- [Supabase Auth JWTs](https://supabase.com/docs/guides/auth/jwts), [Realtime authorization](https://supabase.com/docs/guides/realtime/authorization), [private Storage](https://supabase.com/docs/guides/storage/security/access-control).
-- [AI SDK](https://ai-sdk.dev/docs/introduction), [pg-boss](https://github.com/timgit/pg-boss), [pgvector](https://github.com/pgvector/pgvector).
-- [TanStack Table](https://tanstack.com/table/latest), [TanStack Query](https://tanstack.com/query/latest), [Playwright](https://playwright.dev/docs/intro), [Vitest](https://vitest.dev/guide/), [Promptfoo](https://github.com/promptfoo/promptfoo).
-
-The architecture source register records the research and repository comparisons behind these selections.
+- [Exact challenge rules](https://www.exasol.com/events/exathon-india-2026/), [Exasol Personal](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm), [developer hub](https://www.exasol.com/developers/).
+- [Launcher repository](https://github.com/exasol/exasol-personal), [TypeScript driver](https://github.com/exasol/exasol-driver-ts), [driver guide](https://github.com/exasol/exasol-driver-ts/blob/main/doc/user_guide/user_guide.md), [PyExasol](https://github.com/exasol/pyexasol).
+- [Transactions](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm), [IMPORT](https://docs.exasol.com/db/latest/sql/import.htm), [MERGE](https://docs.exasol.com/db/latest/sql/merge.htm), [analytic functions](https://docs.exasol.com/db/latest/sql_references/functions/analyticfunctions.htm), [constraint differences](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm).

@@ -6,7 +6,15 @@ The first product is a **data-request desk for internal analytics teams**. It he
 
 **Hackathon track:** Track 04 — The Work Behind the Work.
 
-**Project status:** Product definition and proposed architecture. No application, database, agent runtime, or deployment has been implemented yet. The documents below describe intended behavior, not available features.
+**Project status:** Implementation paused while revising the design for Exasol Personal and Next.js. No application, database, agent runtime, or deployment has been implemented yet. The documents below describe intended behavior, not available features.
+
+## Build and challenge requirements
+
+Selected stack: **Next.js App Router, TypeScript, and Exasol Personal**. Next.js supplies the basic frontend and Node server endpoints. Exasol is the canonical store and analytical engine: imported requests, status history, backlog/SLA metrics, and evidence for triage suggestions. This replaces the earlier PostgreSQL/Supabase design.
+
+The matching [ExaThon India 2026 rules](https://www.exasol.com/events/exathon-india-2026/) allow any framework and teams of one to three. Use only public or synthetic data, not employer/proprietary data. Submit a public repository, problem statement, slide deck, demo of at most three minutes, setup/usage instructions, and a deployment/run guide. This repository already uses Apache-2.0, an accepted license. The published deadline is **25 October 2026, 23:59 IST**; confirm any organizer updates before submission. Effective Exasol use accounts for 25% of judging, so it must power the working workflow and measurable SQL insights.
+
+Personal is documented for individual use with a single-user restriction. The event demo uses synthetic role personas under one operator; an actual shared service needs clarification of applicable permissions and edition terms. See the [Personal documentation](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm).
 
 ## Who it serves
 
@@ -39,7 +47,7 @@ Loom aims to reduce coordination delays. It does not automatically create analys
 | One request-and-review tool family, led by the data-request desk | General-purpose application generation |
 | Versioned tool specifications and a fixed component catalog | Arbitrary generated JavaScript, SQL, or backend code |
 | CSV import/export and persisted requests | A connector marketplace or broad SaaS migration |
-| Shared saved records, comments, presence, and activity | Character-level collaborative editing and offline writes |
+| Shared saved records, comments, authorized refresh, and activity | Character-level collaborative editing and offline writes |
 | A bounded agent that reads context and creates proposals | Unattended external actions or autonomous agent teams |
 | Approved procedures, definitions, and reviewed decision reuse | Automatic promotion of chat messages into policy |
 | Exact-change review, version checks, and audit events | Claims of guaranteed AI correctness or universal rollback |

@@ -1,6 +1,6 @@
 # Loom architecture
 
-Status: proposed architecture for the first implementation. Research reviewed: 2026-10-21.
+Status: revised for Exasol Personal and Next.js; application implementation remains paused. Research reviewed: 2026-10-21.
 
 Loom is a shared internal-tool workspace. The first workflow is a data-request desk: collect requirements, clarify missing details, retrieve team guidance, propose ownership, and track resolution. The design preserves a reusable request-and-review engine while limiting the first product to one workflow family.
 
@@ -8,11 +8,11 @@ No application or infrastructure described here is implemented yet. [TECH_STACK.
 
 ## 1. Research method and limits
 
-This document screens **27 research papers and 23 public GitHub repositories** across generated interfaces, human-agent collaboration, retrieval, memory, authorization, transactions, and evaluation. The registers below link primary sources and explain their relevance. Most papers were screened through abstracts or author publication summaries; selected full-text sections were examined for the closest design questions. Repository review covered READMEs and selected documentation, not source-code audits, benchmark reproduction, or local execution.
+This document screens **27 research papers and 26 public GitHub repositories** across generated interfaces, human-agent collaboration, retrieval, memory, authorization, transactions, and evaluation. The registers below link primary sources and explain their relevance. Most papers were screened through abstracts or author publication summaries; selected full-text sections were examined for the closest design questions. Repository review covered READMEs and selected documentation, not source-code audits, benchmark reproduction, or local execution.
 
 This is a focused architecture review, not an exhaustive systematic literature review. Some sources are peer-reviewed papers, others are preprints or workshop work. Vendor-authored memory benchmarks and simulated-human studies have limited transfer to Loom. Repository default branches and documentation can change; pin versions/commits when adopting code.
 
-Research motivates patterns; it does not prove that this architecture is secure, useful, or faster. Explicit choices such as PostgreSQL, a modular backend, and the initial role model are engineering decisions to validate through implementation and pilot evaluation.
+Research motivates patterns; it does not prove that this architecture is secure, useful, or faster. Explicit choices such as Exasol Personal, Next.js, a modular backend, and the initial role model are engineering decisions to validate through implementation and pilot evaluation.
 
 ## 2. Decisions the evidence changes
 
@@ -25,12 +25,12 @@ Research motivates patterns; it does not prove that this architecture is secure,
 | Retrieve scoped evidence rather than stuffing all history into a prompt | [RAG](https://arxiv.org/abs/2005.11401), [Lost in the Middle](https://arxiv.org/abs/2307.03172), [ALCE](https://arxiv.org/abs/2305.14627) | Assemble a small context with versioned source references. A citation can exist without supporting a recommendation; evaluate support separately. |
 | Give reusable knowledge a lifecycle and provenance | [MemGPT](https://arxiv.org/abs/2310.08560), [Zep](https://arxiv.org/abs/2501.13956), [LongMemEval](https://arxiv.org/abs/2410.10813) | Separate run context, case history, and approved guidance; retain temporal validity and sources. A reviewed rule is authoritative only within its approved scope. |
 | Keep action authorization outside the model | [AgentDojo](https://arxiv.org/abs/2406.13352), [InjecAgent](https://arxiv.org/abs/2403.02691), [CaMeL](https://arxiv.org/abs/2503.18813) | Treat retrieved instructions as untrusted content. Enforce allowed commands and approvals in code. Loom is not an implementation of CaMeL and inherits none of its formal guarantees. |
-| Use transactional records and version checks first | [Zanzibar](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/), [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf), [pg-boss](https://github.com/timgit/pg-boss) | Recheck current authority at commit; use short atomic local writes and durable notifications. Compensation becomes relevant for later external effects. |
+| Use transactional records and version checks first | [Zanzibar](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/), [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf), [Exasol transactions](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm) | Recheck current authority at commit; use short atomic local writes and durable notifications. Compensation becomes relevant for later external effects. |
 | Defer CRDTs and graph infrastructure | [replicated JSON](https://arxiv.org/abs/1608.03960), [local-first software](https://www.inkandswitch.com/essay/local-first/), [GraphRAG](https://arxiv.org/abs/2404.16130) | The MVP needs shared saved records, not offline merging or corpus-wide sensemaking. Revisit these technologies when measured requirements justify them. |
 
 ## 3. System invariants
 
-1. **The database is authoritative.** Chat history, browser state, model output, and Realtime messages are not the business record.
+1. **The database is authoritative.** Chat history, browser state, model output, and refresh notifications are not the business record.
 2. **Every operation has a workspace and actor.** Agent runs carry an initiating user, delegation scope, and selected record set. Background processing does not elevate that user's permissions.
 3. **Models propose; the command service commits.** The agent cannot approve its own proposals or bypass the action registry.
 4. **Approval binds exact content.** The server binds a review to immutable parameters, expected revisions, evidence dependencies, and a canonical hash.
@@ -45,29 +45,28 @@ Research motivates patterns; it does not prove that this architecture is secure,
 
 ```mermaid
 flowchart LR
-  User[Requester or teammate] --> Web[React workspace]
-  Web --> Auth[Supabase Auth]
-  Web -->|Verified bearer token| API[Fastify API]
-  API --> Services[Shared application services]
-  Services --> PG[(PostgreSQL and RLS)]
-  Services --> Storage[Private source storage]
-  PG --> Outbox[Transactional outbox]
-  Outbox --> Dispatcher[Outbox dispatcher]
-  Dispatcher --> Queue[pg-boss]
-  Queue --> Worker[TypeScript worker]
-  Worker --> Services
-  Worker --> Context[Authorized context assembly]
+  User[Requester or teammate persona] --> Web[Next.js React workspace]
+  Web -->|Authenticated same-origin requests| API[Next.js Node Route Handlers]
+  API --> Services[Scoped domain services]
+  Services --> Coordinator[Single-process write coordinator]
+  Coordinator --> DB[(Exasol Personal)]
+  Services -->|Authorized reads and named SQL| DB
+  Services --> Storage[Private local source staging]
+  API --> Runner[Bounded run advance request]
+  Runner --> Context[Authorized context and query evidence]
   Context --> Model[Configured model provider]
-  Model --> Validation[Output and evidence validation]
-  Validation --> Proposals[Persisted proposals]
-  Proposals --> PG
-  Dispatcher --> RT[Private Realtime channels]
-  RT -->|Invalidation and presence| Web
+  Model --> Validation[Validate evidence and proposed actions]
+  Validation --> Coordinator
+  DB -->|Authorized polling and refetch| API
 ```
 
-One codebase supplies the API, worker, and shared domain modules. They are separate process roles, not independent microservices. Expensive model calls and parsing happen in the worker. The API remains usable while a run is queued, fails, or awaits review.
+One self-hosted Next.js Node process serves pages and APIs. Server Components perform authorized initial reads; Client Components implement forms, tables, filters, and review. Route Handlers call framework-independent domain/repository modules. Keep Exasol and model credentials in server-only modules. A protected page does not authorize a separate endpoint; every handler rechecks access. Private responses and caches must never cross identities.
 
-The browser obtains identity through Auth, reads/writes domain data through the API, and receives non-authoritative notifications. The model never receives database credentials or general database access. The queue and outbox are internal infrastructure.
+Exasol is the sole canonical domain store and analytical engine. There is no required PostgreSQL/Supabase side store. A private local volume stages bounded uploads. The browser never connects to Exasol or receives its credentials.
+
+Agent runs use persisted Exasol checkpoints and bounded authenticated advance requests. Provider calls occur outside database transactions and the write coordinator. Disconnects/crashes leave resumable state; neither detached promises nor Next.js `after()` constitute a durable queue. A future unattended runner requires explicit scheduling/recovery and coordination design.
+
+The single write coordinator serializes all mutations, including membership/rule publication and run persistence. This is an intentionally small single-instance baseline, not a distributed lock. M0 must verify the production Next build shares it across routes. Replicas, serverless instances, and direct database writers are outside this contract. See [Next.js Node deployment](https://nextjs.org/docs/app/getting-started/deploying), [Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), and [`after()`](https://nextjs.org/docs/app/api-reference/functions/after).
 
 ## 5. Modules and contracts
 
@@ -79,40 +78,45 @@ The browser obtains identity through Auth, reads/writes domain data through the 
 | Knowledge | Sources, approved guidance, provenance, applicability, retrieval | Promote a correction into global policy without review. |
 | Agent runs | Context snapshots, bounded steps, validated suggestions | Commit business updates or impersonate an approver. |
 | Proposals and commands | Immutable proposals, review, concurrency, atomic writes | Trust a previous permission check after state changes. |
-| Activity and delivery | Audit events, outbox, queue work, invalidations | Claim browser delivery or an external effect occurred merely because it was enqueued. |
+| Activity and delivery | Audit events, outbox, persisted work, authorized refresh | Claim browser delivery or an external effect occurred merely because it was enqueued. |
 | Evaluation | Fixtures, state assertions, quality and cost comparisons | Use an LLM judge as the authorization mechanism. |
 
-Use shared input/output contracts and domain services from HTTP and worker entry points. Domain modules do not depend on React or model-provider-specific response objects.
+Use shared input/output contracts and domain services from Node Route Handlers and bounded run execution. Domain modules do not depend on React or model-provider-specific response objects.
 
 ## 6. Data model
 
-Use UUID identifiers, UTC timestamps, explicit foreign keys, and integer revisions. Keep request workflow fields relational; store approved optional/custom fields in JSONB validated against the published definition. Do not create arbitrary tenant-authored SQL tables in the MVP.
+Use application-generated UUIDs stored initially as `VARCHAR(36)`, exact numeric revisions, and explicitly tested UTC timestamps. Store workflow fields relationally and custom values/specifications as bounded canonical JSON text validated by Zod. Exasol JSON text is not PostgreSQL JSONB. Test empty-string/null behavior and exact numeric serialization. Do not create tenant-authored SQL tables.
+
+Use enabled primary/composite keys and verified foreign keys; unsupported UNIQUE/CHECK constraints must not appear in migrations. Enforce business predicates in domain code. Confirm invalid inserts fail against the actual installed release, not merely a mock. See [data types](https://docs.exasol.com/db/latest/sql_references/data_types/datatypedetails.htm) and [constraint differences](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm).
 
 | Entity | Important fields and relationships |
 | --- | --- |
 | `organizations` | Organization identity; not an automatic grant to all workspaces. |
 | `workspaces` | `organization_id`, name, notification revision, membership revision. |
-| `workspace_memberships` | Unique `(workspace_id, user_id)`, role, active status, revision. |
+| `workspace_memberships` | Enabled primary key `(workspace_id, user_id)`, role, active status, revision. |
 | `tools` | `workspace_id`, template family, current published revision pointer. |
 | `tool_revisions` | `tool_id`, immutable specification, version, state, parent revision, author, publication time. |
 | `requests` | `workspace_id`, `tool_id`, creator/requester, title, business question, owner, priority, due date, status, custom values, readiness findings, `version`. |
 | `request_revisions` | Before/after changes, actor, command ID, previous/new version; immutable history. |
 | `comments` | Parent request, author, body, visibility (`internal` or `requester_visible`), timestamps. |
 | `source_documents` / `source_revisions` | Workspace, uploader, private storage key, content hash, revision, visibility, deletion state. |
-| `source_chunks` | Parent source revision, location/span, extracted text, full-text index; optional rebuildable embedding. |
+| `source_chunks` | Parent source revision, location/span, canonical text and normalized searchable terms; embeddings deferred. |
 | `knowledge_items` / `knowledge_revisions` | Kind, content, owner, scope, status, effective interval, precedence metadata, version. |
 | `knowledge_evidence` | Knowledge revision to source revision/span or reviewed decision; derived visibility dependencies. |
 | `decision_records` | Parent request/proposal, outcome, human explanation, case-specific scope, actor. |
 | `agent_runs` / `agent_steps` | Initiator, selected record IDs, fixed budgets, tool/prompt/model versions, status, checkpoint, usage and timings. |
 | `proposals` / `proposal_items` | Immutable action inputs, target versions, evidence revisions, expiry, content hash, current lifecycle state. |
-| `approvals` / `action_executions` | Reviewer, proposal hash, approval time, execution result, unique idempotency key. |
+| `approvals` / `action_executions` | Reviewer, proposal hash, approval time, execution result, command ID referencing an enabled primary-key receipt. |
 | `audit_events` | Workspace, actor and delegated actor, action, resource, request/run/command IDs, revisions, outcome. |
 | `outbox_events` | Committed domain event, destination/scope, delivery state, retry information. |
+| `command_receipts` | Enabled `(workspace_id, command_id)` primary key, payload hash, result; atomic with domain writes. |
+| `work_items` | Run/step identity, expected revision, checkpoint, bounded retry state; no assumed distributed queue leasing. |
+| `query_evidence` | Named query/version, parameter digest, scoped source revisions, execution time, row count, bounded result reference. |
 | `import_batches` / `import_rows` | Source hash, column mapping, validated preview, row errors, commit key, resulting request IDs. |
 
 All tenant-owned tables include `workspace_id`. Composite foreign keys such as `(workspace_id, request_id)` prevent cross-workspace references even if application code supplies a valid ID from another workspace. Apply the same protection to source evidence, proposal targets, comments, owners, and tool references. An owner assignment must reference an eligible active member of the same workspace.
 
-Use indexes beginning with workspace identity for common queue filters, membership lookup, active guidance, source revisions, and request history. The small corpus can use exact nearest-neighbor search if semantic retrieval is adopted; approximate shared indexes require separate recall/isolation evaluation.
+Design scoped query predicates for queue filters, membership lookup, active guidance, source revisions, and history. Measure Exasol query plans and runtime before adding platform-specific tuning; do not copy PostgreSQL index DDL. Semantic retrieval is deferred.
 
 ## 7. Authorization and trust boundaries
 
@@ -134,21 +138,21 @@ Roles are workspace-scoped. Platform/database administrators are operational ide
 
 Requesters receive explicitly requester-visible comments and a safe subset of request fields. Internal reasoning, other requesters' records, internal comments, and internal evidence are excluded. Viewer access is intentionally broad read-only internal access; use it only for authorized internal colleagues.
 
-### 7.2 Database enforcement
+### 7.2 Identity and scoped data access
 
-The API verifies token signature, issuer, audience, expiry, and configured algorithm. It derives the actor from that identity, then queries current membership. JWT role claims and client-supplied user IDs cannot replace database authorization.
+The backend verifies signature, issuer, audience, expiry, and configured token algorithm, derives the actor, and queries current membership. Client-supplied user IDs and JWT role claims cannot replace current authorization. Local synthetic demo identities are explicitly isolated from production mode.
 
-Domain operations use a non-owner, non-`BYPASSRLS` `loom_app` connection. Start a transaction, set a transaction-local actor context from verified backend identity, and perform scoped queries with RLS. This context is trusted backend state, not a value accepted from a request body. Avoid session-scoped settings that leak actors through a pooled connection. Fail closed if context is absent.
+Every repository operation requires verified actor/workspace scope and binds values in reviewed SQL. Requester queries additionally constrain requester identity and project only permitted fields. Apply this to counts, joins, analytics, source text, proposal evidence, activity, and exports. Test forged IDs and cross-workspace references. There is no assumed PostgreSQL RLS, transaction-local actor setting, or Supabase policy enforcement.
 
-Migration, queue, application, and delivery roles are separate. The dispatcher uses a `loom_delivery` role with access only to reviewed outbox claim/acknowledgment and recipient-resolution functions; it cannot enumerate ordinary tenant records. Those functions inspect current recipient membership and return minimal event metadata. Browser `anon`/`authenticated` roles have no generic domain mutation privileges. Supabase service-role credentials must not be used for ordinary domain queries or agent context. RLS has explicit grants and default-deny policies; table owners and bypass roles need separate consideration. [PostgreSQL RLS](https://www.postgresql.org/docs/current/ddl-rowsecurity.html), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
+Exasol credentials remain server-side. Restrict database/schema privileges to the available deployment's required operations and separate migration access where supported. SQL privileges supplement application authorization; they do not automatically implement per-person workspace policy. Model output cannot choose SQL identifiers or acquire database credentials.
 
-Use non-recursive membership policies and narrowly defined membership-check helpers. Any security-definer helper must have a fixed safe search path, explicit grants, no dynamic SQL, and an independently tested access contract. Its existence must not open arbitrary cross-workspace reads.
+Personal is documented for individual use with a single-user restriction. Synthetic personas demonstrate the intended product roles; they do not establish permission for a real multi-user service. Verify applicable organizer/vendor terms and the appropriate edition before shared rollout. See [Personal](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm) and [GRANT](https://docs.exasol.com/db/latest/sql/grant.htm).
 
 ### 7.3 Delegation and revocation
 
-Workers rehydrate a server-created run, not a client-invented actor. Recheck active user and membership before retrieving content, persisting results, exposing outputs, or executing an approved command. A long-lived job does not rely on a stale browser token or cached role.
+Execution requests rehydrate a server-created run, not a client-invented actor. Recheck active user and membership before retrieving content, persisting results, exposing outputs, or executing an approved command. A long-lived job does not rely on a stale browser token or cached role.
 
-At commit, lock the relevant membership and dependency rows along with target records. Membership changes and knowledge publication use compatible locking so a revocation or rule change cannot race between the final check and commit. Lock multi-record targets in deterministic order and retry deadlocks within a bounded budget.
+All membership changes, knowledge publication, and record commands pass through the same single-process coordinator. Inside an exclusive Exasol transaction, reread authority, dependency revisions, and target versions before writing. Exasol uses serializable transactions with object-level locking and possible collision rollbacks; do not assume row locks or SELECT FOR UPDATE. Retry the entire idempotent transaction from a fresh snapshot within a bounded budget. Direct writers or multiple application processes invalidate this baseline and need a new concurrency design.
 
 Content already sent to a provider cannot be recalled after revocation. Minimize context, check access immediately before calls, cancel further work, and suppress later output when authority is lost. Storage access, API reads, context caches, and evidence displays recheck current permissions. Document provider data handling before using real pilot data.
 
@@ -190,7 +194,7 @@ Publication pipeline:
 
 MVP edits can change labels, visibility, fixed filter descriptors, and add optional fields. Adding a readiness requirement marks older requests as needing review without deleting them. Removing data-bearing fields, changing types, renaming stable keys, arbitrary new workflow states, and destructive migrations are deferred.
 
-Do not compile model-authored JSON Schemas with Fastify/Ajv. Fixed application schemas validate the finite descriptors; Loom's own validators implement the resulting field requirements. Fastify documents that validation/serialization compilation treats schemas as application code. [Fastify validation guidance](https://fastify.dev/docs/latest/Reference/Validation-and-Serialization/)
+Use fixed code-owned Zod contracts to validate finite generated descriptors. Loom's own validators implement supported field requirements. Never evaluate generated expressions, compile untrusted schemas into executable code, or treat a model-authored schema as an authorization policy.
 
 Restoring an older compatible tool definition creates a new publication revision. It does not roll back request records or external events.
 
@@ -249,12 +253,12 @@ Retiring/deleting a source removes it from retrieval and invalidates dependent g
 1. Resolve the workspace, current actor, authorized selected requests, current tool revision, and task intent.
 2. Fetch structured facts and exact identifiers through SQL.
 3. Filter knowledge by current visibility, approved status, applicable scope, effective date, and active source dependencies.
-4. Search the authorized candidate set using full-text search and exact glossary/routing keys.
+4. Search the authorized candidate set using bounded normalized-term lookup and exact glossary/routing keys in Exasol.
 5. If adopted after evaluation, fuse semantic candidates with lexical candidates and deduplicate by source revision.
 6. Assemble a bounded context with stable evidence IDs, timestamps, active guidance, and relevant case history clearly distinguished.
 7. Check access again before model submission and result delivery. Revalidate dependencies before any later command commit.
 
-Start without embeddings. If added, record model/dimension/index versions and keep indexes reconstructible. Use exact filtered search for a small corpus before approximate indexes. With approximate indexes, selective filtering can reduce recall; evaluate this using tenant-scoped fixtures rather than retrieving globally and filtering results in application memory. [pgvector filtering guidance](https://github.com/pgvector/pgvector#filtering)
+Start without embeddings or PostgreSQL full-text search. Evaluate normalized-term/key retrieval on the small authorized corpus. If paraphrase failures justify semantic search, choose an Exasol-compatible implementation only after a frozen recall/isolation comparison; pgvector is not an Exasol extension.
 
 Caches include workspace, actor visibility/membership revision, query intent, and source/knowledge versions. Requester and internal caches cannot be shared blindly. Invalidate cached derived content on source retirement or role change. For small MVP loads, prefer no shared semantic-result cache.
 
@@ -281,7 +285,7 @@ Allowed agent tools: read selected/authorized requests, read authorized comments
 
 The context envelope records selected record versions, tool revision, knowledge/evidence revisions, prompt version, model identifier, user intent, and bounded action scope. ReAct motivates interleaved retrieval and action selection, but Loom uses short inspectable steps rather than depending on or displaying hidden model reasoning. Persist tool calls, outputs, evidence, brief user-facing rationales, and usage; do not require private chain-of-thought.
 
-Persist checkpoints after successful expensive steps. On retry, reuse a completed step only if its inputs, permissions, and dependencies remain valid. Record partial failures per request; never manufacture a successful triage result for failed items. Once a draft proposal is exposed as pending review, it is immutable; a retried step cannot overwrite it.
+Persist checkpoints after successful expensive steps through the write coordinator. An authenticated advance endpoint executes bounded work and uses persisted step identity/revision to reject duplicate completion. Do not hold a database transaction during provider calls. On retry, reuse a completed step only if its inputs, permissions, and dependencies remain valid. Record partial failures per request; never manufacture a successful triage result for failed items. Once a draft proposal is exposed as pending review, it is immutable; a retried step cannot overwrite it.
 
 Initial limits are set in [PLAN.md](PLAN.md). Cancellation applies to queued/running runs, sets a persistent flag, attempts to abort the provider request, and blocks subsequent persistence/execution after rechecking the flag. Once a run has completed, users reject its pending proposals instead of changing the completed run to cancelled. Already completed approved commands remain committed and visible. Agent run cancellation does not undo historical changes.
 
@@ -306,14 +310,14 @@ Editing a suggestion creates a new immutable revision, supersedes the old one, a
 For local MVP actions, `approve` validates and executes within one short database transaction:
 
 1. Verify current reviewer identity and current owner/operator permission.
-2. Lock proposal, participating memberships, tool/knowledge dependency rows, and target records in stable order.
+2. Enter the shared write coordinator; exclusively own one connection with autocommit disabled. Reread proposal, memberships, dependencies, and targets in the transaction.
 3. Verify pending-review state, unexpired proposal, hash, selected scope, initiator delegation, and reviewer access to all action evidence/targets.
 4. Verify expected target versions, current published tool revision, current applicable rule/evidence revisions, and command preconditions.
-5. Claim/check the unique idempotency key. The same key with a different payload is a conflict.
+5. Check the enabled primary-key command receipt. The same command ID with a different payload is a conflict; a recorded matching result is replayed only after current access checks.
 6. Apply commands; atomically write request revisions, approval, execution result, audit events, and outbox entries.
-7. Mark proposal items applied and commit. Only then return success and deliver notifications.
+7. Persist proposal state and the command receipt, then commit. Only acknowledge success after commit; subsequent authorized reads see the saved result.
 
-All selected items in an MVP approval batch commit together or none do. A partial batch needs a separately reviewed selection. There are no external network calls inside this transaction.
+Verify conditional version updates report the expected affected-row count; do not assume PostgreSQL RETURNING semantics. On a transaction collision, roll back and retry the full command with fresh reads. On a lost commit acknowledgement, reconcile by command ID before retrying. All selected items in an MVP approval batch commit together or none do. A partial batch needs a separately reviewed selection. There are no external network calls inside this transaction.
 
 If stale, expired, denied, or invalid, no business records change. Return a clear reason with an authorized current-state view. Stale-state marking and attempted-review metadata may be recorded in a separate permitted transaction after the failed command transaction rolls back. A new suggestion must be reviewed again; never silently rebase an approved patch onto newer data.
 
@@ -321,7 +325,7 @@ If stale, expired, denied, or invalid, no business records change. Return a clea
 
 ```mermaid
 sequenceDiagram
-  participant A as Agent worker
+  participant A as Bounded agent run
   participant D as Database
   participant H as Reviewer
   participant C as Command service
@@ -331,7 +335,7 @@ sequenceDiagram
   C->>D: Read authorized proposal and evidence
   C-->>H: Exact review payload
   H->>C: Approve proposal hash and selected items
-  C->>D: Lock and validate identity, revisions, and idempotency
+  C->>D: Coordinate transaction and validate authority, revisions, receipt
   alt Record and rule still current
     C->>D: Commit update v8, approval, audit, outbox
     C-->>H: Applied
@@ -342,21 +346,17 @@ sequenceDiagram
 
 Undo is an explicit compensating local command with its own version and permission checks, not a time machine. If another person has edited the record, show the resulting conflict. Tool revision restoration and record compensation are distinct operations.
 
-## 13. Live collaboration and delivery
+## 13. Shared saved records and recovery
 
-Human/agent coordination uses server-committed saved records. An optimistic browser edit is visibly pending until the API acknowledges it. Record versions prevent silent overwrites; presence never locks a business record or grants permissions.
+Saved Exasol records are authoritative. Optimistic edits remain visibly pending until acknowledged; expected revisions prevent silent overwrites. Initially use authenticated polling/refetch after mutations, focus, reconnect, and a configurable interval. Recheck current membership and field visibility on every request, including metric counts and activity. Clear inaccessible client data after denied refresh and isolate query caches by identity/workspace.
 
-Outbox events commit with domain changes. A dispatcher idempotently enqueues work and publishes authorized invalidations. pg-boss claims jobs and retries transient failures. A crash between enqueue and marking delivery may enqueue duplicates; deterministic job/event IDs and application deduplication make repeated delivery safe. Do not claim exactly-once execution across network boundaries.
+Domain events, audit, command receipts, and outbox entries commit atomically. The outbox preserves delivery intent and supports later invalidation delivery; initial correctness does not depend on a notification dispatcher. Durable steps and work items support bounded request-driven run recovery without pg-boss. Duplicate advancement or command requests must reconcile persisted identities/results.
 
-Use private topics such as an internal-team workspace topic and requester-specific topics. Current membership policies authorize joining, receiving, and publishing presence. Only trusted backend publishers send authoritative invalidation messages. Requesters cannot receive internal activity or identifiers of other requesters' records. Prefer minimal resource/revision notifications and API refetch over full row payloads.
-
-Supabase authorizes private Broadcast/Presence through policies on `realtime.messages`; public-channel access must be disabled. Channel authorization can have cached/session behavior: reauthorize on token refresh, bound connection lifetime, and recheck all API fetches. A revoked session may still receive a non-sensitive invalidation until disconnected; do not promise instantaneous socket revocation. [Realtime authorization](https://supabase.com/docs/guides/realtime/authorization)
-
-Notifications can be duplicated, reordered, or lost. Refetch on reconnect/focus and after mutations. Use resource versions for deduplication and an authorized full refresh when continuity is uncertain. Do not use a sequence number as proof that every prior message arrived. Ephemeral presence can expire independently.
+Optional SSE or presence can follow the working baseline. Scope any stream using current access, use minimal non-sensitive invalidations, bound authorization lifetime, and refetch through authorized endpoints. Notifications may repeat, reorder, or disappear; they cannot authorize reads or replace record versions. No exactly-once network-delivery guarantee is claimed.
 
 ## 14. API surface
 
-All routes below are proposed and workspace-scoped. IDs are checked for ownership; request/response serializers apply field visibility.
+All routes below are proposed Next.js Node Route Handlers and workspace-scoped. Cookie-authenticated mutations require origin/CSRF checks; credentials never use NEXT_PUBLIC variables. IDs are checked for ownership; request/response serializers apply field visibility.
 
 | Operation | Proposed route | Key contract |
 | --- | --- | --- |
@@ -368,6 +368,8 @@ All routes below are proposed and workspace-scoped. IDs are checked for ownershi
 | Retrieve knowledge | `GET /api/workspaces/:w/knowledge/search` | Internal access; approved/applicable results and permitted evidence. |
 | Publish guidance | `POST /api/workspaces/:w/knowledge/:k/publish` | Owner; expected version, sources, scope, precedence. |
 | Start/read/cancel agent run | `POST/GET /api/workspaces/:w/runs`, `POST .../runs/:id/cancel` | Role and run ownership; fixed selected scope and budget. |
+| Advance persisted run | `POST /api/workspaces/:w/runs/:id/advance` | Current authorization, bounded step budget, expected checkpoint revision. |
+| Read analytical evidence | `GET /api/workspaces/:w/analytics/:queryId` | Code-owned named query, validated bound filters, scoped result and evidence. |
 | Review proposal | `GET /api/workspaces/:w/proposals/:p` | Current target/evidence visibility. |
 | Approve or reject | `POST /api/workspaces/:w/proposals/:p/approve`, `POST .../reject` | Exact hash/selection, expected proposal revision, reviewer and command checks. |
 | Read activity | `GET /api/workspaces/:w/activity` | Internal history or separately filtered own-request activity. |
@@ -384,7 +386,7 @@ Use `401` for invalid identity, `403` for denied capabilities, `404` for unknown
 | Record/tool/rule changes during review | Reject stale execution, show a permitted current view, and require fresh review. |
 | Membership revoked during a run | Stop later retrieval/delivery; block command commit; retain access-restricted audit metadata. |
 | API response lost after commit | Same idempotency key returns the recorded execution result after authorization. |
-| Worker crashes | Resume from durable job/run state; reuse only valid checkpoints; deduplicate effects. |
+| Server/request execution interrupted | Resume through a new authenticated advance request from persisted state; reuse only valid checkpoints; reject duplicate completion. |
 | Notification missed | Authorized refresh on reconnect/focus/next operation restores current state. |
 | Import fails mid-processing | Keep preview/error state; commit an approved bounded batch atomically; retry cannot duplicate committed rows. |
 | Run cancelled/timed out | Persist terminal state and partial item outcomes; block subsequent proposed/apply work for that cancelled run. |
@@ -403,24 +405,24 @@ Required integration scenarios include two-workspace isolation; own-request rest
 
 Correlate API request, workspace, run, step, proposal, command, and outbox IDs. Track queue age, retries, validation failures, blocked/stale proposals, review time, provider usage, and completed work. Keep credentials and full private content out of ordinary logs; observability exports require the same data-handling review as any other third-party service.
 
-Deploy web assets, API, and worker separately from one build. Use connection limits, health/readiness checks, worker drain on shutdown, explicit migration jobs, backups with a restore rehearsal, and separate development/pilot environments. Database audits are append-only to ordinary product roles, not cryptographically immutable against database administrators. Retention and deletion must cover uploaded sources, derived chunks, cached context, and provider/log copies where applicable.
+Deploy one self-hosted Next.js Node process alongside local Exasol Personal for the synthetic event demo. Verify connection limits, TLS trust, health/readiness, graceful shutdown, explicit migrations, and backup/restore. No installation or deployment has been performed during this documentation revision. Keep any future licensed shared environment separate. Database audits are append-only to ordinary product roles, not cryptographically immutable against database administrators. Retention and deletion must cover uploaded sources, derived chunks, cached context, and provider/log copies where applicable.
 
 ## 17. Architecture decisions and expansion triggers
 
 | ID | Decision | Revisit trigger |
 | --- | --- | --- |
-| ADR-001 | Modular TypeScript backend with shared command services | Independently scaling or specialized workloads appear in measurements. |
+| ADR-001 | Next.js App Router, Node handlers, modular TypeScript domain services | Independently scaling or specialized workloads appear in measurements. |
 | ADR-002 | Loom-owned persistent `ToolSpec`; fixed renderer catalog | M0 adapter evaluation or real workflow requirements demand a wider protocol. |
-| ADR-003 | PostgreSQL, relational workflow fields, JSONB extensions | Data volume or validated schemas exceed measured query/validation limits. |
-| ADR-004 | Workspace roles and own-request rules with RLS | Nested sharing relationships justify OpenFGA or equivalent. |
+| ADR-003 | Exasol Personal as sole canonical domain store and analytical engine; validated JSON text | Real SQL/driver tests or measured write contention require reconsideration without weakening event requirements. |
+| ADR-004 | Explicit server/repository workspace and own-request predicates | Nested sharing relationships justify OpenFGA or equivalent. |
 | ADR-005 | Review-bound proposals, version checks, atomic local execution | External actions require per-connector authorization and reconciliation. |
 | ADR-006 | Approved scoped guidance distinct from case history | A real workflow requires a richer authority/temporal model. |
 | ADR-007 | Structured/lexical retrieval first | Frozen evaluation demonstrates semantic retrieval adds material value. |
-| ADR-008 | PostgreSQL outbox and pg-boss | Queue isolation/throughput or long-lived workflows justify another system. |
+| ADR-008 | Exasol receipts/outbox/checkpoints and one process-wide mutation coordinator | Multiple writers, unattended jobs, or replicas require a new scheduling/concurrency contract. |
 | ADR-009 | Saved-record collaboration without CRDT | Offline writes or character-level simultaneous editing become necessary. |
 | ADR-010 | One bounded agent, no autonomous agent team | Measured tasks require independent specialist execution beyond the current runner. |
 
-External connectors, scheduled autonomous work, PDF/Office parsing, graph memory, SSO, and multi-workspace sharing need explicit future design. A growing bibliography is not a reason to add all referenced technologies.
+External connectors, scheduled autonomous work, PDF/Office parsing, graph memory, expanded SSO, and multi-workspace sharing need explicit future design. A growing bibliography is not a reason to add all referenced technologies.
 
 ## 18. Research paper register
 
@@ -474,11 +476,11 @@ Status means a proposed relationship to Loom: **Adopt** = intended dependency/se
 | R10 | [getzep/graphiti](https://github.com/getzep/graphiti), README | Defer | Temporal facts, episode provenance, and hybrid graph retrieval. Additional graph operations/backends require a validated need. |
 | R11 | [letta-ai/letta-code](https://github.com/letta-ai/letta-code), README and legacy Letta pointer | Reference | Stateful harness and persistent memory. The old Letta repo points to this active source; do not assume the retired V1 server is the current API. |
 | R12 | [microsoft/graphrag](https://github.com/microsoft/graphrag), README | Reference | Graph extraction and community summaries. README reports maintenance mode; not selected as a new MVP dependency. |
-| R13 | [supabase/supabase](https://github.com/supabase/supabase), README and Auth/RLS/Realtime docs | Adopt | PostgreSQL platform, identity, storage, and channels. Service credentials and ownership bypass need explicit isolation. |
-| R14 | [pgvector/pgvector](https://github.com/pgvector/pgvector), README/filtering docs | Defer | SQL vector search. Add only after retrieval evaluation; test filtered recall and tenant isolation. |
-| R15 | [timgit/pg-boss](https://github.com/timgit/pg-boss), README | Adopt | PostgreSQL queues, retries, and transactional integration. Domain idempotency/outbox behavior still belongs to Loom. |
-| R16 | [drizzle-team/drizzle-orm](https://github.com/drizzle-team/drizzle-orm), README/transaction docs | Adopt | Typed SQL and transaction access. Review custom RLS and migration SQL separately. |
-| R17 | [fastify/fastify](https://github.com/fastify/fastify), README/validation docs | Adopt | API plugin boundaries and fixed schema validation. Do not compile untrusted generated schemas; pick a supported release rather than default-branch APIs. |
+| R13 | [supabase/supabase](https://github.com/supabase/supabase), README and Auth/RLS/Realtime docs | Reference; superseded | Earlier bundled-platform choice; not part of the Exasol baseline. |
+| R14 | [pgvector/pgvector](https://github.com/pgvector/pgvector), README/filtering docs | Reference | Filtered retrieval caveats; PostgreSQL extension cannot be installed into Exasol. |
+| R15 | [timgit/pg-boss](https://github.com/timgit/pg-boss), README | Reference; superseded | Durable-job/idempotency patterns; PostgreSQL runtime dependency removed. |
+| R16 | [drizzle-team/drizzle-orm](https://github.com/drizzle-team/drizzle-orm), README/transaction docs | Reference; superseded | Typed repository patterns; no assumed Exasol dialect. |
+| R17 | [fastify/fastify](https://github.com/fastify/fastify), README/validation docs | Reference; superseded | Fixed-schema/API boundaries; Next.js handles the initial server endpoints. |
 | R18 | [vercel/ai](https://github.com/vercel/ai), package README/structured-data docs | Adopt | Provider adapters, tool calls, structured generation. Validate outputs and enforce permissions outside the SDK. |
 | R19 | [yjs/yjs](https://github.com/yjs/yjs), README | Defer | Shared types and collaborative text. Not needed for saved-record synchronization. |
 | R20 | [automerge/automerge](https://github.com/automerge/automerge), README | Defer | Replicated documents and sync. Offline merging is a different contract from approved business transactions. |
@@ -486,14 +488,31 @@ Status means a proposed relationship to Loom: **Adopt** = intended dependency/se
 | R22 | [temporalio/temporal](https://github.com/temporalio/temporal), README | Defer | Durable workflows and retries. Extra infrastructure is not justified for bounded local proposal generation. |
 | R23 | [promptfoo/promptfoo](https://github.com/promptfoo/promptfoo), README | Adopt | Model/prompt comparisons and adversarial evaluation. Judge scores supplement final-state assertions. |
 
+| R24 | [exasol/exasol-personal](https://github.com/exasol/exasol-personal), repository overview and linked setup docs | Adopt | Official Personal launcher; verify current Linux/Podman setup, hardware, version, and edition terms. |
+| R25 | [exasol/exasol-driver-ts](https://github.com/exasol/exasol-driver-ts), README and driver user guide | Adopt | Server-only TypeScript adapter, prepared bindings, explicit connection transactions, TLS. Must pass M0 against actual installed Exasol. |
+| R26 | [exasol/pyexasol](https://github.com/exasol/pyexasol), README | Defer | Python fallback only if a documented TypeScript compatibility blocker warrants a second runtime. |
+
 ## 20. Primary implementation documentation
 
-- [PostgreSQL row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html): grants, owners/bypass behavior, and policy semantics.
-- [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security): platform roles and row policies.
-- [Supabase JWTs](https://supabase.com/docs/guides/auth/jwts): signing/verification configuration.
-- [Supabase Realtime authorization](https://supabase.com/docs/guides/realtime/authorization) and [Broadcast](https://supabase.com/docs/guides/realtime/broadcast): private topics and message transport.
-- [Fastify validation](https://fastify.dev/docs/latest/Reference/Validation-and-Serialization/): fixed trusted schemas and validation/serialization behavior.
-- [Drizzle transactions](https://orm.drizzle.team/docs/transactions): transaction and savepoint APIs.
+- [ExaThon India 2026](https://www.exasol.com/events/exathon-india-2026/): exact event requirements summarized in README.
+- [Exasol Personal](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm) and [developer hub](https://www.exasol.com/developers/): current setup/edition guidance. Prefer these over outdated general-index platform wording.
+- [TypeScript driver user guide](https://github.com/exasol/exasol-driver-ts/blob/main/doc/user_guide/user_guide.md): prepared bindings, Node WebSocket factory, pools, and transaction configuration. A sequence of pool queries is not automatically one transaction.
+- [Transactions](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm): serializable isolation, object locks, collision rollback, and default autocommit.
+- [Data types](https://docs.exasol.com/db/latest/sql_references/data_types/datatypedetails.htm), [constraints](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm), and [GRANT](https://docs.exasol.com/db/latest/sql/grant.htm): verify platform differences rather than porting PostgreSQL assumptions.
+- [IMPORT](https://docs.exasol.com/db/latest/sql/import.htm), [MERGE](https://docs.exasol.com/db/latest/sql/merge.htm), and [analytic functions](https://docs.exasol.com/db/latest/sql_references/functions/analyticfunctions.htm): staging, deterministic source matching, and event/window analytics.
+- [Next.js Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), [deployment](https://nextjs.org/docs/app/getting-started/deploying), and [after](https://nextjs.org/docs/app/api-reference/functions/after): application/server boundaries and background execution limits.
 - [AI SDK structured generation](https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data): provider integration; semantic/action validation remains Loom's responsibility.
 
-Before implementation, verify exact package versions, hosted-service constraints, credentials, and licenses against these primary sources. Update the decision register when a technical spike changes the selected approach.
+Before implementation resumes, pin compatible versions, verify actual SQL/driver behavior, and record tested setup. Research findings above are not completed technical spikes.
+
+## 21. Exasol analytical pipeline and evidence contract
+
+1. Stage a bounded synthetic CSV, retain its hash/mapping, and validate rows. Import ordering is not a business identity; use explicit stable source IDs. Normalize values and deduplicate before a deterministic MERGE or reviewed insert transaction. A MERGE statement alone does not guarantee end-to-end command idempotency.
+2. Store requests and append status transitions atomically with commands. Derive current queue age, due-date/SLA risk, owner workload, and time per status through reviewed SQL. Use event ordering with an explicit tie-breaker and window functions such as LEAD for status intervals; define reopen/cancel/null behavior in fixtures.
+3. Keep SQL in a code-owned registry with query IDs, versions, allowed filters, authorization requirements, and bounded outputs. Models may request known query intents and validated filters; they cannot author arbitrary SQL or identifiers.
+4. Return query ID/version, scoped parameters digest, relevant source IDs/revisions, query time, row count, and bounded metrics/evidence. A changing dataset can invalidate a snapshot; recommendations still check target and rule versions at commit.
+5. Present simple cards/tables and evidence to the operator and agent. Distinguish observed queue patterns from hypotheses about causes. Explain deterministic duplicate candidates as candidates, not proven duplicate intent.
+
+Verify analytical output against hand-calculated synthetic fixtures and repeat from clean setup. Record measured latency on declared hardware without asserting Exasol performance from marketing or unrelated benchmarks. Exasol must power actual canonical data and insights; removing it should break the real workflow rather than only remove an optional chart.
+
+The single-process coordinator and small write batches are deliberate responses to this analytical database's transaction model. If M0 reveals unacceptable contention or incompatible key/driver behavior, document that result and revise the design before building on it. Do not silently replace Exasol with a mocked or PostgreSQL-backed runtime.

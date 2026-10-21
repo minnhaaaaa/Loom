@@ -1,12 +1,12 @@
 # Loom implementation plan
 
-Status: proposed; implementation has not started. Updated: 2026-10-21.
+Status: revised for Exasol Personal and Next.js; implementation remains paused. Updated: 2026-10-21.
 
 ## Objective
 
 Deliver a working data-request desk that a team lead can describe, refine, and share. Requesters submit and track their own requests. Operators and an agent triage the same queue using approved procedures. Authorized people review exact proposed changes before execution.
 
-The user has accepted coordination pain as a promising problem. This is product direction, not evidence of willingness to pay or measured time savings. Validate those with real users while implementing.
+The user has accepted coordination pain as a promising problem. This is product direction, not evidence of willingness to pay or measured time savings. Validate those through user exercises with synthetic data; the event submission excludes employer/proprietary data.
 
 Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.md](ARCHITECTURE.md) together. Milestones are ordered by dependencies, not calendar promises. Every checkbox below represents future work.
 
@@ -20,39 +20,52 @@ Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.m
 - Make a proposal approval authorize only the immutable changes displayed.
 - A milestone is complete only when its acceptance criteria have been demonstrated.
 
-## M0 — Contracts, fixtures, and thin technical spike
+## M0 — Exasol compatibility and Next.js foundation
 
-Dependencies: none.
+Dependencies: documentation revision complete; application implementation resumes only after the requested pause ends.
 
-- [ ] Set up pnpm workspaces, TypeScript, formatting, linting, and a supported Node runtime.
-- [ ] Create React/Vite web, Fastify API, and a minimal worker entry point.
-- [ ] Confirm supported package versions, licenses, database connection roles, and migration ownership.
-- [ ] Define shared `ToolSpec`, action, proposal, event, and API error schemas.
-- [ ] Define the role matrix: owner, operator, requester, viewer.
-- [ ] Seed two organizations/workspaces and separate role identities with synthetic data.
-- [ ] Create a fixed data-request template and validate/render it without an LLM.
-- [ ] Evaluate json-render against the small catalog; record adapter adoption or rejection.
-- [ ] Verify pg-boss queue/schema privileges and outbox delivery with one harmless job.
-- [ ] Verify private Realtime channel authorization and the restricted database role in the intended Supabase environment.
+- [ ] Verify the current local Personal starter kit on Linux/Podman, edition terms, hardware needs, and actual database/launcher versions. Do not provision cloud resources by default.
+- [ ] Test the official TypeScript driver with supported Node LTS, TLS trust/hostname checks, prepared value bindings, explicit transactions, rollback, affected-row reporting, and connection cleanup.
+- [ ] Test exact numeric/UTC/JSON-text mappings and empty-string/null behavior against the real database.
+- [ ] Prove enabled primary/composite keys reject invalid inserts; do not assume UNIQUE/CHECK, JSONB, RLS, row locks, or PostgreSQL queue syntax.
+- [ ] Verify command receipt replay, rollback after a partial command, collision retry, and reconciliation after an ambiguous commit response.
+- [ ] Set up pnpm, TypeScript, Next.js App Router, and Node Route Handlers with server-only Exasol access. Keep the UI basic and easy to redesign.
+- [ ] Prove distinct mutation routes share one process-wide coordinator in the production Node build. No replicas or serverless deployment in this baseline.
+- [ ] Define ToolSpec, action/proposal/event/error contracts and the owner/operator/requester/viewer matrix.
+- [ ] Seed two workspaces and synthetic role identities. Verify API and repository isolation, including direct forged requests.
+- [ ] Render a fixed request template without an LLM; evaluate json-render only as a thin optional adapter.
+- [ ] Persist one bounded run/checkpoint and resume it after a server restart through an authenticated advance request.
 
-Acceptance: a static specification renders; a valid identity can call one scoped API endpoint; another workspace's identity cannot read it; a job survives worker restart. Resolve auth/database role compatibility before building additional features.
+Acceptance: a real Exasol connection passes transaction, key, identity-isolation, and concurrent-route checks; a static tool renders in Next.js; persisted state survives restart. Record tested versions and limitations. Mock-only success does not satisfy this milestone. If the TypeScript driver blocks progress, record the failing contract before evaluating PyExasol as a narrow fallback.
 
 ## M1 — Usable request desk without AI
 
 Dependencies: M0.
 
 - [ ] Implement workspace membership and current-permission checks.
-- [ ] Create request, comment, revision, activity, and audit tables with composite workspace constraints.
+- [ ] Create request, comment, revision, activity, and audit tables with enabled composite workspace keys verified on Exasol.
 - [ ] Implement request creation, own-request listing, team queue listing, details, comments, and controlled updates.
 - [ ] Render intake form, table, details, filters, and summary cards from `ToolSpec`.
 - [ ] Support statuses `new`, `needs_info`, `ready`, `in_progress`, `done`, and `cancelled`.
 - [ ] Separate hard intake requirements from readiness requirements; imported historical records may be incomplete and must be marked accordingly.
 - [ ] Implement owner and due-date controls, pagination, and requester-visible status.
 - [ ] Implement CSV column mapping, bounded upload parsing, validation preview, explicit import commit, and authorized export.
-- [ ] Add compare-and-swap record versions and database idempotency keys for mutations.
+- [ ] Add compare-and-swap record versions and Exasol-backed command receipts with enabled primary keys for mutations.
 - [ ] Write audit and outbox events in the same transaction as successful changes.
 
 Acceptance: a requester submits a record; an operator clarifies, assigns, and completes it; the requester sees their own progress. A requester cannot change owner, priority, or status through a forged API call. A viewer cannot mutate. Invalid transitions and stale versions fail without partial writes. Duplicate import submission does not create duplicate rows.
+
+## M1b — Exasol insights and evidence
+
+Dependencies: M1; required before the agent demo.
+
+- [ ] Import synthetic backlog rows into bounded staging, validate mappings, deduplicate source identities, and commit reviewed rows.
+- [ ] Implement reviewed named SQL queries for queue age, SLA risk, owner workload, missing requirements, and normalized duplicate candidates.
+- [ ] Derive status durations from request events using Exasol window functions; define reopened requests, null owners, cancelled work, and UTC boundaries.
+- [ ] Compare real SQL results with hand-calculated fixture outputs. Record query ID, input digest, scope, data revisions, row count, timing, and source record references.
+- [ ] Render simple summary cards/table results and expose the same authorized query evidence to the agent. Never execute model-authored SQL.
+
+Acceptance: changing imported or persisted requests changes verified SQL metrics; another workspace and requester-only identity cannot access internal aggregates. Demonstrate Exasol doing the actual data work, without claiming causal explanations or unmeasured performance gains.
 
 ## M2 — Describe, refine, and publish the tool
 
@@ -70,19 +83,17 @@ Dependencies: M1.
 
 Acceptance: an owner describes a desk and gets a working draft; a follow-up adds an optional field without losing records. A required-field change shows its impact on existing requests. Unknown components or generated expressions never execute. Concurrent publication produces a clear conflict. The second template does not require a separate app implementation.
 
-## M3 — Shared workspace and activity
+## M3 — Shared saved records and activity
 
 Dependencies: M1; can proceed before M2 is complete.
 
-- [ ] Publish idempotent invalidations after outbox events commit.
-- [ ] Authorize internal-team channels separately from requester-owned channels.
-- [ ] Refetch through the API after notifications, reconnect, and tab focus.
-- [ ] Detect event gaps/out-of-order delivery using versions; perform a full authorized refresh when needed.
-- [ ] Add minimal presence, authorized activity, and record comments.
-- [ ] Show conflict resolution controls that retain the user's unsaved input.
-- [ ] Handle permission revocation: deny subsequent API access and clear local data on denied refresh; bound subscription lifetime and reauthorize channels.
+- [ ] Use authenticated polling/refetch after mutations, tab focus, reconnect, and a modest configurable interval.
+- [ ] Apply current role/own-request scope to every read, including activity, counts, exports, and query results.
+- [ ] Retain unsaved input on version conflict and show the authorized current state.
+- [ ] Clear inaccessible local data when a refresh is denied; isolate caches by identity and workspace.
+- [ ] Keep transactional outbox events for durable change history; SSE/presence are optional extensions after core correctness.
 
-Acceptance: two authenticated browser contexts see saved updates. Simultaneous edits cannot silently overwrite each other. Missing notifications do not leave the queue permanently stale. Requesters never subscribe to internal queue channels or receive other requesters' record identifiers.
+Acceptance: two synthetic browser personas see acknowledged saved updates, simultaneous edits do not silently overwrite, and revocation denies subsequent fetches. Requesters never receive internal activity or other requesters' identifiers.
 
 ## M4 — Approved team knowledge
 
@@ -93,10 +104,10 @@ Dependencies: M1.
 - [ ] Implement knowledge states: draft, approved, superseded, retired; preserve case-specific exceptions separately.
 - [ ] Require an owner to publish reusable procedures or rules.
 - [ ] Add searchable active approved knowledge with explicit applicability and effective dates.
-- [ ] Implement SQL full-text retrieval and exact-key lookup with access filtering before retrieval results reach the model.
+- [ ] Implement bounded normalized-term retrieval and exact-key lookup in Exasol with access filtering before retrieval results reach the model.
 - [ ] Support source inspection and permission-checked evidence links.
 - [ ] Mark conflicting approved rules as requiring clarification rather than silently choosing one.
-- [ ] Evaluate pgvector only if the baseline fails paraphrase retrieval; compare against the frozen lexical baseline before adoption.
+- [ ] Defer semantic retrieval; if the lexical baseline fails, evaluate an Exasol-compatible approach against frozen authorized fixtures before choosing additional infrastructure.
 
 Acceptance: an active approved routing rule is retrieved; a draft or retired rule is not treated as authority. A requester cannot retrieve internal procedures. Updating or revoking a source invalidates dependent reusable knowledge and pending proposals. Search failure is distinguishable from a legitimate no-match result.
 
@@ -105,7 +116,7 @@ Acceptance: an active approved routing rule is retrieved; a draft or retired rul
 Dependencies: M1 and M4; tool-aware interface depends on M2.
 
 - [ ] Start a run with an authenticated initiator, selected record IDs, published spec revision, budgets, and idempotency key.
-- [ ] Recheck access in the worker before each retrieval, persisted result, and proposed action.
+- [ ] Recheck access in each bounded execution request before each retrieval, persisted result, and proposed action.
 - [ ] Support summarization, missing-field identification, owner suggestions, duplicate candidates, and clarification drafts.
 - [ ] Restrict the agent to known read/propose tools; keep business mutation and approval tools unavailable to it.
 - [ ] Persist run steps and validated outputs; checkpoint after each completed expensive call.
@@ -116,7 +127,7 @@ Dependencies: M1 and M4; tool-aware interface depends on M2.
 - [ ] Implement cancel, timeout, budget exhaustion, retry exhaustion, and stale-proposal behavior.
 - [ ] Revalidate inside the write transaction and append audit/outbox records on commit.
 
-Acceptance: agent-assisted triage completes on a selected batch. No request is modified before an authorized approval. Editing a proposal invalidates the previous approval. Changed records, rules, tool revisions, or permissions block stale execution. A duplicate approval or retried job produces one domain effect. Worker restart and cancellation do not cause an unapproved write.
+Acceptance: agent-assisted triage completes on a selected batch. No request is modified before an authorized approval. Editing a proposal invalidates the previous approval. Changed records, rules, tool revisions, or permissions block stale execution. A duplicate approval or retried job produces one domain effect. Server restart, request interruption, and cancellation do not cause an unapproved write.
 
 ## M6 — Reviewed decision reuse
 
@@ -131,20 +142,20 @@ Dependencies: M4 and M5.
 
 Acceptance: a correction remains an exception until reviewed. Once approved as guidance, it influences an applicable later request. It does not influence unrelated requests or a user who lacks access. Retiring it removes it from future authoritative context and prevents pending dependent changes from being applied.
 
-## M7 — Evaluation, pilot readiness, and demo
+## M7 — Evaluation and reproducible event submission
 
 Dependencies: M1–M6.
 
 - [ ] Freeze evaluation fixtures, prompts, models, specification versions, and knowledge revisions.
-- [ ] Complete permission, concurrency, idempotency, source-injection, and worker recovery integration checks.
+- [ ] Complete permission, concurrency, idempotency, source-injection, and persisted-step recovery integration checks.
 - [ ] Run the complete two-user journey in Playwright.
 - [ ] Compare the manual desk with the agent-assisted desk on equivalent tasks.
-- [ ] Run a small pilot with consenting team members using their chosen workflow and permitted data.
+- [ ] Run usability exercises with consenting participants using synthetic request scenarios. Keep future real-team pilots separate from this submission.
 - [ ] Record actual setup effort, completion quality, review time, latency, token usage, and repeat usage.
-- [ ] Verify backups/restoration, migration rehearsal, private storage/channel settings, error monitoring, and deployment secrets.
-- [ ] Publish a demo environment with synthetic data and a reset procedure.
+- [ ] Verify backups/restoration, migration rehearsal, private storage and identity/cache settings, error monitoring, and deployment secrets.
+- [ ] Prepare a local synthetic-data demo and reset procedure; public hosting is optional and requires an appropriate edition/deployment design.
 
-Acceptance: all correctness gates pass, material limitations are documented, and the demonstration runs from fresh state. Pilot metrics are reported separately from synthetic evaluations.
+Acceptance: all correctness gates pass, actual Exasol SQL outputs are reproducible, material limitations are documented, and the demonstration runs from fresh state. Pilot metrics are reported separately from synthetic evaluations.
 
 ## Evaluation fixtures and proposed gates
 
@@ -156,7 +167,7 @@ All thresholds below are proposed release targets, not achieved results. Revise 
 
 | Dimension | Initial gate | How to assess |
 | --- | --- | --- |
-| Authorization | Zero unauthorized reads/writes in the defined isolation suite | Assert API responses, context inputs, channel routing, storage access, and database state. |
+| Authorization | Zero unauthorized reads/writes in the defined isolation suite | Assert API responses, context inputs, query scope, storage access, and database state. |
 | Change integrity | Every stale or tampered approval rejected; every committed action audited | Concurrent transactions, proposal-edit tests, retry/replay tests. |
 | Request intake | Required intake checks deterministic and consistent | Schema and end-to-end fixture assertions; no model judge needed. |
 | Tool generation | At least 95% of supported prompts produce valid drafts within the configured attempt budget | Fixed supported prompt set; separately report semantic suitability. |
@@ -173,14 +184,14 @@ Model judges can help assess phrasing and support, but cannot authorize actions 
 
 ## Resource limits to implement first
 
-Initial tunable limits: CSV up to 5 MiB and 5,000 rows; text/Markdown source up to 1 MiB; agent triage up to 20 selected records; at most eight model/tool steps, two transient retries per step, and a 120-second total run deadline. Define provider token/spend budgets in configuration before live runs. These are engineering starting points requiring measurement.
+Initial tunable limits: CSV up to 5 MiB and 5,000 rows; text/Markdown source up to 1 MiB; agent triage up to 20 selected records; at most eight model/tool steps, two transient retries per step, and a 120-second active execution budget across bounded requests. Define provider token/spend budgets in configuration before live runs. These are engineering starting points requiring measurement.
 
 Stream or process files with bounded memory. Export untrusted spreadsheet cells with formula-injection protection. Treat linked URLs as text; remote fetching and PDF/Office parsing are deferred to a separately designed ingestion step.
 
 ## Demo script
 
 1. An owner describes a data-request desk and publishes the validated draft.
-2. Import a synthetic CSV with known missing fields and repeated requests.
+2. Import a synthetic CSV with known missing fields and repeated requests; inspect Exasol-derived queue age, owner workload, SLA risk, and query evidence.
 3. A requester submits a request and sees only their own records.
 4. An operator opens the shared queue in a second browser and changes an owner.
 5. Ask the agent to triage selected requests using an approved procedure.
@@ -190,6 +201,18 @@ Stream or process files with bounded memory. Export untrusted spreadsheet cells 
 9. Submit a new applicable request; show grounded reuse and the audit trail.
 
 The demo should include a visible rejected/stale proposal. It should use genuine persisted state and a synthetic dataset, not simulated success messages.
+
+## Submission checklist
+
+Follow the exact [event requirements](https://www.exasol.com/events/exathon-india-2026/) summarized in [README.md](README.md).
+
+- [ ] Public repository with existing Apache-2.0 license and no credentials/proprietary data.
+- [ ] Problem statement identifies the data-team coordination problem and Track 04.
+- [ ] README setup/usage, tested Exasol/Node/driver versions, environment example, migrations, seed/reset, and deployment/run instructions.
+- [ ] Slide deck and a demo video within the published limit; show real Exasol query results and a reviewed change.
+- [ ] Fresh-clone rehearsal, limitations, actual evaluation results, and clear distinction between implemented and planned features.
+
+Given the published deadline, prioritize M0, M1, M1b, and one evidence-backed proposal/review path before optional presence, semantic search, or broader template polish. Do not present unfinished milestones as shipped.
 
 ## After the MVP
 
@@ -201,7 +224,7 @@ Do not add a graph database, autonomous agent team, offline editing, arbitrary c
 
 | Decision/risk | Default | Evidence that changes it |
 | --- | --- | --- |
-| Which team to pilot with | Internal analytics/data operations | Interviews and access to a consenting pilot team. |
+| Event data and users | Synthetic analytics scenarios and consenting testers | Real-team pilots require separate data permission and applicable edition terms. |
 | Agent provider/model | One provider selected with fixtures | Grounded task quality, latency, price, and permitted data handling. |
 | Renderer adapter | Loom-owned schema, thin catalog renderer | M0 spike proves json-render fits without obscuring domain contracts. |
 | Semantic retrieval | Lexical/structured retrieval first | Measured retrieval failures and a passing hybrid-search comparison. |
