@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { openConnection, schemaName } from "@loom/db-exasol";
+import { DatabaseError, openConnection, schemaName } from "@loom/db-exasol";
 const connection = await openConnection(false);
 try {
   const schema = schemaName();
@@ -37,7 +37,13 @@ try {
   }
 } catch (error) {
   await connection.rollback().catch(() => undefined);
-  console.error(error instanceof Error ? error.message : "Migration failed.");
+  console.error(
+    error instanceof DatabaseError
+      ? `Migration SQL ${error.sqlCode}: ${error.sqlDetail || error.message}`
+      : error instanceof Error
+        ? error.message
+        : "Migration failed.",
+  );
   process.exitCode = 1;
 } finally {
   await connection.close();

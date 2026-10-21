@@ -155,7 +155,7 @@ export async function details(actor: Actor, id: string) {
       [actor.workspaceId, id],
     );
     const activity = await sql.query(
-      "SELECT A.ID,A.ACTION,A.VERSION,A.CREATED_AT,M.NAME FROM AUDIT_EVENTS A JOIN MEMBERSHIPS M ON M.WORKSPACE_ID=A.WORKSPACE_ID AND M.USER_ID=A.ACTOR_ID WHERE A.WORKSPACE_ID = ? AND A.REQUEST_ID = ? ORDER BY A.CREATED_AT DESC,A.ID LIMIT 100",
+      "SELECT A.ID,A.ACTION_KIND,A.VERSION,A.CREATED_AT,M.NAME FROM AUDIT_EVENTS A JOIN MEMBERSHIPS M ON M.WORKSPACE_ID=A.WORKSPACE_ID AND M.USER_ID=A.ACTOR_ID WHERE A.WORKSPACE_ID = ? AND A.REQUEST_ID = ? ORDER BY A.CREATED_AT DESC,A.ID LIMIT 100",
       [actor.workspaceId, id],
     );
     return {
@@ -169,7 +169,7 @@ export async function details(actor: Actor, id: string) {
       })),
       activity: activity.map((r) => ({
         id: String(r.ID),
-        action: String(r.ACTION),
+        action: String(r.ACTION_KIND),
         version: Number(r.VERSION),
         actorName: String(r.NAME),
         createdAt: fromTimestamp(r.CREATED_AT),
@@ -241,7 +241,7 @@ async function recordChange(
   const now = sqlTimestamp(request.updatedAt),
     eventId = randomUUID();
   await sql.execute(
-    "INSERT INTO REQUEST_EVENTS (WORKSPACE_ID,ID,REQUEST_ID,ACTOR_ID,ACTION,VERSION,STATUS,SNAPSHOT_JSON,CREATED_AT) VALUES (?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO REQUEST_EVENTS (WORKSPACE_ID,ID,REQUEST_ID,ACTOR_ID,ACTION_KIND,VERSION,STATUS,SNAPSHOT_JSON,CREATED_AT) VALUES (?,?,?,?,?,?,?,?,?)",
     [
       actor.workspaceId,
       eventId,
@@ -255,7 +255,7 @@ async function recordChange(
     ],
   );
   await sql.execute(
-    "INSERT INTO AUDIT_EVENTS (WORKSPACE_ID,ID,REQUEST_ID,ACTOR_ID,COMMAND_ID,ACTION,VERSION,CREATED_AT) VALUES (?,?,?,?,?,?,?,?)",
+    "INSERT INTO AUDIT_EVENTS (WORKSPACE_ID,ID,REQUEST_ID,ACTOR_ID,COMMAND_ID,ACTION_KIND,VERSION,CREATED_AT) VALUES (?,?,?,?,?,?,?,?)",
     [
       actor.workspaceId,
       eventId,

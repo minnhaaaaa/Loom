@@ -4,6 +4,10 @@ import {
   QueryResult,
   FetchCommand,
   CloseResultSetCommand,
+  CreatePreparedStatementCommand,
+  ExecutePreparedStatementCommand,
+  ClosePreparedStatementCommand,
+  type CreatePreparedStatementResponse,
   type ExaWebsocket,
   type FetchResponse,
   type SQLQueriesResponse,
@@ -19,6 +23,7 @@ export interface SqlSession {
 export class DatabaseUnavailable extends Error {
   constructor(
     message = "Exasol is not configured. Connect a database to save requests.",
+    public connectionCode?: string,
   ) {
     super(message);
   }
@@ -27,6 +32,7 @@ export class DatabaseError extends Error {
   constructor(
     public sqlCode: string,
     message: string,
+    public sqlDetail?: string,
   ) {
     super(message);
   }
@@ -47,6 +53,7 @@ function ensureOk<T>(result: SQLResponse<T>): T {
     throw new DatabaseError(
       result.exception?.sqlCode ?? "UNKNOWN",
       "Exasol rejected the database operation.",
+      result.exception?.text,
     );
   return result.responseData;
 }
@@ -65,12 +72,16 @@ export async function openConnection(useSchema = true) {
     ? await readFile(process.env.EXASOL_CA_FILE)
     : undefined;
   const socket: { current?: WebSocket } = {};
+  let connectionCode: string | undefined;
   const driver = new ExasolDriver(
     (url) => {
       socket.current = new WebSocket(url, {
         ca,
         rejectUnauthorized: true,
         handshakeTimeout: 10_000,
+      });
+      socket.current.on("error", (error: NodeJS.ErrnoException) => {
+        connectionCode = error.code || error.name;
       });
       return socket.current as unknown as ExaWebsocket;
     },
@@ -94,25 +105,79 @@ export async function openConnection(useSchema = true) {
   timer.unref();
   try {
     await driver.connect();
-  } catch {
+  } catch (error) {
+    connectionCode ??=
+      error instanceof Error
+        ? error.message.match(/E-EDJS-\d+/)?.[0] || error.name
+        : "LOGIN_ERROR";
     clearTimeout(timer);
     socket.current?.terminate();
     await driver.close().catch(() => undefined);
     throw new DatabaseUnavailable(
       "Cannot connect to Exasol. Check the server, credentials, and trusted TLS certificate.",
+      connectionCode,
     );
   }
   async function run(sql: string, values: unknown[] = []) {
     if (timedOut)
       throw new DatabaseUnavailable("The Exasol operation timed out.");
     if (!values.length)
-      return ensureOk(await driver.query(sql, undefined, undefined, "raw"));
-    const statement = await driver.prepare(sql);
+      return ensureOk(
+        await driver.query(
+          sql,
+          { timezone: "UTC", queryTimeout: 15 },
+          undefined,
+          "raw",
+        ),
+      );
+    // Driver 0.8.1's prepare() dereferences error response data and can retain
+    // its connection on prepare failure. Use its public command API so SQL
+    // errors are checked before reading metadata and the connection is released.
+    const prepared = ensureOk(
+      await driver.sendCommand<CreatePreparedStatementResponse>(
+        new CreatePreparedStatementCommand(sql, {
+          timezone: "UTC",
+          queryTimeout: 15,
+        }),
+      ),
+    );
     let response: SQLQueriesResponse;
     try {
-      response = ensureOk(await statement.execute(...values));
+      const columns = prepared.parameterData.columns;
+      if (columns.length !== values.length)
+        throw new DatabaseError(
+          "PARAMETER_COUNT",
+          "Unexpected prepared parameter count.",
+        );
+      response = ensureOk(
+        await driver.sendCommand<SQLQueriesResponse>(
+          new ExecutePreparedStatementCommand({
+            statementHandle: prepared.statementHandle,
+            columns,
+            numColumns: columns.length,
+            numRows: 1,
+            data: values.map((value, index) => {
+              if (value === null) return [null];
+              if (!["string", "number", "boolean"].includes(typeof value))
+                throw new DatabaseError(
+                  "INVALID_BINDING",
+                  "Only primitive SQL values may be bound.",
+                );
+              const type = columns[index].dataType.type;
+              if (type === "BOOLEAN") return [value as boolean];
+              if (type === "DOUBLE") return [Number(value)];
+              // VARCHAR is common parameter metadata even for numeric casts.
+              return [String(value)];
+            }),
+          }),
+        ),
+      );
     } finally {
-      await statement.close();
+      ensureOk(
+        await driver.sendCommand(
+          new ClosePreparedStatementCommand(prepared.statementHandle),
+        ),
+      );
     }
     // Prepared execution returns raw result sets in driver 0.8.1. Fetch every
     // page explicitly and close its cursor rather than silently dropping rows.

@@ -181,7 +181,13 @@ export function endpoint(
           { error: { code: error.code, message: error.message, requestId } },
           error.status,
         );
-      if (error instanceof DatabaseUnavailable)
+      if (error instanceof DatabaseUnavailable) {
+        console.error(
+          JSON.stringify({
+            requestId,
+            code: error.connectionCode || "DATABASE_UNAVAILABLE",
+          }),
+        );
         return response(
           {
             error: {
@@ -192,6 +198,7 @@ export function endpoint(
           },
           503,
         );
+      }
       // Never serialize SQL, credentials, source text, or internal driver errors.
       console.error(
         JSON.stringify({

@@ -1,13 +1,31 @@
 import { randomUUID } from "node:crypto";
-import { openConnection } from "@loom/db-exasol";
+import { DatabaseError, fromTimestamp, openConnection } from "@loom/db-exasol";
 const connection = await openConnection();
 const id = randomUUID();
 try {
-  const [{ VALUE }] = await connection.session.query(
-    "SELECT CAST(? AS DECIMAL(18,0)) AS VALUE FROM DUAL",
+  const [{ BOUND_VALUE }] = await connection.session.query(
+    "SELECT CAST(? AS DECIMAL(18,0)) AS BOUND_VALUE FROM DUAL",
     [42],
   );
-  if (Number(VALUE) !== 42) throw new Error("Prepared binding failed.");
+  if (Number(BOUND_VALUE) !== 42) throw new Error("Prepared binding failed.");
+  let prepareRejected = false;
+  try {
+    await connection.session.query(
+      `SELECT ID FROM MISSING_${id.replaceAll("-", "")} WHERE ID = ?`,
+      [id],
+    );
+  } catch (error) {
+    if (!(error instanceof DatabaseError)) throw error;
+    prepareRejected = true;
+  }
+  if (!prepareRejected)
+    throw new Error("Expected a missing-table prepare error.");
+  const [afterError] = await connection.session.query(
+    "SELECT CAST(? AS DECIMAL(18,0)) AS BOUND_VALUE FROM DUAL",
+    [42],
+  );
+  if (Number(afterError.BOUND_VALUE) !== 42)
+    throw new Error("Prepared statement failure leaked the connection.");
   await connection.session.execute(
     "INSERT INTO WORKSPACES (ID,NAME) VALUES (?,?)",
     [id, "Rollback check"],
@@ -38,16 +56,24 @@ try {
     mapping.EMPTY_VALUE !== null
   )
     throw new Error("Unexpected scalar mapping.");
+  if (fromTimestamp(mapping.UTC_VALUE) !== "2026-10-21T12:00:00.123Z")
+    throw new Error("UTC timestamp round trip failed.");
+  const [metadata] = await connection.session.query(
+    "SELECT PARAM_VALUE FROM EXA_METADATA WHERE PARAM_NAME = 'databaseProductVersion'",
+  );
   console.log(
     JSON.stringify(
       {
         ok: true,
+        databaseVersion: metadata?.PARAM_VALUE,
         checks: [
           "TLS connection",
           "prepared bindings",
+          "prepare failure recovery",
           "enabled primary key",
           "rollback",
           "exact numeric and empty-string mapping",
+          "UTC timestamp round trip",
         ],
         timestamp: mapping.UTC_VALUE,
       },
@@ -58,7 +84,11 @@ try {
 } catch (error) {
   await connection.rollback().catch(() => undefined);
   console.error(
-    error instanceof Error ? error.message : "Exasol check failed.",
+    error instanceof DatabaseError
+      ? `Check SQL ${error.sqlCode}: ${error.sqlDetail || error.message}`
+      : error instanceof Error
+        ? error.message
+        : "Exasol check failed.",
   );
   process.exitCode = 1;
 } finally {

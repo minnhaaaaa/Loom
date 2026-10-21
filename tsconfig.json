@@ -15,7 +15,8 @@
       "@loom/domain": ["./packages/domain/src/index.ts"],
       "@loom/db-exasol": ["./packages/db-exasol/src/index.ts"],
       "@loom/analytics": ["./packages/analytics/src/index.ts"]
-    }
+    },
+    "allowImportingTsExtensions": true
   },
   "include": [
     "packages/**/*.ts",

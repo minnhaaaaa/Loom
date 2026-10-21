@@ -48,6 +48,27 @@ beforeEach(() => {
     execute: driver.execute,
     close: driver.statementClose,
   });
+  driver.sendCommand.mockImplementation(async (command) => {
+    if (command.command === "createPreparedStatement")
+      return {
+        status: "ok",
+        responseData: {
+          statementHandle: 1,
+          parameterData: {
+            columns: [{ name: "V", dataType: { type: "VARCHAR", size: 100 } }],
+          },
+        },
+      };
+    if (command.command === "executePreparedStatement")
+      return driver.execute(
+        ...command.data.map((column: unknown[]) => column[0]),
+      );
+    if (command.command === "closePreparedStatement") {
+      await driver.statementClose();
+      return { status: "ok", responseData: {} };
+    }
+    return { status: "ok", responseData: {} };
+  });
 });
 it("commits the entire callback and closes its connection after success", async () => {
   const result = await writeDatabase(async (sql) => {
@@ -127,13 +148,14 @@ it("fetches prepared-result pages and closes the cursor without losing rows", as
       ],
     },
   });
+  const dispatch = driver.sendCommand.getMockImplementation()!;
   driver.sendCommand.mockImplementation(async (command) =>
     command.command === "fetch"
       ? {
           status: "ok",
           responseData: { numRows: 2, data: [["second", "third"]] },
         }
-      : { status: "ok", responseData: {} },
+      : dispatch(command),
   );
   const connection = await openConnection();
   try {
@@ -144,7 +166,9 @@ it("fetches prepared-result pages and closes the cursor without losing rows", as
     ).toEqual([{ ID: "first" }, { ID: "second" }, { ID: "third" }]);
     expect(driver.statementClose).toHaveBeenCalledOnce();
     expect(
-      driver.sendCommand.mock.calls.map(([command]) => command.command),
+      driver.sendCommand.mock.calls
+        .map(([command]) => command.command)
+        .filter((name) => ["fetch", "closeResultSet"].includes(name)),
     ).toEqual(["fetch", "closeResultSet"]);
   } finally {
     await connection.close();

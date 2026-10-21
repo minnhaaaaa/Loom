@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { loadEnvConfig } from "@next/env";
 import path from "node:path";
 loadEnvConfig(path.resolve(process.cwd(), "../.."));
+// Use ws's supported JS masking path; optional native stubs can break Next bundles.
+process.env.WS_NO_BUFFER_UTIL = "1";
 const config: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@exasol/exasol-driver-ts", "ws"],

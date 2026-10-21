@@ -19,7 +19,12 @@
     "db:seed": "tsx --env-file-if-exists=.env scripts/db-seed.ts",
     "test:db": "node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run --config vitest.database.config.ts",
     "format": "prettier --write apps packages scripts tests *.ts *.mjs *.json *.yaml",
-    "format:check": "prettier --check apps packages scripts tests *.ts *.mjs *.json *.yaml"
+    "format:check": "prettier --check apps packages scripts tests *.ts *.mjs *.json *.yaml",
+    "db:setup": "bash scripts/setup-exasol.sh",
+    "test:e2e:connected": "node --env-file-if-exists=.env node_modules/@playwright/test/cli.js test --config=playwright.connected.config.ts",
+    "db:status": ".local/bin/exasol status --deployment-dir .local/exasol",
+    "db:start": ".local/bin/exasol start --deployment-dir .local/exasol",
+    "db:stop": ".local/bin/exasol stop --deployment-dir .local/exasol"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
