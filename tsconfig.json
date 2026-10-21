@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "@loom/contracts": [
+        "./packages/contracts/src/index.ts"
+      ],
+      "@loom/domain": [
+        "./packages/domain/src/index.ts"
+      ],
+      "@loom/db-exasol": [
+        "./packages/db-exasol/src/index.ts"
+      ],
+      "@loom/analytics": [
+        "./packages/analytics/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "packages/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
+}

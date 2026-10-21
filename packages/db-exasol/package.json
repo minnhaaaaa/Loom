@@ -1,0 +1,12 @@
+{
+  "name": "@loom/db-exasol",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@loom/contracts": "workspace:*",
+    "@exasol/exasol-driver-ts": "0.8.1",
+    "ws": "^8.19.0"
+  }
+}

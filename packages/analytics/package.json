@@ -1,0 +1,11 @@
+{
+  "name": "@loom/analytics",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@loom/contracts": "workspace:*",
+    "@loom/db-exasol": "workspace:*"
+  }
+}
