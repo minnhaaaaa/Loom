@@ -3,6 +3,12 @@ import { fileURLToPath } from "node:url";
 export default defineConfig({
   resolve: {
     alias: {
+      "@exasol/exasol-driver-ts": fileURLToPath(
+        new URL(
+          "./packages/db-exasol/node_modules/@exasol/exasol-driver-ts/dist/index.esm.js",
+          import.meta.url,
+        ),
+      ),
       "@loom/contracts/fixtures": fileURLToPath(
         new URL("./packages/contracts/src/fixtures.ts", import.meta.url),
       ),
