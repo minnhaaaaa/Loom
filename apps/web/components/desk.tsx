@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { CsvTransfer } from "./csv-transfer";
+import { TriageWorkspace } from "./triage-workspace";
 import {
   useCallback,
   useEffect,
@@ -650,9 +651,19 @@ export function Desk({
                   onImported={refresh}
                 />
               )}
+              {!preview && operates && member && (
+                <TriageWorkspace
+                  key={member.userId}
+                  owner={member.role === "owner"}
+                  requests={desk.requests}
+                  members={desk.members}
+                  onApplied={refresh}
+                />
+              )}
               <p className="scope-note">
-                The first build supports manual intake and coordination. Agent
-                proposals and tool generation are planned.
+                Manual intake, coordination, and reviewed rule-based triage are
+                available. Language-model integration and tool generation are
+                planned.
               </p>
             </>
           )}

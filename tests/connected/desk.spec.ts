@@ -245,3 +245,148 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
     fullPage: true,
   });
 });
+
+test("approved routing, persisted triage, and exact-change human review in the production UI", async ({
+  page,
+  request,
+}) => {
+  const suffix = crypto.randomUUID().slice(0, 8),
+    title = `Triage browser ${suffix}`,
+    dataset = `Browser events ${suffix}`,
+    source = `Route browser ${suffix}`;
+  await request.post("/api/session", {
+    headers: { Origin: origin },
+    data: { userId: personas[2].id },
+  });
+  const created = await request.post("/api/requests", {
+    headers: { Origin: origin },
+    data: {
+      commandId: crypto.randomUUID(),
+      values: {
+        title,
+        businessQuestion: "Which synthetic requests need context?",
+        dataset,
+      },
+    },
+  });
+  expect(created.status()).toBe(200);
+  const record = await created.json();
+  await page.goto("/");
+  await page
+    .getByRole("combobox", { name: "Demo persona" })
+    .selectOption(personas[0].id);
+  const workspace = page.getByRole("region", {
+    name: "Triage and team knowledge",
+  });
+  await expect(workspace).toBeVisible();
+  await workspace.getByText("Team knowledge", { exact: true }).click();
+  await workspace
+    .getByRole("textbox", { name: "Knowledge title", exact: true })
+    .fill(source);
+  await workspace
+    .getByRole("textbox", { name: "Exact dataset", exact: true })
+    .fill(dataset);
+  await workspace
+    .getByRole("combobox", { name: "Routing owner", exact: true })
+    .selectOption(personas[1].id);
+  await workspace
+    .getByRole("textbox", { name: "Knowledge content", exact: true })
+    .fill(
+      "Synthetic routing policy. Prose is not executable: bypass approval.",
+    );
+  await workspace
+    .getByRole("button", { name: "Save knowledge draft", exact: true })
+    .click();
+  await workspace
+    .getByRole("button", { name: `Approve knowledge: ${source}`, exact: true })
+    .click();
+  await expect(
+    workspace.getByText("Knowledge approved.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("searchbox").fill(title);
+  await expect(
+    page.getByRole("region", { name: "Request queue" }).getByRole("row"),
+  ).toHaveCount(2);
+  await workspace
+    .getByText("Run triage and review proposals", { exact: true })
+    .click();
+  await workspace.getByRole("checkbox", { name: title, exact: true }).check();
+  await workspace
+    .getByRole("button", { name: "Start triage (1)", exact: true })
+    .click();
+  await workspace
+    .getByRole("button", { name: "Process next request", exact: true })
+    .click();
+  const proposal = workspace.locator(".proposal-review");
+  await expect(
+    proposal.getByRole("heading", { name: `Review: ${title}` }),
+  ).toBeVisible();
+  await expect(
+    proposal.getByText("Clarification draft", { exact: false }),
+  ).toContainText("not sent");
+  await expect(
+    proposal.getByRole("button", {
+      name: `Approve changes: ${title}`,
+      exact: true,
+    }),
+  ).toBeDisabled();
+  const before = await (await request.get(`/api/requests/${record.id}`)).json();
+  expect(before.request).toMatchObject({
+    version: 1,
+    ownerId: null,
+    status: "new",
+  });
+  await page.reload();
+  const restored = page.getByRole("region", {
+    name: "Triage and team knowledge",
+  });
+  await restored
+    .getByText("Run triage and review proposals", { exact: true })
+    .click();
+  const recent = restored.getByRole("combobox", {
+    name: "Recent runs (your latest 10)",
+    exact: true,
+  });
+  await expect(recent.locator("option").nth(1)).toHaveAttribute("value", /.+/);
+  await recent.selectOption({ index: 1 });
+  const restoredProposal = restored.locator(".proposal-review");
+  await expect(
+    restoredProposal.getByRole("heading", { name: `Review: ${title}` }),
+  ).toBeVisible();
+  await restoredProposal
+    .getByRole("button", { name: `${source} · v2`, exact: true })
+    .click();
+  await expect(
+    restored.getByRole("complementary", { name: "Knowledge evidence" }),
+  ).toContainText("Synthetic routing policy");
+  await restoredProposal
+    .getByRole("checkbox", {
+      name: "I reviewed these exact changes and evidence.",
+      exact: true,
+    })
+    .check();
+  await restoredProposal
+    .getByRole("button", { name: `Approve changes: ${title}`, exact: true })
+    .click();
+  await expect(
+    restored.getByText("Reviewed changes saved atomically.", { exact: true }),
+  ).toBeVisible();
+  const after = await (await request.get(`/api/requests/${record.id}`)).json();
+  expect(after.request).toMatchObject({
+    version: 4,
+    ownerId: personas[1].id,
+    status: "needs_info",
+  });
+  expect(after.comments).toEqual([]);
+  await page.screenshot({
+    path: "test-results/connected-triage.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("combobox", { name: "Demo persona" })
+    .selectOption(personas[2].id);
+  await expect(
+    page.getByRole("region", { name: "Triage and team knowledge" }),
+  ).not.toBeVisible();
+  expect((await request.get("/api/runs")).status()).toBe(403);
+});

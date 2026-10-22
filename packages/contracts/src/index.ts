@@ -207,3 +207,138 @@ export const csvCommitSchema = z
     commandId: z.uuid(),
   })
   .strict();
+
+export const knowledgeInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(160),
+    kind: z.enum(["procedure", "glossary", "routing"]),
+    content: z.string().trim().min(1).max(4000),
+    dataset: z.string().trim().max(200).default(""),
+    ownerId: z.uuid().nullable().default(null),
+    effectiveFrom: z.iso.date(),
+    effectiveUntil: z.iso.date().nullable().default(null),
+    supersedesId: z.uuid().nullable().default(null),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.kind === "routing" && (!value.dataset || !value.ownerId))
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Routing rules require an exact dataset and an eligible owner.",
+      });
+    if (value.kind !== "routing" && (value.dataset || value.ownerId))
+      ctx.addIssue({
+        code: "custom",
+        message: "Dataset and owner apply only to routing rules.",
+      });
+    if (value.effectiveUntil && value.effectiveUntil < value.effectiveFrom)
+      ctx.addIssue({
+        code: "custom",
+        message: "Effective end date must not precede the start date.",
+      });
+  });
+export type KnowledgeInput = z.infer<typeof knowledgeInputSchema>;
+export type KnowledgeEntry = KnowledgeInput & {
+  id: string;
+  workspaceId: string;
+  version: number;
+  state: "draft" | "approved" | "superseded" | "retired";
+  contentHash: string;
+  createdBy: string;
+  createdAt: string;
+  approvedBy: string | null;
+};
+export const knowledgeCreateSchema = z
+  .object({ commandId: z.uuid(), values: knowledgeInputSchema })
+  .strict();
+export const knowledgeActionSchema = z
+  .object({
+    commandId: z.uuid(),
+    expectedVersion: z.number().int().positive(),
+    action: z.enum(["approve", "retire"]),
+  })
+  .strict();
+export const runStartSchema = z
+  .object({
+    commandId: z.uuid(),
+    requestIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(20)
+      .refine(
+        (ids) => new Set(ids).size === ids.length,
+        "Choose unique request IDs.",
+      ),
+  })
+  .strict();
+export const runAdvanceSchema = z
+  .object({ commandId: z.uuid(), expectedVersion: z.number().int().positive() })
+  .strict();
+export const runActionSchema = runAdvanceSchema.extend({
+  action: z.enum(["advance", "cancel"]),
+});
+export type TriageRun = {
+  id: string;
+  workspaceId: string;
+  initiatorId: string;
+  requestIds: string[];
+  engine: "rules-v1";
+  toolRevision: "request-desk-v1";
+  status: "queued" | "running" | "completed" | "cancelled" | "timed_out";
+  version: number;
+  checkpoint: number;
+  createdAt: string;
+  expiresAt: string;
+};
+export type ProposalContent = {
+  workspaceId: string;
+  runId: string;
+  id: string;
+  revision: 1;
+  initiatorId: string;
+  engine: "rules-v1";
+  toolRevision: "request-desk-v1";
+  requestId: string;
+  expectedVersion: number;
+  before: RequestRecord;
+  commands: Command[];
+  after: RequestRecord;
+  evidence: {
+    id: string;
+    version: number;
+    contentHash: string;
+    title: string;
+  }[];
+  // All exact-dataset routing candidates, including scheduled/draft entries, bind future rule changes.
+  routingDigest: string;
+  reasons: string[];
+  uncertainty: string[];
+  expiresAt: string;
+};
+export type TriageProposal = {
+  content: ProposalContent;
+  hash: string;
+  state: "pending" | "applied" | "rejected";
+  reviewedBy: string | null;
+};
+export type TriageStep = {
+  index: number;
+  requestId: string;
+  requestVersion: number;
+  summary: string;
+  uncertainty: string[];
+  proposalId: string | null;
+};
+export type RunDetails = {
+  run: TriageRun;
+  steps: TriageStep[];
+  proposals: TriageProposal[];
+};
+export const proposalReviewSchema = z
+  .object({
+    commandId: z.uuid(),
+    hash: z.string().regex(/^[a-f0-9]{64}$/),
+    action: z.enum(["approve", "reject"]),
+  })
+  .strict();

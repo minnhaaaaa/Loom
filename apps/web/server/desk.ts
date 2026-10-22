@@ -52,7 +52,7 @@ export async function membership(
   requireMembership(member);
   return member;
 }
-async function membersFor(sql: SqlSession, actor: Actor) {
+export async function membersFor(sql: SqlSession, actor: Actor) {
   return (
     await sql.query(
       "SELECT USER_ID, NAME, ROLE FROM MEMBERSHIPS WHERE WORKSPACE_ID = ? AND ACTIVE = TRUE ORDER BY NAME LIMIT 100",
@@ -88,7 +88,7 @@ function scope(member: Membership): { sql: string; values: string[] } {
     ? { sql: " AND R.REQUESTER_ID = ?", values: [member.userId] }
     : { sql: "", values: [] };
 }
-async function getRequest(
+export async function getRequest(
   sql: SqlSession,
   actor: Actor,
   member: Membership,
@@ -405,59 +405,95 @@ export async function mutateRequest(
     assertReadable(member, request);
     const existing = await receipt(sql, actor, commandId, hash);
     if (existing) return visibleRequest(member, existing);
-    if (request.version !== expectedVersion)
-      throw new DomainError(
-        "VERSION_CONFLICT",
-        "This request changed. Refresh its details before saving again.",
-        409,
-      );
-    const next = applyCommand(
+    const next = await applyRequestCommand(
+      sql,
+      actor,
       member,
       request,
+      commandId,
+      hash,
+      expectedVersion,
       command,
-      await membersFor(sql, actor),
     );
-    const changed = await sql.execute(
-      "UPDATE REQUESTS SET TITLE=?,BUSINESS_QUESTION=?,REPORTING_PERIOD=?,DATASET=?,OWNER_ID=?,PRIORITY=?,STATUS=?,DUE_AT=?,VERSION=?,UPDATED_AT=? WHERE WORKSPACE_ID=? AND ID=? AND VERSION=?",
-      [
-        next.title,
-        next.businessQuestion,
-        next.reportingPeriod || null,
-        next.dataset || null,
-        next.ownerId,
-        next.priority,
-        next.status,
-        next.dueAt,
-        next.version,
-        sqlTimestamp(next.updatedAt),
-        actor.workspaceId,
-        id,
-        expectedVersion,
-      ],
-    );
-    if (changed !== 1)
-      throw new DomainError(
-        "VERSION_CONFLICT",
-        "This request changed. Refresh before saving.",
-        409,
-      );
-    if (command.type === "add_comment")
-      await sql.execute(
-        "INSERT INTO COMMENTS (WORKSPACE_ID,ID,REQUEST_ID,AUTHOR_ID,BODY,VISIBILITY,CREATED_AT) VALUES (?,?,?,?,?,?,?)",
-        [
-          actor.workspaceId,
-          randomUUID(),
-          id,
-          actor.userId,
-          command.body,
-          command.visibility,
-          sqlTimestamp(next.updatedAt),
-        ],
-      );
-    await recordChange(sql, actor, next, commandId, hash, command.type);
     return visibleRequest(member, next);
   });
 }
+// Shared transactional executor for manual commands and exact reviewed proposal actions.
+export async function applyRequestCommand(
+  sql: SqlSession,
+  actor: Actor,
+  member: Membership,
+  request: RequestRecord,
+  commandId: string,
+  hash: string,
+  expectedVersion: number,
+  command: Command,
+  saveReceipt = true,
+) {
+  assertWriter(member, command);
+  assertReadable(member, request);
+  const id = request.id;
+  if (request.version !== expectedVersion)
+    throw new DomainError(
+      "VERSION_CONFLICT",
+      "This request changed. Refresh its details before saving again.",
+      409,
+    );
+  const next = applyCommand(
+    member,
+    request,
+    command,
+    await membersFor(sql, actor),
+  );
+  const changed = await sql.execute(
+    "UPDATE REQUESTS SET TITLE=?,BUSINESS_QUESTION=?,REPORTING_PERIOD=?,DATASET=?,OWNER_ID=?,PRIORITY=?,STATUS=?,DUE_AT=?,VERSION=?,UPDATED_AT=? WHERE WORKSPACE_ID=? AND ID=? AND VERSION=?",
+    [
+      next.title,
+      next.businessQuestion,
+      next.reportingPeriod || null,
+      next.dataset || null,
+      next.ownerId,
+      next.priority,
+      next.status,
+      next.dueAt,
+      next.version,
+      sqlTimestamp(next.updatedAt),
+      actor.workspaceId,
+      id,
+      expectedVersion,
+    ],
+  );
+  if (changed !== 1)
+    throw new DomainError(
+      "VERSION_CONFLICT",
+      "This request changed. Refresh before saving.",
+      409,
+    );
+  if (command.type === "add_comment")
+    await sql.execute(
+      "INSERT INTO COMMENTS (WORKSPACE_ID,ID,REQUEST_ID,AUTHOR_ID,BODY,VISIBILITY,CREATED_AT) VALUES (?,?,?,?,?,?,?)",
+      [
+        actor.workspaceId,
+        randomUUID(),
+        id,
+        actor.userId,
+        command.body,
+        command.visibility,
+        sqlTimestamp(next.updatedAt),
+      ],
+    );
+  await recordChange(
+    sql,
+    actor,
+    next,
+    commandId,
+    hash,
+    command.type,
+    saveReceipt,
+  );
+  return next;
+}
+
 export const defaultWorkspace = workspaceId;
 export type DetailsResponse = Omit<RequestDetails, "request"> & {
   request: ReturnType<typeof visibleRequest>;

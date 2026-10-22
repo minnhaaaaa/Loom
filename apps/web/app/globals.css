@@ -809,3 +809,62 @@ tr:hover td {
   gap: 1rem;
   align-items: end;
 }
+
+.triage-workspace {
+  margin-block: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+}
+.triage-workspace h2 {
+  font-size: 1.2rem;
+}
+.triage-workspace h3 {
+  font-size: 1rem;
+  margin-block: 0.75rem;
+}
+.triage-workspace summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding-block: 0.75rem;
+}
+.triage-workspace p {
+  margin-block: 0.75rem;
+}
+.triage-workspace label {
+  display: block;
+  margin-block: 0.75rem;
+}
+.triage-workspace input[type="checkbox"] {
+  display: inline;
+  width: auto;
+}
+.triage-form {
+  display: grid;
+  gap: 0 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.knowledge-entry,
+.proposal-review {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.triage-selection {
+  max-height: 250px;
+  overflow: auto;
+}
+.proposal-review dl {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 0.5rem;
+}
+.proposal-review dd {
+  margin: 0;
+}

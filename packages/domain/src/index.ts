@@ -140,3 +140,5 @@ export function applyCommand(
   }
   return next;
 }
+
+export { activeKnowledge, routingKey, triageRequest } from "./triage";
