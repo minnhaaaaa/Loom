@@ -662,8 +662,7 @@ export function Desk({
               )}
               <p className="scope-note">
                 Manual intake, coordination, and reviewed model-generated
-                proposals are available. Language-model integration and tool
-                generation are planned.
+                proposals are available. Generated tool definitions are planned.
               </p>
             </>
           )}

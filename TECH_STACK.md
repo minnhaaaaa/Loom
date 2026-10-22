@@ -1,6 +1,6 @@
 # Loom technical stack
 
-Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live persistence, approved knowledge, rule-based triage/review, and production-process recovery verified on the recorded local versions. Reviewed: 2026-10-22.
+Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live persistence, approved knowledge, OpenRouter-backed inference/review implemented. Free-router integration is configured; live generation, browser, and restart verification status is recorded in RUNBOOK. Reviewed: 2026-10-22.
 
 **Exasol Personal is the required and selected primary data platform. Next.js App Router is the recommended application framework.** This replaces the earlier React/Vite + Fastify + PostgreSQL/Supabase design. The frontend stays basic for a later redesign.
 
@@ -37,10 +37,10 @@ The general getting-started index contains older platform wording. Use the dedic
 | Saved-record updates | Authorized polling/refetch initially | Basic working collaboration prototype without Supabase Realtime. SSE is optional after persistence works. |
 | CSV parsing | `csv-parse` 7.0.3, server-only | Bounded UTF-8 parsing, explicit column mapping, persisted Exasol preview, atomic import, and formula-safe scoped export. See RUNBOOK for current limits. |
 | Source files | Bounded upload staging on a private local volume; canonical text/metadata in Exasol | Keep raw files outside SQL where appropriate. Download access is checked by the API. No mandatory cloud storage. |
-| Model integration | Vercel AI SDK behind a provider adapter | Generate a bounded tool definition or reviewable suggestions; never unrestricted SQL or direct writes. |
-| Agent state | Explicit persisted runs, steps, immutable proposals, and receipts in Exasol | The implemented `rules-v1` baseline processes one of up to 20 selected records per request and resumes across production-process restarts. LLM/provider integration and richer work scheduling remain planned; no pg-boss dependency. |
+| Model integration | Server-only OpenRouter adapter using native fetch and strict JSON-schema responses | Configurable model ID, free-form task, approved knowledge, bounded inference outside SQL transactions. No hardcoded recommendations or fallback engine. |
+| Agent state | Explicit persisted runs, steps, immutable proposals, and receipts in Exasol | The `openrouter-v1` runner persists input snapshots, inference-attempt leases, checkpoints, model/usage metadata, and exact reviewed proposals. At most 20 records and two explicit calls per checkpoint; live restart verification remains pending. |
 | Mutation concurrency | One write coordinator in one backend instance | Serialize local commands, membership changes, and run persistence; use database transactions and expected versions. Not a distributed lock. |
-| Retrieval | Typed rules, glossary keys, normalized term lookup over authorized Exasol rows | Small-corpus baseline; no PostgreSQL full-text indexes or pgvector. |
+| Retrieval | Authorized active approved knowledge supplied as model context | Bounded small-corpus context, no hardcoded dataset matcher. General retrieval/ranking remains pending. |
 | Tests/evaluation | Vitest, real Exasol integration fixtures, Playwright, Promptfoo | Verify real SQL, commit/rollback, isolation boundaries, retries, UI flow, and grounded suggestions. |
 | Observability | Pino, Exasol-backed run/query/execution metadata | Query ID, parameters digest, data revision, row count, latency, run ID, review outcome. |
 | Delivery | Local Exasol Personal plus one self-hosted Next.js Node process | Reproducible synthetic-data demo. Horizontal replicas and serverless deployment are outside the first concurrency contract. |
@@ -116,7 +116,7 @@ exasol/
 scripts/               Future setup/check/seed entry points
 ```
 
-The web, contracts, domain, db-exasol, analytics, migration, and script directories now exist. The initial rule engine lives in `packages/domain/src/triage.ts` and the scoped runner/review services in `apps/web/server/triage.ts`. Dedicated model-provider/evaluation packages are future work. Store no real credentials or employer data in the repository.
+The web, contracts, domain, db-exasol, analytics, migration, and script directories now exist. Model HTTP integration lives in `apps/web/server/openrouter.ts`, with inference orchestration/review in `apps/web/server/triage.ts`. The former heuristic engine is removed. A dedicated evaluation package remains future work. Store no real credentials or employer data in the repository.
 
 ## Configuration contract
 
@@ -133,7 +133,7 @@ The web, contracts, domain, db-exasol, analytics, migration, and script director
 | `LLM_PROVIDER`, `LLM_MODEL`, provider credential | Backend only, selected through fixture evaluation. |
 | Run/upload/query limits | Bounded result rows, deadlines, retries, and model spend. |
 
-A redacted `.env.example` is now provided. `LOOM_SESSION_SECRET` signs local synthetic sessions; `LOOM_ALLOW_DEMO_PRODUCTION` explicitly permits loopback-only synthetic sign-in in a production build. OIDC, model, storage, and pool configuration rows remain future contracts. Do not copy local credentials into documentation. Retire the earlier `DATABASE_URL_*`, `SUPABASE_*`, and embedding-specific variables from the selected baseline.
+A redacted `.env.example` is now provided. `LOOM_SESSION_SECRET` signs local synthetic sessions; `LOOM_ALLOW_DEMO_PRODUCTION` explicitly permits loopback-only synthetic sign-in in a production build. `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_MAX_OUTPUT_TOKENS`, and `OPENROUTER_TIMEOUT_MS` configure the implemented provider adapter. OIDC, storage, and pool configuration rows remain future contracts. Do not copy local credentials into documentation. Retire the earlier `DATABASE_URL_*`, `SUPABASE_*`, and embedding-specific variables from the selected baseline.
 
 ## Deployment and edition gates
 
@@ -148,3 +148,7 @@ A redacted `.env.example` is now provided. `LOOM_SESSION_SECRET` signs local syn
 - [Exact challenge rules](https://www.exasol.com/events/exathon-india-2026/), [Exasol Personal](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm), [developer hub](https://www.exasol.com/developers/).
 - [Launcher repository](https://github.com/exasol/exasol-personal), [TypeScript driver](https://github.com/exasol/exasol-driver-ts), [driver guide](https://github.com/exasol/exasol-driver-ts/blob/main/doc/user_guide/user_guide.md), [PyExasol](https://github.com/exasol/pyexasol).
 - [Transactions](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm), [IMPORT](https://docs.exasol.com/db/latest/sql/import.htm), [MERGE](https://docs.exasol.com/db/latest/sql/merge.htm), [analytic functions](https://docs.exasol.com/db/latest/sql_references/functions/analyticfunctions.htm), [constraint differences](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm).
+
+OpenRouter integration references: [structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs), [provider routing/parameter support](https://openrouter.ai/docs/guides/routing/provider-selection), [chat completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request).
+
+Free-tier deployment: set `OPENROUTER_MODEL=openrouter/free` and `OPENROUTER_FREE_ONLY=true` (the latter defaults to true). The model ID remains configuration, not application logic. Free-only requests include zero input/output/per-request price limits. The router selects compatible free models per request, subject to account privacy/capacity limits; successive requests may use the same model. Inference metadata preserves the actual model. Leave optional reasoning overrides unset so endpoints with mandatory reasoning remain eligible. `pnpm model:check` checks a live synthetic request. [Free router documentation](https://openrouter.ai/openrouter/free), [price caps](https://openrouter.ai/docs/guides/routing/provider-selection#max-price).

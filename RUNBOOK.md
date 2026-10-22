@@ -1,6 +1,6 @@
 # Run Loom locally
 
-Implementation checkpoint: 2026-10-22. The Next.js request desk and Exasol server adapter exist. Exasol Personal is running locally; compatibility checks and nine live database tests passed. Three connected production-browser journeys and a real process-restart check passed. Approved knowledge and persisted rule-based triage/proposal review now work. LLM integration, generated tool definitions, and production identity are not implemented yet.
+Implementation checkpoint: 2026-10-22. The manual desk, approved knowledge, and OpenRouter-backed proposal pipeline are implemented. The heuristic recommendation engine has been removed. Ten real Exasol tests cover orchestration (the external provider is explicitly mocked only in tests), and adapter tests cover OpenRouter HTTP/JSON behavior. The private key is configured and free-only routing is enabled. The configured model is `openrouter/free`; successful schema parsing alone is not treated as evidence of correct actions. Production-browser and restart verification are tracked separately below. The earlier deterministic-engine restart result does not verify the new provider path.
 
 ## Requirements and preview
 
@@ -83,21 +83,34 @@ All signed-in roles can export authorized rows with the current search/status fi
 
 Expired previews are rejected but retained in Exasol; automated retention/cleanup remains future work. Use synthetic data only. Browser tests likewise retain synthetic demo records; database integration fixtures are isolated and removed.
 
-## Approved knowledge and reviewed triage
+## OpenRouter model setup and reviewed proposals
 
-Apply migration `003_knowledge_triage`. Owners and operators see **Triage and team knowledge** below the queue. Requesters and viewers cannot access its API or source content.
+Apply migration `004_openrouter_runs` with `pnpm db:migrate`. Set these values in the repository's private `.env` (never in `NEXT_PUBLIC_*` variables or chat):
 
-1. Open **Team knowledge**. Draft a routing rule with a title, plain-text content, exact dataset, eligible owner/operator, and UTC effective dates. Procedures and glossary entries can also be stored; this baseline does not retrieve their prose during triage.
-2. An owner approves the draft. Operators can draft but cannot approve or retire reusable guidance. A replacement copies the existing content into a new immutable draft linked to its predecessor. The old source remains approved until owner approval atomically supersedes it. Retirement removes guidance from routing and invalidates pending dependent proposals. Content is rendered as plain text; uploaded text/Markdown files and requester-visible sources are still future work.
-3. Open **Run triage and review proposals**, select 1–20 requests from the current queue page, and start a run. Click **Process next request** to save one checkpoint. This is the explicitly labeled deterministic `rules-v1` baseline: no language model or provider credential is used. Dataset matching trims whitespace and ignores case. It does not infer routing from prose or execute instructions embedded in request/source text.
-4. Read the proposed before/after owner/status values, exact internal clarification draft, evidence links, and uncertainty. Triage has not changed the requests. Missing context produces a clarification draft stored as an internal comment only after approval; nothing is sent externally. Conflicting/absent rules produce an owner abstention. Closed requests receive no proposed changes.
-5. Finish the run, tick the exact-change review checkbox, and approve one proposal or reject it. Owner/operator approval executes that request's complete action set atomically, with request versions, events, audit/outbox, reviewer, and receipt. Each command increments the request version. Separate proposals are reviewed separately; applying an entire run in one transaction and editing proposal revisions are future work.
+```dotenv
+OPENROUTER_API_KEY=your-private-key
+OPENROUTER_MODEL=openrouter/free
+OPENROUTER_FREE_ONLY=true
+OPENROUTER_MAX_OUTPUT_TOKENS=8192
+OPENROUTER_TIMEOUT_MS=90000
+# Leave OPENROUTER_REASONING_ENABLED unset for router compatibility.
+```
 
-Runs retain their selected scope, fixed `request-desk-v1` template/engine, initiator, checkpoint, and 30-minute expiry in Exasol. Use **Recent runs** (your latest 10) after reload to reopen them. Only the initiator or a workspace owner can advance/cancel a run. Operators can review proposals from other eligible teammates in the same workspace when they have the run ID. Completed runs cannot be cancelled; reject their proposals instead. Cancellation blocks pending execution and preserves earlier checkpoints.
+Choose a model/provider endpoint with [structured-output support](https://openrouter.ai/docs/guides/features/structured-outputs). The example uses OpenRouter’s free router, which selects a compatible available free model per request; the app itself has no hardcoded model ID or heuristic fallback. The adapter uses OpenRouter's chat-completions API with strict JSON schema and `provider.require_parameters=true`. Free-only mode is enabled by default, rejects paid model IDs (including a paid model pinned in an older run), and sends a zero-price cap for input/output/per-request routing. Only explicit `:free` models or `openrouter/free` are accepted in this mode; there is no paid fallback. Unsupported parameters/models, missing credentials, insufficient credits, rate limits, refusals, truncated output, invalid JSON, or unsupported actions produce explicit errors. Provider error bodies, keys, and source text are not logged. `data_collection=deny` requests compatible provider data policies; it is not a claim that all retention is eliminated. Review your chosen provider/account settings. Restart the app after changing environment configuration.
 
-Every delivery/advance/review checks current operator permissions and the initiator's continuing eligibility. Approval checks the server-stored hash, target version, current routing candidate digest, source state/version/hash/effective dates, fixed engine/template, and current owner eligibility. New/conflicting/scheduled rules or revoked/retired sources can invalidate a pending proposal. Reject stale proposals and run triage again; the server never silently rebases them. Repeating an approved proposal returns its saved result without another domain effect. Current permissions are still required when reconciling a receipt.
+1. Owners/operators open **Team knowledge** and draft procedures, glossary entries, or routing guidance in their own words. Dataset/owner metadata is optional. Only an owner can approve, retire, or approve a replacement. Source content is immutable; approving a linked replacement supersedes its predecessor. These are user-managed documents, not executable routing rules.
+2. Open **Run triage and review proposals**. Select 1–20 requests and enter your own instructions. The chosen OpenRouter model is displayed. Starting the run stores the task, exact model ID, prompt version, fixed template revision, selected records, and 30-minute expiry in Exasol. Without model configuration, starting a run fails rather than pretending to work.
+3. **Process next request** makes one model call for the current checkpoint. It receives the task, authorized request and comments, active approved knowledge prose, current members, and supported tool/action constraints. There is no dataset matcher, canned clarification response, predefined assignment, or deterministic recommendation. The model selects proposed commands, explanation, uncertainty, and evidence IDs. No request changes during generation.
+4. Review the model's explanation, sources, full exact command JSON, before/after owner/status, model identity, and token metadata. Supported commands can also change priority, due date, descriptions, or comment visibility; their exact parameters are shown in the command JSON. The model cannot generate executable SQL/code or bypass permissions. Schema validity does not prove factual correctness or evidence support.
+5. Finish the run, confirm the displayed review hash, and approve or reject an individual proposal. Approval never calls the model again or substitutes recomputed recommendations. It applies only the stored, reviewed commands through the same transactional command service as manual edits. Current role, initiator eligibility, target version, source revisions/validity, knowledge context, and command preconditions are rechecked. Any conflict blocks the entire proposal without partial writes.
 
-Knowledge listing shows the newest 100 entries and labels overflow. Exact-dataset lookup reads at most 100 current candidates and fails explicitly on overflow. Entries, run steps, proposals, and lifecycle events are durable; automated retention is not implemented. General source search, model summaries, duplicate candidates, production identity, provider budgets, and generated tool publication remain pending.
+Inference is outside the database transaction and write coordinator. A short reservation transaction records the input snapshot/hash, command/attempt identity, and a two-minute lease. Finalization opens a fresh transaction and rechecks permissions, run state/version, and the whole context. Changes to records, comments, members, or approved knowledge discard the response. Cancellation can run while inference is pending; aborting the provider is best effort and cancelled results cannot be saved/applied.
+
+There are at most two provider-call attempts per request checkpoint, including failed/interrupted attempts. Retries are explicit; there are no automatic paid retries or model fallbacks. An in-flight lease blocks duplicate calls. After a process crash, wait for its two-minute lease to expire before an explicit retry. Completed checkpoints/command receipts reconcile without another call. A crash between provider success and durable persistence can still cause a second charge; this is not exactly-once provider billing. Token counts, generation/model IDs, duration, and cost when returned are stored with successful outputs; failed/unknown calls may still be billable. The configured free-only mode caps provider prices at zero. Free models still have rate/capacity limits; an individual free endpoint may return 429. `openrouter/free` is the configured router. Endpoint availability and model output quality can vary between calls; no account privacy setting was changed. Both requested and actual model identities are recorded.
+
+The current context limit is 120 KB UTF-8, at most 50 approved knowledge entries and 20 comments per selected request. Overflow is an explicit error, not silent truncation. A general retrieval strategy is still pending. The output-token limit must be 256–8192; provider timeout 1–90 seconds. Optional `OPENROUTER_REASONING_ENABLED` can be true, false, or unset; the selected free model permits disabling reasoning. Reasoning can otherwise consume the completion budget before visible JSON appears. The selected model needed more than a 2,048-token total budget with default reasoning. Each run processes at most 20 records and expires after 30 minutes. All snapshots/attempt metadata remain private in Exasol; automated retention is pending. Historical heuristic runs remain readable but cannot be advanced or approved through the new engine.
+
+Only owners/operators can read model context, runs, or knowledge. The initiator or a workspace owner can advance/cancel; eligible operators can review workspace proposals. Source files, model-authored tool generation, proposal editing, whole-run atomic approval, production identity, and quality/productivity evaluation remain unfinished.
 
 ## Production build for a local demonstration
 
@@ -121,9 +134,10 @@ pnpm build
 pnpm test:e2e
 pnpm test:e2e:connected
 pnpm test:restart
+pnpm model:check
 ```
 
-Browser tests use `/usr/bin/google-chrome` by default; set `CHROME_PATH` if needed. The preview suite starts the production build on loopback port 3100 with public synthetic test configuration and no database credentials. The connected suite uses port 3200. The preview suite verifies the UI/API boundary without database credentials. The connected suite loads private `.env`, uses local Exasol and seeded synthetic personas, and exercises actual saves and denied API operations. Run `pnpm build` before browser and restart tests. `test:restart` requires seeded local personas and starts a temporary loopback production server on port 3400, records a checkpoint, stops it, starts a fresh process, resumes the run, and checks that no request changed. It cleans only the synthetic records/command IDs it created. Run it separately from other database-backed application servers or writers. Screenshots and reports are ignored by Git.
+Browser tests use `/usr/bin/google-chrome` by default; set `CHROME_PATH` if needed. The preview suite starts the production build on loopback port 3100 with public synthetic test configuration and no database credentials. The connected suite uses port 3200. The preview suite verifies the UI/API boundary without database credentials. The connected suite loads private `.env`, uses local Exasol and seeded synthetic personas, and exercises actual saves and denied API operations. Run `pnpm build` before browser and restart tests. The connected live-model journey is skipped unless `LOOM_TEST_LIVE_MODEL=true` and both OpenRouter settings are present; skipped tests do not establish live-model correctness. `test:restart` requires configured OpenRouter credentials/model and seeded local personas, makes two live provider calls, and starts a temporary loopback production server on port 3400, records a checkpoint, stops it, starts a fresh process, resumes the run, and checks that no request changed. It cleans only the synthetic records/command IDs it created. Run it separately from other database-backed application servers or writers. Screenshots and reports are ignored by Git.
 
 Do not run a build and a development server in the same app directory concurrently; they share `.next`. Formatting is available through `pnpm format`. The lockfile pins resolved dependencies.
 
@@ -136,11 +150,11 @@ Do not run a build and a development server in the same app directory concurrent
 | Local database | Launcher 2.3.0; Personal 2026.2.0-nano.3; rootless Podman |
 | Adapter | Official TypeScript driver 0.8.1; verified private CA and hostname |
 | Static checks | TypeScript, ESLint, formatting, production build passed |
-| Unit/service tests | 29 passed; mocked SQL/driver boundaries clearly separated |
-| Real SQL integration | 9 passed; temporary UUID-scoped workspaces cleaned up |
+| Unit/service tests | 33 passed; mocked SQL/driver boundaries clearly separated |
+| Real SQL integration | 10 passed; real Exasol, explicit test-only provider fixtures, temporary workspaces cleaned up |
 | Preview browser suite | 4 passed, including mobile and denied API calls |
-| Connected production journeys | 3 passed: manual coordination/API; CSV transfer; knowledge approval and reviewed triage |
-| Restart recovery | Fresh production process resumes one saved checkpoint and preserves the proposal hash; no request changes |
+| Connected production journeys | Manual desk, CSV transfer, and missing-model rejection verified; current free-router browser journey failed: malformed action output was rejected and no proposal saved |
+| Restart recovery | Live-model restart check available; not yet verified against the current provider transport. The earlier heuristic check is superseded |
 
 The adapter uses the official driver's public prepared-statement command API because its 0.8.1 `prepare()` error path can retain a connection. Values follow returned parameter metadata. Next config selects `ws`'s supported JavaScript masking fallback for its production bundle. No TLS bypass is used.
 
@@ -148,9 +162,11 @@ Synthetic browser runs create demonstration records; failed runs may leave their
 
 Use `pnpm db:status`, `pnpm db:stop`, and `pnpm db:start` to manage the project-local database. Keep `.local` and `.env` private and ignored by Git. The helper pins Linux x86_64; use official platform setup for other hosts.
 
+`pnpm model:check` makes a live request using only synthetic fixtures and prints model/usage and the generated proposal. It never modifies requests. The current configuration uses `openrouter/free` and leaves reasoning overrides unset for compatibility. The current transport passed a live synthetic `openrouter/free` check: the router selected `dots-studio/dots-3-note-preview:free`, returned a valid comment action, and reported cost zero. Other router checks encountered unsupported/unavailable endpoints and malformed action output. Earlier output also contained ineffective actions despite a plausible explanation; the server now rejects duplicate and no-op state changes. A successful synthetic call does not establish browser approval or restart correctness. No account privacy settings or paid fallback were enabled, and no key or private `.env` content is committed.
+
 ## Next implementation gates
 
-1. Finish the remaining M0 contracts and deliberately invalid composite-reference checks; the bounded rule-engine checkpoint/restart path is now verified.
+1. Finish remaining M0 contracts and deliberately invalid composite-reference checks; verify the new model-backed restart path with live credentials.
 2. Extend precision limits, forced database collision, lost-acknowledgement, restart, and backup/restore checks. The current cross-route command-conflict journey already passes.
 3. Finish owner eligibility updates and the reusable ToolSpec renderer; measure larger CSV batches before adding chunking/source-ID merge.
-4. Extend exact-dataset triage with reviewed query evidence and broader knowledge retrieval before adding a bounded model-provider adapter. No model credentials are used by the current baseline.
+4. Improve structured-action reliability and verify the live browser/restart paths with the configured free router; add bounded knowledge/query retrieval.
