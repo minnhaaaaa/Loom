@@ -6,7 +6,7 @@ The first product is a **data-request desk for internal analytics teams**. It he
 
 **Hackathon track:** Track 04 — The Work Behind the Work.
 
-**Project status:** Implementation underway. The basic Next.js request desk, scoped Exasol adapter, manual command endpoints, and test suites are in place. Without Exasol credentials the UI offers a read-only synthetic preview; the configured local build saves real records. Local Exasol is configured and live SQL plus production-browser workflows pass. Agent and tool-generation features are still planned. See [RUNBOOK.md](RUNBOOK.md) for setup and current limitations.
+**Project status:** Implementation underway. The basic Next.js request desk, scoped Exasol adapter, manual command endpoints, and test suites are in place. Without Exasol credentials the UI offers a read-only synthetic preview; the configured local build saves real records. Local Exasol is configured and live SQL plus production-browser workflows pass. SQL-backed pagination/search and reviewed CSV import/export are working. Agent and tool-generation features are still planned. See [RUNBOOK.md](RUNBOOK.md) for setup and current limitations.
 
 ## Run the current build
 

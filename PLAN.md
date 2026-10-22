@@ -1,6 +1,6 @@
 # Loom implementation plan
 
-Status: manual request workflow implemented and verified locally; M0/M1 still have unchecked scope. Updated: 2026-10-21.
+Status: manual request workflow implemented and verified locally; M0/M1 still have unchecked scope. Updated: 2026-10-22.
 
 ## Objective
 
@@ -14,9 +14,10 @@ Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.m
 
 - Basic queue, search/status filters, intake, details, description editing, owner/priority/due-date/status controls, comments, and activity UI implemented.
 - Signed local synthetic sessions, scoped SQL reads, versioned commands, atomic receipt/history/audit/outbox code, migrations, seed/check scripts, and a named Exasol summary query implemented.
-- TypeScript, lint, formatting, production build, 20 unit/service tests, two live Exasol integration tests, four preview browser tests, and one connected production-browser journey passed. Mocked unit tests and real SQL tests remain separate.
+- TypeScript, lint, formatting, production build, 24 unit/service tests, four live Exasol integration tests, four preview browser tests, and two connected production-browser journeys passed. Mocked unit tests and real SQL tests remain separate.
 - Linux setup completed with Podman and verified launcher 2.3.0; Personal reports database version 2026.2.0-nano.3. Migration/replay, synthetic seeding, TLS, bindings, prepare-error recovery, enabled primary key, rollback, UTC/scalars, isolation, command replay, and browser persistence pass. RUNBOOK records setup and remaining limits.
-- No agent, generation/publication, CSV import/export, knowledge lifecycle, or production identity yet. M0 and M1 remain incomplete.
+- SQL-backed search/status filters and 25-row pagination, reviewed CSV mapping/import, atomic batch receipts, and scoped CSV export are implemented. Imports start with 100 rows per batch; exports with 500 matching records.
+- No agent, generation/publication, knowledge lifecycle, or production identity yet. M0 and M1 remain incomplete.
 
 ## Delivery rules
 
@@ -57,9 +58,9 @@ Dependencies: M0.
 - [x] Implement request creation, own-request listing, team queue listing, details, comments, and controlled updates.
 - [ ] Render intake form, table, details, filters, and summary cards from `ToolSpec`.
 - [x] Support statuses `new`, `needs_info`, `ready`, `in_progress`, `done`, and `cancelled`.
-- [ ] Separate hard intake requirements from readiness requirements; imported historical records may be incomplete and must be marked accordingly.
-- [ ] Implement owner and due-date controls, pagination, and requester-visible status.
-- [ ] Implement CSV column mapping, bounded upload parsing, validation preview, explicit import commit, and authorized export.
+- [x] Separate hard intake requirements from readiness requirements; imported historical records may be incomplete and must be marked accordingly.
+- [x] Implement owner and due-date controls, pagination, and requester-visible status.
+- [x] Implement CSV column mapping, bounded upload parsing, validation preview, explicit import commit, and authorized export.
 - [x] Add compare-and-swap record versions and Exasol-backed command receipts with enabled primary keys for mutations.
 - [x] Write audit and outbox events in the same transaction as successful changes.
 
@@ -194,7 +195,7 @@ Model judges can help assess phrasing and support, but cannot authorize actions 
 
 ## Resource limits to implement first
 
-Initial tunable limits: CSV up to 5 MiB and 5,000 rows; text/Markdown source up to 1 MiB; agent triage up to 20 selected records; at most eight model/tool steps, two transient retries per step, and a 120-second active execution budget across bounded requests. Define provider token/spend budgets in configuration before live runs. These are engineering starting points requiring measurement.
+Initial tunable limits: CSV up to 5 MiB and 100 data rows per atomic reviewed batch (the earlier 5,000-row target is deferred until measured chunking/resume exists); exports up to 500 matching records; text/Markdown source up to 1 MiB; agent triage up to 20 selected records; at most eight model/tool steps, two transient retries per step, and a 120-second active execution budget across bounded requests. Define provider token/spend budgets in configuration before live runs. These are engineering starting points requiring measurement.
 
 Stream or process files with bounded memory. Export untrusted spreadsheet cells with formula-injection protection. Treat linked URLs as text; remote fetching and PDF/Office parsing are deferred to a separately designed ingestion step.
 

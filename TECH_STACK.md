@@ -1,6 +1,6 @@
 # Loom technical stack
 
-Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live persistence and production-browser workflow verified on the recorded local versions. Reviewed: 2026-10-21.
+Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live persistence and production-browser workflow verified on the recorded local versions. Reviewed: 2026-10-22.
 
 **Exasol Personal is the required and selected primary data platform. Next.js App Router is the recommended application framework.** This replaces the earlier React/Vite + Fastify + PostgreSQL/Supabase design. The frontend stays basic for a later redesign.
 
@@ -35,6 +35,7 @@ The general getting-started index contains older platform wording. Use the dedic
 | Authentication | Backend-verified identity contract using `jose` | Local-only synthetic demo identities; configured OIDC/JWT for an appropriately licensed shared deployment. No production bypass. |
 | Authorization | Explicit workspace/role predicates in the API and repository layer | Owner, operator, requester, viewer. No PostgreSQL RLS assumption and no browser DB credentials. |
 | Saved-record updates | Authorized polling/refetch initially | Basic working collaboration prototype without Supabase Realtime. SSE is optional after persistence works. |
+| CSV parsing | `csv-parse` 7.0.3, server-only | Bounded UTF-8 parsing, explicit column mapping, persisted Exasol preview, atomic import, and formula-safe scoped export. See RUNBOOK for current limits. |
 | Source files | Bounded upload staging on a private local volume; canonical text/metadata in Exasol | Keep raw files outside SQL where appropriate. Download access is checked by the API. No mandatory cloud storage. |
 | Model integration | Vercel AI SDK behind a provider adapter | Generate a bounded tool definition or reviewable suggestions; never unrestricted SQL or direct writes. |
 | Agent state | Explicit persisted steps and work items in Exasol | Bounded request-driven execution with resumable checkpoints; no pg-boss dependency or assumed durable background execution. |

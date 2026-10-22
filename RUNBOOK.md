@@ -1,6 +1,6 @@
 # Run Loom locally
 
-Implementation checkpoint: 2026-10-21. The Next.js request desk and Exasol server adapter exist. Exasol Personal is running locally; compatibility checks and two live database tests passed. The connected production-browser journey also passed. Agent runs, proposal review, generated tool definitions, CSV import/export, approved knowledge, and production identity are not implemented yet.
+Implementation checkpoint: 2026-10-22. The Next.js request desk and Exasol server adapter exist. Exasol Personal is running locally; compatibility checks and four live database tests passed. Two connected production-browser journeys also passed. Agent runs, proposal review, generated tool definitions, approved knowledge, and production identity are not implemented yet.
 
 ## Requirements and preview
 
@@ -69,7 +69,19 @@ Create a request with a title and business question. Add reporting period and da
 
 Saved lists refresh every 15 seconds and on window focus. Details refresh on open, explicit refresh, and successful changes. Expected versions reject stale edits; the form retains unsaved input on failure. The client reuses its pending command ID when retrying the identical action in the same session. Command receipts, request revisions, audit events, and outbox entries commit with the change. Outbox delivery, presence, and cross-process scheduling are not implemented.
 
-Queue summary SQL runs on Exasol for internal personas. Cards show a named query ID and query time when available; list-derived counts are labeled separately. The current list loads at most 100 recent requests; full pagination is pending.
+Queue summary SQL runs on Exasol for internal personas. Cards show a named query ID and query time when available; list-derived counts are labeled separately. Search and status filters execute in authorized SQL across the queue. Lists show 25 rows per page, newest creation first with ID as a deterministic tie-breaker. Pagination uses bounded offsets (up to page index 4,000); concurrent inserts can shift page boundaries. It is a live list, not a frozen export snapshot. Returning to page one shows new requests.
+
+## Transfer a synthetic CSV backlog
+
+Apply migration `002_csv_imports` with `pnpm db:migrate`. Open **CSV import / export** below the queue. Owners/operators can choose `exasol/fixtures/request-backlog.csv`, map its four intake columns, generate a preview, inspect every row and warning, tick the review checkbox, and commit. Title and business question are required. Missing dataset/reporting period is allowed and starts that request as Needs information. Other rows start as New. Each imported request belongs to the importing persona, with normal priority, no owner, and no due date. Other CSV columns are deliberately ignored; existing requester identities/status/history are not migrated.
+
+Uploads are UTF-8 CSV, at most 5 MiB, 100 data records, 20 uniquely named columns, and 20,000 characters per record. The JSON transport has an additional 6 MiB limit. Parsing handles BOMs, quoted commas, escaped quotes, and multiline cells. Invalid intake, inconsistent columns, repeated mapped rows, or ambiguous mapping prevents the whole batch from committing. Fix the file and regenerate the preview; no rows are silently dropped. CSV record numbers count parsed records, not physical lines in multiline files.
+
+Preview mappings, normalized rows, source/preview hashes, actor, workspace, and a 30-minute expiry are stored in Exasol. Commit checks current membership and exact preview hash. Requests, history, audit/outbox events, batch result, and command receipt save in one transaction. Retry the unchanged action after an uncertain response; its command ID or committed batch returns the original IDs. Reopening the exact same file with the same mapping as the same actor also returns an existing committed batch. This is batch deduplication, not detection of the same business request across edited files or different people. Stable source-ID merge/update is future work.
+
+All signed-in roles can export authorized rows with the current search/status filters, across all pages. Requesters export only their own requests, without internal priority/comments/metrics. Exports contain request fields, not comment/activity history. More than 500 matches returns an error asking for narrower filters; there is no silent truncation. Formula-like cell prefixes are neutralized and cells are quoted. CSV is a viewing/transfer format, not a full backup or lossless formula-text round trip.
+
+Expired previews are rejected but retained in Exasol; automated retention/cleanup remains future work. Use synthetic data only. Browser tests likewise retain synthetic demo records; database integration fixtures are isolated and removed.
 
 ## Production build for a local demonstration
 
@@ -107,10 +119,10 @@ Do not run a build and a development server in the same app directory concurrent
 | Local database | Launcher 2.3.0; Personal 2026.2.0-nano.3; rootless Podman |
 | Adapter | Official TypeScript driver 0.8.1; verified private CA and hostname |
 | Static checks | TypeScript, ESLint, formatting, production build passed |
-| Unit/service tests | 20 passed; mocked SQL/driver boundaries clearly separated |
-| Real SQL integration | 2 passed; temporary UUID-scoped workspaces cleaned up |
+| Unit/service tests | 24 passed; mocked SQL/driver boundaries clearly separated |
+| Real SQL integration | 4 passed; temporary UUID-scoped workspaces cleaned up |
 | Preview browser suite | 4 passed, including mobile and denied API calls |
-| Connected production journey | 1 passed: create, comment, assign, complete, reload, denied actions, competing command IDs across routes |
+| Connected production journeys | 2 passed: manual coordination and protected API; CSV mapping/review/commit/scoped download |
 
 The adapter uses the official driver's public prepared-statement command API because its 0.8.1 `prepare()` error path can retain a connection. Values follow returned parameter metadata. Next config selects `ws`'s supported JavaScript masking fallback for its production bundle. No TLS bypass is used.
 
@@ -122,5 +134,5 @@ Use `pnpm db:status`, `pnpm db:stop`, and `pnpm db:start` to manage the project-
 
 1. Finish the remaining M0 contracts, invalid composite-reference checks, and durable agent checkpoint.
 2. Extend precision limits, forced database collision, lost-acknowledgement, restart, and backup/restore checks. The current cross-route command-conflict journey already passes.
-3. Complete pagination, CSV mapping/import/export, owner eligibility updates, and remaining M1 checks.
+3. Finish owner eligibility updates and the reusable ToolSpec renderer; measure larger CSV batches before adding chunking/source-ID merge.
 4. Add evidence-backed agent proposals only after the manual persistence checks pass. No model credentials are needed for this checkpoint.
