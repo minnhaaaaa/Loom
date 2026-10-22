@@ -3,6 +3,7 @@ import base from "./playwright.config.ts";
 export default defineConfig({
   testDir: "./tests/connected",
   workers: 1,
+  outputDir: "test-results-connected",
   use: {
     ...base.use,
     screenshot: "only-on-failure",

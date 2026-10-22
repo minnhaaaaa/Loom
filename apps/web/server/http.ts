@@ -115,9 +115,9 @@ export function checkMutation(request: Request) {
       415,
     );
 }
-export async function jsonBody(request: Request) {
+export async function jsonBody(request: Request, maxBytes = 16_384) {
   const declared = Number(request.headers.get("content-length") || 0);
-  if (declared > 16_384)
+  if (declared > maxBytes)
     throw new DomainError("BODY_TOO_LARGE", "Request body is too large.", 413);
   if (!request.body)
     throw new DomainError("INVALID_JSON", "A JSON body is required.", 400);
@@ -129,7 +129,7 @@ export async function jsonBody(request: Request) {
       const { value, done } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > 16_384) {
+      if (size > maxBytes) {
         await reader.cancel();
         throw new DomainError(
           "BODY_TOO_LARGE",
@@ -161,7 +161,8 @@ export function endpoint(
     const requestId = randomUUID();
     try {
       if (mutation) checkMutation(request);
-      return response(await fn(request));
+      const result = await fn(request);
+      return result instanceof Response ? result : response(result);
     } catch (error) {
       if (error instanceof ZodError)
         return response(

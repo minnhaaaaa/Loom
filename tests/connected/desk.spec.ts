@@ -162,3 +162,86 @@ test("real Exasol workflow through the production UI and protected API", async (
     ).status(),
   ).toBe(403);
 });
+
+test("CSV mapping, review, explicit commit, and scoped download in the production UI", async ({
+  page,
+}) => {
+  const title = `CSV browser ${crypto.randomUUID().slice(0, 8)}`;
+  await page.goto("/");
+  await page
+    .getByRole("combobox", { name: "Demo persona" })
+    .selectOption(personas[0].id);
+  await expect(
+    page.getByRole("button", { name: "+ New request", exact: true }),
+  ).toBeEnabled();
+  await page.getByText("CSV import / export", { exact: true }).click();
+  await page.getByLabel("Choose CSV").setInputFiles({
+    name: "synthetic.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      `Summary,Question,Period,Data\n${title},Why is this waiting?,,\n`,
+    ),
+  });
+  await expect(
+    page.getByRole("button", { name: "Generate import preview" }),
+  ).toBeVisible();
+  const transfer = page.locator(".csv-transfer");
+  for (const [field, value] of [
+    ["Request title", "0"],
+    ["Business question", "1"],
+    ["Reporting period", "2"],
+    ["Dataset", "3"],
+  ])
+    await transfer
+      .getByRole("combobox", { name: field, exact: true })
+      .selectOption(value);
+  await transfer
+    .getByRole("button", { name: "Generate import preview" })
+    .click();
+  await expect(
+    transfer.getByText(
+      "Missing readiness context; imported as Needs information.",
+    ),
+  ).toBeVisible();
+  await expect(
+    transfer.getByRole("button", { name: "Commit reviewed import" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: title, exact: true }),
+  ).not.toBeVisible();
+  await transfer.getByRole("checkbox").check();
+  await transfer
+    .getByRole("button", { name: "Commit reviewed import" })
+    .click();
+  await expect(
+    transfer.getByText("This batch is already saved (1 requests)."),
+  ).toBeVisible();
+  await page.getByRole("searchbox").fill(title);
+  const queue = page.getByRole("region", { name: "Request queue" });
+  await expect(queue.getByRole("row")).toHaveCount(2);
+  await expect(
+    queue.getByRole("table").getByText("Needs information", { exact: true }),
+  ).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await transfer.getByRole("button", { name: "Export matching CSV" }).click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toBe("loom-requests.csv");
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  const csv = Buffer.concat(chunks).toString("utf8");
+  expect(csv).toContain(title);
+  expect(csv).toContain('"needs_info"');
+  await page
+    .getByRole("combobox", { name: "Demo persona" })
+    .selectOption(personas[2].id);
+  await expect(
+    page.getByRole("heading", { name: "No matching requests" }),
+  ).toBeVisible();
+  await page.getByText("CSV import / export", { exact: true }).click();
+  await expect(page.getByLabel("Choose CSV")).not.toBeVisible();
+  await page.screenshot({
+    path: "test-results/connected-csv-requester.png",
+    fullPage: true,
+  });
+});

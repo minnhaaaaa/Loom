@@ -1,11 +1,13 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import {
+  deskQuerySchema,
   personas,
   workspaceId,
   type Actor,
   type Command,
   type DeskSnapshot,
+  type DeskQuery,
   type Intake,
   type Membership,
   type RequestDetails,
@@ -58,10 +60,10 @@ async function membersFor(sql: SqlSession, actor: Actor) {
     )
   ).map(mapMembership);
 }
-const requestSelect = `SELECT R.*, M.NAME AS REQUESTER_NAME, O.NAME AS OWNER_NAME FROM REQUESTS R
+export const requestSelect = `SELECT R.*, M.NAME AS REQUESTER_NAME, O.NAME AS OWNER_NAME FROM REQUESTS R
   JOIN MEMBERSHIPS M ON M.WORKSPACE_ID = R.WORKSPACE_ID AND M.USER_ID = R.REQUESTER_ID
   LEFT JOIN MEMBERSHIPS O ON O.WORKSPACE_ID = R.WORKSPACE_ID AND O.USER_ID = R.OWNER_ID`;
-function mapRequest(row: Row): RequestRecord {
+export function mapRequest(row: Row): RequestRecord {
   return {
     id: String(row.ID),
     workspaceId: String(row.WORKSPACE_ID),
@@ -106,7 +108,24 @@ export function visibleRequest(member: Membership, request: RequestRecord) {
   delete safe.priority;
   return safe as Omit<RequestRecord, "priority">;
 }
-export async function snapshot(actor: Actor | null): Promise<DeskSnapshot> {
+export function requestFilter(member: Membership, query: DeskQuery) {
+  const filter = scope(member);
+  if (query.status !== "all") {
+    filter.sql += " AND R.STATUS = ?";
+    filter.values.push(query.status);
+  }
+  if (query.search) {
+    filter.sql +=
+      " AND INSTR(LOWER(R.TITLE || ' ' || R.BUSINESS_QUESTION || ' ' || M.NAME || ' ' || COALESCE(O.NAME, '') || ' ' || COALESCE(R.DATASET, '') || ' ' || COALESCE(R.REPORTING_PERIOD, '')), LOWER(?)) > 0";
+    filter.values.push(query.search);
+  }
+  return filter;
+}
+export async function snapshot(
+  actor: Actor | null,
+  input: Partial<DeskQuery> = {},
+): Promise<DeskSnapshot> {
+  const query = deskQuerySchema.parse(input);
   if (!isConfigured()) {
     if (
       process.env.EXASOL_HOST ||
@@ -131,17 +150,18 @@ export async function snapshot(actor: Actor | null): Promise<DeskSnapshot> {
     return { mode: "connected", membership: null, requests: [], members: [] };
   return readDatabase(async (sql) => {
     const member = await membership(sql, actor),
-      filter = scope(member);
+      filter = requestFilter(member, query);
     const requests = (
       await sql.query(
-        `${requestSelect} WHERE R.WORKSPACE_ID = ?${filter.sql} ORDER BY R.UPDATED_AT DESC, R.ID LIMIT 100`,
+        `${requestSelect} WHERE R.WORKSPACE_ID = ?${filter.sql} ORDER BY R.CREATED_AT DESC, R.ID LIMIT 26 OFFSET ${query.page * 25}`,
         [actor.workspaceId, ...filter.values],
       )
     ).map(mapRequest);
     return {
       mode: "connected",
       membership: member,
-      requests: requests.map((r) => visibleRequest(member, r)),
+      page: { index: query.page, size: 25, hasMore: requests.length > 25 },
+      requests: requests.slice(0, 25).map((r) => visibleRequest(member, r)),
       members: member.role === "requester" ? [] : await membersFor(sql, actor),
     };
   });
@@ -208,10 +228,10 @@ function assertWriter(member: Membership, command?: Command) {
       403,
     );
 }
-function digest(payload: unknown): string {
+export function digest(payload: unknown): string {
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
-async function receipt(
+export async function receipt<T = RequestRecord>(
   sql: SqlSession,
   actor: Actor,
   commandId: string,
@@ -228,7 +248,7 @@ async function receipt(
       "This command ID was already used for a different action.",
       409,
     );
-  return JSON.parse(String(row.RESULT_JSON)) as RequestRecord;
+  return JSON.parse(String(row.RESULT_JSON)) as T;
 }
 async function recordChange(
   sql: SqlSession,
@@ -237,6 +257,7 @@ async function recordChange(
   commandId: string,
   hash: string,
   action: string,
+  saveReceipt = true,
 ) {
   const now = sqlTimestamp(request.updatedAt),
     eventId = randomUUID();
@@ -271,17 +292,18 @@ async function recordChange(
     "INSERT INTO OUTBOX_EVENTS (WORKSPACE_ID,ID,REQUEST_ID,VERSION,CREATED_AT) VALUES (?,?,?,?,?)",
     [actor.workspaceId, eventId, request.id, request.version, now],
   );
-  await sql.execute(
-    "INSERT INTO COMMAND_RECEIPTS (WORKSPACE_ID,COMMAND_ID,ACTOR_ID,PAYLOAD_HASH,RESULT_JSON,CREATED_AT) VALUES (?,?,?,?,?,?)",
-    [
-      actor.workspaceId,
-      commandId,
-      actor.userId,
-      hash,
-      JSON.stringify(request),
-      now,
-    ],
-  );
+  if (saveReceipt)
+    await sql.execute(
+      "INSERT INTO COMMAND_RECEIPTS (WORKSPACE_ID,COMMAND_ID,ACTOR_ID,PAYLOAD_HASH,RESULT_JSON,CREATED_AT) VALUES (?,?,?,?,?,?)",
+      [
+        actor.workspaceId,
+        commandId,
+        actor.userId,
+        hash,
+        JSON.stringify(request),
+        now,
+      ],
+    );
 }
 export async function createRequest(
   actor: Actor,
@@ -297,45 +319,77 @@ export async function createRequest(
       await getRequest(sql, actor, member, existing.id);
       return visibleRequest(member, existing);
     }
-    const now = new Date().toISOString();
-    const request: RequestRecord = {
-      ...values,
-      id: randomUUID(),
-      workspaceId: actor.workspaceId,
-      requesterId: actor.userId,
-      requesterName: member.name,
-      ownerId: null,
-      ownerName: null,
-      priority: "normal",
-      status: "new",
-      dueAt: null,
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await sql.execute(
-      "INSERT INTO REQUESTS (WORKSPACE_ID,ID,REQUESTER_ID,TITLE,BUSINESS_QUESTION,REPORTING_PERIOD,DATASET,OWNER_ID,PRIORITY,STATUS,DUE_AT,VERSION,CREATED_AT,UPDATED_AT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-      [
-        actor.workspaceId,
-        request.id,
-        actor.userId,
-        values.title,
-        values.businessQuestion,
-        values.reportingPeriod || null,
-        values.dataset || null,
-        null,
-        "normal",
-        "new",
-        null,
-        1,
-        sqlTimestamp(now),
-        sqlTimestamp(now),
-      ],
+    const request = await insertRequest(
+      sql,
+      actor,
+      member,
+      commandId,
+      hash,
+      values,
     );
-    await recordChange(sql, actor, request, commandId, hash, "created");
     return visibleRequest(member, request);
   });
 }
+// Call only inside an authorized transaction; imports share its audit/outbox path.
+export async function insertRequest(
+  sql: SqlSession,
+  actor: Actor,
+  member: Membership,
+  commandId: string,
+  hash: string,
+  values: Intake,
+  imported = false,
+) {
+  const now = new Date().toISOString();
+  const request: RequestRecord = {
+    ...values,
+    id: randomUUID(),
+    workspaceId: actor.workspaceId,
+    requesterId: actor.userId,
+    requesterName: member.name,
+    ownerId: null,
+    ownerName: null,
+    priority: "normal",
+    status:
+      imported && (!values.dataset || !values.reportingPeriod)
+        ? "needs_info"
+        : "new",
+    dueAt: null,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await sql.execute(
+    "INSERT INTO REQUESTS (WORKSPACE_ID,ID,REQUESTER_ID,TITLE,BUSINESS_QUESTION,REPORTING_PERIOD,DATASET,OWNER_ID,PRIORITY,STATUS,DUE_AT,VERSION,CREATED_AT,UPDATED_AT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    [
+      actor.workspaceId,
+      request.id,
+      actor.userId,
+      values.title,
+      values.businessQuestion,
+      values.reportingPeriod || null,
+      values.dataset || null,
+      null,
+      "normal",
+      request.status,
+      null,
+      1,
+      sqlTimestamp(now),
+      sqlTimestamp(now),
+    ],
+  );
+  await recordChange(
+    sql,
+    actor,
+    request,
+    commandId,
+    hash,
+    imported ? "imported" : "created",
+    !imported,
+  );
+  return request;
+}
+
 export async function mutateRequest(
   actor: Actor,
   id: string,

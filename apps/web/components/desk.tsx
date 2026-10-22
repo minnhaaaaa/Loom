@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { CsvTransfer } from "./csv-transfer";
 import {
   useCallback,
   useEffect,
@@ -99,6 +100,12 @@ export function Desk({
     [visibility, setVisibility] = useState<"internal" | "requester_visible">(
       "requester_visible",
     );
+  const [page, setPage] = useState(0);
+  const refreshGeneration = useRef(0);
+  const invalidateRefresh = useCallback(() => {
+    ++refreshGeneration.current;
+  }, []);
+  const changingIdentity = useRef(false);
   const pendingCommand = useRef<{ payload: string; id: string } | null>(null);
   const preview = desk.mode === "preview",
     member = desk.membership;
@@ -106,18 +113,29 @@ export function Desk({
   const operates = member?.role === "owner" || member?.role === "operator";
   const canWrite = !preview && Boolean(member) && member?.role !== "viewer";
   const refresh = useCallback(async () => {
+    if (changingIdentity.current) return;
+    const generation = ++refreshGeneration.current;
+    const current = () => generation === refreshGeneration.current;
     try {
-      const next = await api<DeskSnapshot>("/api/desk");
+      const params = new URLSearchParams({
+        search,
+        status,
+        page: String(page),
+      });
+      const next = await api<DeskSnapshot>(`/api/desk?${params}`);
+      if (!current()) return;
       setDesk(next);
       setError(null);
       if (next.membership?.role !== "requester") {
         try {
-          setAnalytics(await api<AnalyticsResult>("/api/analytics"));
+          const result = await api<AnalyticsResult>("/api/analytics");
+          if (current()) setAnalytics(result);
         } catch {
-          setAnalytics(null);
+          if (current()) setAnalytics(null);
         }
       } else setAnalytics(null);
     } catch (e) {
+      if (!current()) return;
       if (e instanceof ApiError && [401, 403].includes(e.status)) {
         setDesk((d) => ({ ...d, membership: null, requests: [], members: [] }));
         setSelected(null);
@@ -126,13 +144,13 @@ export function Desk({
       }
       setError(e instanceof Error ? e.message : "Could not refresh.");
     }
-  }, []);
+  }, [search, status, page]);
   useEffect(() => {
     if (preview || !memberId) return;
     const timer = setInterval(() => void refresh(), 15_000);
     const focus = () => void refresh();
     window.addEventListener("focus", focus);
-    const firstPoll = setTimeout(() => void refresh(), 0);
+    const firstPoll = setTimeout(() => void refresh(), 250);
     return () => {
       clearInterval(timer);
       clearTimeout(firstPoll);
@@ -167,6 +185,8 @@ export function Desk({
     };
   }, [creating, selected]);
   async function signIn(userId: string) {
+    changingIdentity.current = true;
+    invalidateRefresh();
     setBusy(true);
     setError(null);
     try {
@@ -179,24 +199,30 @@ export function Desk({
       setDetail(null);
       setAnalytics(null);
       pendingCommand.current = null;
+      changingIdentity.current = false;
       await refresh();
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      changingIdentity.current = false;
       setBusy(false);
     }
   }
   async function signOut() {
+    changingIdentity.current = true;
+    invalidateRefresh();
     setBusy(true);
     try {
       await api("/api/session", { method: "DELETE", body: "{}" });
       setDesk((d) => ({ ...d, membership: null, requests: [], members: [] }));
       setSelected(null);
       setAnalytics(null);
+      setDetail(null);
       setNotice("Signed out.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      changingIdentity.current = false;
       setBusy(false);
     }
   }
@@ -243,13 +269,15 @@ export function Desk({
     });
     if (saved && value.type === "add_comment") setComment("");
   }
-  const filtered = desk.requests.filter(
-    (r) =>
-      (status === "all" || r.status === status) &&
-      `${r.title} ${r.businessQuestion} ${r.requesterName} ${r.ownerName || ""}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-  );
+  const filtered = preview
+    ? desk.requests.filter(
+        (r) =>
+          (status === "all" || r.status === status) &&
+          `${r.title} ${r.businessQuestion} ${r.requesterName} ${r.ownerName || ""}`
+            .toLowerCase()
+            .includes(search.toLowerCase()),
+      )
+    : desk.requests;
   const open = desk.requests.filter(
     (r) => !["done", "cancelled"].includes(r.status),
   );
@@ -444,7 +472,7 @@ export function Desk({
                   ? `Exasol · ${analytics.queryId} · checked ${new Date(analytics.queriedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`
                   : preview
                     ? "Sample counts · not live SQL results"
-                    : "Counts cover the visible list · up to 100 most recently updated requests"}
+                    : "Counts cover this page · use the queue summary for workspace totals"}
               </div>
               <section className="queue" aria-label="Request queue">
                 <div className="queue-toolbar">
@@ -454,14 +482,23 @@ export function Desk({
                       type="search"
                       placeholder="Search requests, people, or context…"
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      maxLength={200}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(0);
+                        ++refreshGeneration.current;
+                      }}
                     />
                   </label>
                   <label className="inline-label">
                     Status{" "}
                     <select
                       value={status}
-                      onChange={(e) => setStatus(e.target.value)}
+                      onChange={(e) => {
+                        setStatus(e.target.value);
+                        setPage(0);
+                        ++refreshGeneration.current;
+                      }}
                     >
                       <option value="all">All statuses</option>
                       {statuses.map((s) => (
@@ -560,7 +597,41 @@ export function Desk({
                   </div>
                 )}
                 <div className="table-footer">
-                  {filtered.length} shown · {desk.requests.length} loaded
+                  {filtered.length} shown ·{" "}
+                  {preview
+                    ? "sample list"
+                    : `page ${(desk.page?.index ?? 0) + 1}`}
+                  {!preview && (
+                    <div>
+                      <button
+                        className="secondary"
+                        disabled={
+                          busy || desk.page?.index !== page || page === 0
+                        }
+                        onClick={() => {
+                          invalidateRefresh();
+                          setPage((p) => p - 1);
+                        }}
+                      >
+                        Previous page
+                      </button>{" "}
+                      <button
+                        className="secondary"
+                        disabled={
+                          busy ||
+                          desk.page?.index !== page ||
+                          !desk.page?.hasMore ||
+                          page >= 4000
+                        }
+                        onClick={() => {
+                          invalidateRefresh();
+                          setPage((p) => p + 1);
+                        }}
+                      >
+                        Next page
+                      </button>
+                    </div>
+                  )}
                   <span>
                     {preview
                       ? "Read-only preview"
@@ -570,6 +641,15 @@ export function Desk({
                   </span>
                 </div>
               </section>
+              {!preview && member && (
+                <CsvTransfer
+                  key={member.userId}
+                  operates={operates}
+                  search={search}
+                  status={status}
+                  onImported={refresh}
+                />
+              )}
               <p className="scope-note">
                 The first build supports manual intake and coordination. Agent
                 proposals and tool generation are planned.

@@ -775,3 +775,37 @@ tr:hover td {
     scroll-behavior: auto !important;
   }
 }
+
+.csv-transfer {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+}
+.csv-transfer summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.csv-transfer p {
+  margin-block: 1rem;
+}
+.csv-transfer label {
+  display: block;
+  margin-block: 1rem;
+}
+.csv-transfer input[type="checkbox"] {
+  width: auto;
+  display: inline;
+}
+.csv-transfer table td {
+  white-space: normal;
+  min-width: 120px;
+  max-width: 340px;
+  overflow-wrap: anywhere;
+}
+.csv-mapping {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  align-items: end;
+}

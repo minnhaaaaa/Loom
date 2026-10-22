@@ -121,7 +121,16 @@ export type RequestDetails = {
 export type PublicRequest = Omit<RequestRecord, "priority"> & {
   priority?: RequestRecord["priority"];
 };
+export const deskQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).default(""),
+    status: z.enum(["all", ...statuses]).default("all"),
+    page: z.coerce.number().int().min(0).max(4000).default(0),
+  })
+  .strict();
+export type DeskQuery = z.infer<typeof deskQuerySchema>;
 export type DeskSnapshot = {
+  page?: { index: number; size: number; hasMore: boolean };
   mode: "preview" | "connected";
   membership: Membership | null;
   requests: PublicRequest[];
@@ -176,3 +185,25 @@ export type AnalyticsResult = {
   oldestAgeDays: number;
   rowCount: number;
 };
+
+export const csvMappingSchema = z
+  .object({
+    title: z.number().int().min(0).max(19).nullable(),
+    businessQuestion: z.number().int().min(0).max(19).nullable(),
+    reportingPeriod: z.number().int().min(0).max(19).nullable(),
+    dataset: z.number().int().min(0).max(19).nullable(),
+  })
+  .strict();
+export const csvPreviewSchema = z
+  .object({
+    text: z.string().max(5 * 1024 * 1024),
+    mapping: csvMappingSchema.optional(),
+  })
+  .strict();
+export const csvCommitSchema = z
+  .object({
+    batchId: z.uuid(),
+    previewHash: z.string().regex(/^[a-f0-9]{64}$/),
+    commandId: z.uuid(),
+  })
+  .strict();
