@@ -1,6 +1,6 @@
 # Loom implementation plan
 
-Status: manual request workflow implemented and verified locally; M0/M1 still have unchecked scope. Updated: 2026-10-22.
+Status: manual desk, approved knowledge, and persisted rule-based triage/review implemented and verified locally; milestones still have unchecked scope. Updated: 2026-10-22.
 
 ## Objective
 
@@ -14,10 +14,11 @@ Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.m
 
 - Basic queue, search/status filters, intake, details, description editing, owner/priority/due-date/status controls, comments, and activity UI implemented.
 - Signed local synthetic sessions, scoped SQL reads, versioned commands, atomic receipt/history/audit/outbox code, migrations, seed/check scripts, and a named Exasol summary query implemented.
-- TypeScript, lint, formatting, production build, 24 unit/service tests, four live Exasol integration tests, four preview browser tests, and two connected production-browser journeys passed. Mocked unit tests and real SQL tests remain separate.
+- TypeScript, lint, formatting, production build, 29 unit/service tests, nine live Exasol integration tests, four preview browser tests, three connected production-browser journeys, and a real production-process restart check passed. Mocked unit tests and real SQL tests remain separate.
 - Linux setup completed with Podman and verified launcher 2.3.0; Personal reports database version 2026.2.0-nano.3. Migration/replay, synthetic seeding, TLS, bindings, prepare-error recovery, enabled primary key, rollback, UTC/scalars, isolation, command replay, and browser persistence pass. RUNBOOK records setup and remaining limits.
 - SQL-backed search/status filters and 25-row pagination, reviewed CSV mapping/import, atomic batch receipts, and scoped CSV export are implemented. Imports start with 100 rows per batch; exports with 500 matching records.
-- No agent, generation/publication, knowledge lifecycle, or production identity yet. M0 and M1 remain incomplete.
+- Approved internal knowledge now supports drafts, owner approval, supersession, retirement, source hashes, effective dates, and evidence inspection. Rule-based triage saves one request checkpoint per advance, produces immutable proposals, and applies exact reviewed changes through the shared transaction path.
+- The current engine is deterministic `rules-v1`, not an LLM. Model integration, richer retrieval/analytics, generated tool publication, proposal editing, and production identity remain planned. Milestones remain incomplete.
 
 ## Delivery rules
 
@@ -43,7 +44,7 @@ Dependencies: documentation revision complete; user resumed implementation on 20
 - [ ] Define ToolSpec, action/proposal/event/error contracts and the owner/operator/requester/viewer matrix.
 - [x] Seed two workspaces and synthetic role identities. Verify API and repository isolation, including direct forged requests.
 - [ ] Render a fixed request template without an LLM; evaluate json-render only as a thin optional adapter.
-- [ ] Persist one bounded run/checkpoint and resume it after a server restart through an authenticated advance request.
+- [x] Persist one bounded run/checkpoint and resume it after a server restart through an authenticated advance request.
 
 Acceptance: a real Exasol connection passes transaction, key, identity-isolation, and concurrent-route checks; a static tool renders in Next.js; persisted state survives restart. Record tested versions and limitations. Mock-only success does not satisfy this milestone. If the TypeScript driver blocks progress, record the failing contract before evaluating PyExasol as a narrow fallback.
 
@@ -113,12 +114,14 @@ Dependencies: M1.
 - [ ] Support bounded plain-text/Markdown uploads and editable glossary/routing entries.
 - [ ] Store canonical source revisions, content hashes, visibility, owners, and provenance.
 - [ ] Implement knowledge states: draft, approved, superseded, retired; preserve case-specific exceptions separately.
-- [ ] Require an owner to publish reusable procedures or rules.
+- [x] Require an owner to publish reusable procedures or rules.
 - [ ] Add searchable active approved knowledge with explicit applicability and effective dates.
 - [ ] Implement bounded normalized-term retrieval and exact-key lookup in Exasol with access filtering before retrieval results reach the model.
-- [ ] Support source inspection and permission-checked evidence links.
-- [ ] Mark conflicting approved rules as requiring clarification rather than silently choosing one.
+- [x] Support source inspection and permission-checked evidence links.
+- [x] Mark conflicting approved rules as requiring clarification rather than silently choosing one.
 - [ ] Defer semantic retrieval; if the lexical baseline fails, evaluate an Exasol-compatible approach against frozen authorized fixtures before choosing additional infrastructure.
+
+Current M4 scope: internal plain-text entries (up to 4,000 characters), immutable replacement drafts linked to their predecessor, owner-controlled lifecycle, validity dates, and exact-dataset routing lookup. Full source upload, general search, requester-visible knowledge, and case-specific decision records remain unfinished.
 
 Acceptance: an active approved routing rule is retrieved; a draft or retired rule is not treated as authority. A requester cannot retrieve internal procedures. Updating or revoking a source invalidates dependent reusable knowledge and pending proposals. Search failure is distinguishable from a legitimate no-match result.
 
@@ -127,16 +130,18 @@ Acceptance: an active approved routing rule is retrieved; a draft or retired rul
 Dependencies: M1 and M4; tool-aware interface depends on M2.
 
 - [ ] Start a run with an authenticated initiator, selected record IDs, published spec revision, budgets, and idempotency key.
-- [ ] Recheck access in each bounded execution request before each retrieval, persisted result, and proposed action.
+- [x] Recheck access in each bounded execution request before each retrieval, persisted result, and proposed action.
 - [ ] Support summarization, missing-field identification, owner suggestions, duplicate candidates, and clarification drafts.
 - [ ] Restrict the agent to known read/propose tools; keep business mutation and approval tools unavailable to it.
 - [ ] Persist run steps and validated outputs; checkpoint after each completed expensive call.
-- [ ] Store immutable proposals containing exact action parameters, expected versions, evidence dependencies, and a server-computed hash.
-- [ ] Display record-level before/after values, sources, and uncertainty. Explain abstention when rules are absent or conflicting.
+- [x] Store immutable proposals containing exact action parameters, expected versions, evidence dependencies, and a server-computed hash.
+- [x] Display record-level before/after values, sources, and uncertainty. Explain abstention when rules are absent or conflicting.
 - [ ] Allow review, rejection, or editing by creating a new proposal revision that requires fresh approval.
-- [ ] Execute approved local actions atomically through the shared command service.
+- [x] Execute approved local actions atomically through the shared command service.
 - [ ] Implement cancel, timeout, budget exhaustion, retry exhaustion, and stale-proposal behavior.
-- [ ] Revalidate inside the write transaction and append audit/outbox records on commit.
+- [x] Revalidate inside the write transaction and append audit/outbox records on commit.
+
+Current M5 scope: `rules-v1` checks readiness and exact-dataset routing; it creates internal clarification drafts and owner/status proposals. Runs select 1–20 requests, expire after 30 minutes, and process one record per authenticated advance. Run checkpoints, immutable review hashes, cancellation, timeout, approval/rejection, replay, stale targets/rules, and role rechecks are verified. The fixed `request-desk-v1` template is bound to proposals; generated/published tool revisions, provider calls, token budgets, proposal editing, duplicate suggestions, and semantic summaries remain unfinished. `pnpm test:restart` stops a production server between steps and resumes through a new process.
 
 Acceptance: agent-assisted triage completes on a selected batch. No request is modified before an authorized approval. Editing a proposal invalidates the previous approval. Changed records, rules, tool revisions, or permissions block stale execution. A duplicate approval or retried job produces one domain effect. Server restart, request interruption, and cancellation do not cause an unapproved write.
 

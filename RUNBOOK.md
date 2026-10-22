@@ -1,6 +1,6 @@
 # Run Loom locally
 
-Implementation checkpoint: 2026-10-22. The Next.js request desk and Exasol server adapter exist. Exasol Personal is running locally; compatibility checks and four live database tests passed. Two connected production-browser journeys also passed. Agent runs, proposal review, generated tool definitions, approved knowledge, and production identity are not implemented yet.
+Implementation checkpoint: 2026-10-22. The Next.js request desk and Exasol server adapter exist. Exasol Personal is running locally; compatibility checks and nine live database tests passed. Three connected production-browser journeys and a real process-restart check passed. Approved knowledge and persisted rule-based triage/proposal review now work. LLM integration, generated tool definitions, and production identity are not implemented yet.
 
 ## Requirements and preview
 
@@ -83,6 +83,22 @@ All signed-in roles can export authorized rows with the current search/status fi
 
 Expired previews are rejected but retained in Exasol; automated retention/cleanup remains future work. Use synthetic data only. Browser tests likewise retain synthetic demo records; database integration fixtures are isolated and removed.
 
+## Approved knowledge and reviewed triage
+
+Apply migration `003_knowledge_triage`. Owners and operators see **Triage and team knowledge** below the queue. Requesters and viewers cannot access its API or source content.
+
+1. Open **Team knowledge**. Draft a routing rule with a title, plain-text content, exact dataset, eligible owner/operator, and UTC effective dates. Procedures and glossary entries can also be stored; this baseline does not retrieve their prose during triage.
+2. An owner approves the draft. Operators can draft but cannot approve or retire reusable guidance. A replacement copies the existing content into a new immutable draft linked to its predecessor. The old source remains approved until owner approval atomically supersedes it. Retirement removes guidance from routing and invalidates pending dependent proposals. Content is rendered as plain text; uploaded text/Markdown files and requester-visible sources are still future work.
+3. Open **Run triage and review proposals**, select 1–20 requests from the current queue page, and start a run. Click **Process next request** to save one checkpoint. This is the explicitly labeled deterministic `rules-v1` baseline: no language model or provider credential is used. Dataset matching trims whitespace and ignores case. It does not infer routing from prose or execute instructions embedded in request/source text.
+4. Read the proposed before/after owner/status values, exact internal clarification draft, evidence links, and uncertainty. Triage has not changed the requests. Missing context produces a clarification draft stored as an internal comment only after approval; nothing is sent externally. Conflicting/absent rules produce an owner abstention. Closed requests receive no proposed changes.
+5. Finish the run, tick the exact-change review checkbox, and approve one proposal or reject it. Owner/operator approval executes that request's complete action set atomically, with request versions, events, audit/outbox, reviewer, and receipt. Each command increments the request version. Separate proposals are reviewed separately; applying an entire run in one transaction and editing proposal revisions are future work.
+
+Runs retain their selected scope, fixed `request-desk-v1` template/engine, initiator, checkpoint, and 30-minute expiry in Exasol. Use **Recent runs** (your latest 10) after reload to reopen them. Only the initiator or a workspace owner can advance/cancel a run. Operators can review proposals from other eligible teammates in the same workspace when they have the run ID. Completed runs cannot be cancelled; reject their proposals instead. Cancellation blocks pending execution and preserves earlier checkpoints.
+
+Every delivery/advance/review checks current operator permissions and the initiator's continuing eligibility. Approval checks the server-stored hash, target version, current routing candidate digest, source state/version/hash/effective dates, fixed engine/template, and current owner eligibility. New/conflicting/scheduled rules or revoked/retired sources can invalidate a pending proposal. Reject stale proposals and run triage again; the server never silently rebases them. Repeating an approved proposal returns its saved result without another domain effect. Current permissions are still required when reconciling a receipt.
+
+Knowledge listing shows the newest 100 entries and labels overflow. Exact-dataset lookup reads at most 100 current candidates and fails explicitly on overflow. Entries, run steps, proposals, and lifecycle events are durable; automated retention is not implemented. General source search, model summaries, duplicate candidates, production identity, provider budgets, and generated tool publication remain pending.
+
 ## Production build for a local demonstration
 
 ```sh
@@ -104,9 +120,10 @@ pnpm format:check
 pnpm build
 pnpm test:e2e
 pnpm test:e2e:connected
+pnpm test:restart
 ```
 
-Browser tests use `/usr/bin/google-chrome` by default; set `CHROME_PATH` if needed. The preview suite starts the production build on loopback port 3100 with public synthetic test configuration and no database credentials. The connected suite uses port 3200. The preview suite verifies the UI/API boundary without database credentials. The connected suite loads private `.env`, uses local Exasol and seeded synthetic personas, and exercises actual saves and denied API operations. Run `pnpm build` before browser tests. Screenshots and reports are ignored by Git.
+Browser tests use `/usr/bin/google-chrome` by default; set `CHROME_PATH` if needed. The preview suite starts the production build on loopback port 3100 with public synthetic test configuration and no database credentials. The connected suite uses port 3200. The preview suite verifies the UI/API boundary without database credentials. The connected suite loads private `.env`, uses local Exasol and seeded synthetic personas, and exercises actual saves and denied API operations. Run `pnpm build` before browser and restart tests. `test:restart` requires seeded local personas and starts a temporary loopback production server on port 3400, records a checkpoint, stops it, starts a fresh process, resumes the run, and checks that no request changed. It cleans only the synthetic records/command IDs it created. Run it separately from other database-backed application servers or writers. Screenshots and reports are ignored by Git.
 
 Do not run a build and a development server in the same app directory concurrently; they share `.next`. Formatting is available through `pnpm format`. The lockfile pins resolved dependencies.
 
@@ -119,10 +136,11 @@ Do not run a build and a development server in the same app directory concurrent
 | Local database | Launcher 2.3.0; Personal 2026.2.0-nano.3; rootless Podman |
 | Adapter | Official TypeScript driver 0.8.1; verified private CA and hostname |
 | Static checks | TypeScript, ESLint, formatting, production build passed |
-| Unit/service tests | 24 passed; mocked SQL/driver boundaries clearly separated |
-| Real SQL integration | 4 passed; temporary UUID-scoped workspaces cleaned up |
+| Unit/service tests | 29 passed; mocked SQL/driver boundaries clearly separated |
+| Real SQL integration | 9 passed; temporary UUID-scoped workspaces cleaned up |
 | Preview browser suite | 4 passed, including mobile and denied API calls |
-| Connected production journeys | 2 passed: manual coordination and protected API; CSV mapping/review/commit/scoped download |
+| Connected production journeys | 3 passed: manual coordination/API; CSV transfer; knowledge approval and reviewed triage |
+| Restart recovery | Fresh production process resumes one saved checkpoint and preserves the proposal hash; no request changes |
 
 The adapter uses the official driver's public prepared-statement command API because its 0.8.1 `prepare()` error path can retain a connection. Values follow returned parameter metadata. Next config selects `ws`'s supported JavaScript masking fallback for its production bundle. No TLS bypass is used.
 
@@ -132,7 +150,7 @@ Use `pnpm db:status`, `pnpm db:stop`, and `pnpm db:start` to manage the project-
 
 ## Next implementation gates
 
-1. Finish the remaining M0 contracts, invalid composite-reference checks, and durable agent checkpoint.
+1. Finish the remaining M0 contracts and deliberately invalid composite-reference checks; the bounded rule-engine checkpoint/restart path is now verified.
 2. Extend precision limits, forced database collision, lost-acknowledgement, restart, and backup/restore checks. The current cross-route command-conflict journey already passes.
 3. Finish owner eligibility updates and the reusable ToolSpec renderer; measure larger CSV batches before adding chunking/source-ID merge.
-4. Add evidence-backed agent proposals only after the manual persistence checks pass. No model credentials are needed for this checkpoint.
+4. Extend exact-dataset triage with reviewed query evidence and broader knowledge retrieval before adding a bounded model-provider adapter. No model credentials are used by the current baseline.
