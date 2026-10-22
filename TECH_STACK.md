@@ -1,6 +1,6 @@
 # Loom technical stack
 
-Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live database compatibility unverified. Reviewed: 2026-10-21.
+Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live persistence and production-browser workflow verified on the recorded local versions. Reviewed: 2026-10-21.
 
 **Exasol Personal is the required and selected primary data platform. Next.js App Router is the recommended application framework.** This replaces the earlier React/Vite + Fastify + PostgreSQL/Supabase design. The frontend stays basic for a later redesign.
 
@@ -17,7 +17,7 @@ See [README.md](README.md) for the problem and contest requirements, [PLAN.md](P
 | The official [TypeScript driver](https://github.com/exasol/exasol-driver-ts) supports encrypted Node connections, prepared statements, and local file import. | Keep the TypeScript backend; isolate the driver behind a repository adapter. |
 | [Constraint guidance](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm) distinguishes supported keys from unsupported UNIQUE/CHECK constraints. | Use enabled primary keys for command receipts and membership identities; validate business rules in the application. |
 
-The general getting-started index contains older platform wording. Use the dedicated Personal page, current developer hub, and selected release documentation; record the tested release during M0. Free database software does not imply free cloud infrastructure. The earlier research revision performed no installation. During implementation, a local launcher attempt failed on Linux; current starter-kit preflight requires missing Podman. No database/cloud deployment was completed. See RUNBOOK.
+The general getting-started index contains older platform wording. Use the dedicated Personal page, current developer hub, and selected release documentation; record the tested release during M0. Free database software does not imply free cloud infrastructure. The earlier research revision performed no installation. During implementation, the old launcher failed on Linux. Podman was then installed and a checksum-verified 2.3.0 launcher brought up local Personal successfully. No cloud resources were created. See RUNBOOK for tested versions and results.
 
 ## Selected baseline
 
@@ -29,7 +29,7 @@ The general getting-started index contains older platform wording. Use the dedic
 | Tables/forms/server state | TanStack Table/Query, React Hook Form, Zod | Reusable controls, validation, and authorized refetch. Server checks remain authoritative. |
 | HTTP/server boundary | Next.js Route Handlers in the Node.js runtime | Same-origin API, validated commands, identity checks, and structured errors. No separate Fastify server initially. |
 | Primary database | Exasol Personal | Requests, history, memberships, tool definitions, approved knowledge, proposals, execution receipts, audit, imports, and query evidence. |
-| Database driver | `@exasol/exasol-driver-ts` with Node `ws` | Server-only TLS connections and bound SQL values. Compatibility is an M0 gate. |
+| Database driver | `@exasol/exasol-driver-ts` with Node `ws` | Server-only TLS connections and bound SQL values. Driver 0.8.1 passed the current live checks through an adapter using its public prepared-statement commands. |
 | SQL/data access | Loom-owned Exasol repositories and reviewed versioned SQL | No assumed Drizzle/Prisma Exasol dialect. Separate data access from domain services. |
 | Analytics | Exasol SQL views and parameterized query registry | Backlog age, status duration, SLA risk, missing requirements, duplicate candidates, and owner workload. |
 | Authentication | Backend-verified identity contract using `jose` | Local-only synthetic demo identities; configured OIDC/JWT for an appropriately licensed shared deployment. No production bypass. |
@@ -65,7 +65,7 @@ Keep the earlier papers and repository comparisons as research history, but mark
 
 This is an authenticated internal web application, so one framework for routing, pages, forms, and server endpoints reduces setup and deployment work. Use Server Components for authorized initial reads and Client Components for tables, filters, dialogs, and request forms. Keep the Exasol adapter in server-only modules. Every Route Handler and Server Action must authorize its operation independently; a protected page is not API authorization.
 
-Select the Node.js runtime for Exasol access. The initial deployment is a self-hosted Node server, with private/user-specific responses uncached and no browser-side database connection. Validate that all mutation handlers share the same process-wide write coordinator; do not deploy multiple serverless instances and assume an in-memory mutex provides distributed serialization. M0 must test concurrent requests across distinct routes.
+Select the Node.js runtime for Exasol access. The initial deployment is a self-hosted Node server, with private/user-specific responses uncached and no browser-side database connection. Validate that all mutation handlers share the same process-wide write coordinator; do not deploy multiple serverless instances and assume an in-memory mutex provides distributed serialization. The connected production test passes simultaneous competing command IDs across create/update routes. Replicas and direct writers remain outside the contract.
 
 Persist agent run/checkpoint state in Exasol and advance work within bounded authenticated requests. A crash or disconnect leaves a retryable step, not an assumed completed job. Do not treat `after()` or a detached promise as a durable queue. Add a separately managed runner only when longer or unattended jobs are required, with a new coordination design. See [Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), [Node deployment](https://nextjs.org/docs/app/getting-started/deploying), and [`after()` constraints](https://nextjs.org/docs/app/api-reference/functions/after).
 
@@ -74,6 +74,10 @@ Use server-only environment variables for Exasol and model credentials. Cookie s
 ## Driver and transaction contract
 
 Use the official [driver user guide](https://github.com/exasol/exasol-driver-ts/blob/main/doc/user_guide/user_guide.md). SQL values use prepared bindings. Schema/table/view names come only from code-owned identifiers. Never put Exasol credentials or the driver in the browser, even though the driver supports browser connections.
+
+Live findings: driver 0.8.1's `prepare()` path dereferences missing response data on preparation errors and can retain the connection. The adapter instead uses its public create/execute/close prepared-statement commands, checks each response, binds values using the returned parameter types, and explicitly fetches/closes result cursors. A failed prepare followed by a successful query now passes on the real database. Values for VARCHAR parameters are encoded as strings, including numeric cast inputs; SQL text never interpolates those values.
+
+The Next.js production bundle also required `ws`'s documented `WS_NO_BUFFER_UTIL` fallback: `next.config.ts` selects its JavaScript masking implementation because the optional native addon resolved to an unusable stub. This does not disable TLS. Both direct SQL and the production browser path are verified.
 
 A multi-statement command exclusively owns one connection with autocommit disabled, commits only on complete success, and rolls back on failure. Do not assume independent pool queries share a transaction. M0 must verify explicit commit/rollback, affected-row reporting, SQL error classification, numeric precision, cancellation, and connection cleanup against the installed release.
 

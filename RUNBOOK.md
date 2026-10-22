@@ -1,6 +1,6 @@
 # Run Loom locally
 
-Implementation checkpoint: 2026-10-21. The Next.js request desk and Exasol server adapter exist. Live database verification is pending. Agent runs, proposal review, generated tool definitions, CSV import/export, approved knowledge, and production identity are not implemented yet.
+Implementation checkpoint: 2026-10-21. The Next.js request desk and Exasol server adapter exist. Exasol Personal is running locally; compatibility checks and two live database tests passed. The connected production-browser journey also passed. Agent runs, proposal review, generated tool definitions, CSV import/export, approved knowledge, and production identity are not implemented yet.
 
 ## Requirements and preview
 
@@ -19,18 +19,19 @@ The frontend is basic semantic React and plain CSS. Edit `apps/web/components/de
 
 Use the current [official starter kit](https://www.exasol.com/developers/) and its [Linux setup](https://github.com/exasol-labs/exasol-personal-local-starterkit/blob/main/setup/setup-linux.sh). Linux requires usable rootless Podman. Follow its prerequisite and certificate instructions; Docker alone does not satisfy that path. No cloud resources are needed.
 
-On this workspace, the installed `exasol` launcher is version 2.2.0. Its `install local` command failed with `local deployments are only supported on macOS Apple Silicon (current platform: linux/amd64)`. The current starter kit has a Linux path, but its preflight reports that Podman is missing. Network, disk, memory, architecture, and port checks passed outside the network-restricted sandbox. Installing Podman was attempted, but `sudo` requires interactive authentication. The database was not installed and no cloud infrastructure was created.
+The original global launcher was 2.2.0 and rejected Linux local deployment. After installing Podman, a verified launcher **2.3.0** was placed in the ignored `.local/bin` directory. Its SHA-256 matches the official starter kit's version manifest. The existing global launcher was left unchanged. The local database is ready, migrations and synthetic seeding succeeded, and live SQL checks passed. No cloud infrastructure was created.
 
-On a Debian/Ubuntu host, install the prerequisite in your own terminal, then follow the current kit's setup instructions:
+For a fresh Linux x86_64 host:
 
 ```sh
 sudo apt-get install -y podman uidmap
 podman info
+pnpm db:setup
 ```
 
-The kit may require updating the old launcher. Do not repeatedly use the unsupported 2.2.0 local preset on Linux. Inspect installer options; Loom needs the database, not automatic configuration of unrelated AI clients. Resolve any rootless namespace prerequisites reported by the kit.
+`db:setup` downloads the pinned official launcher, verifies its checksum, and installs Personal under `.local/exasol`. It brings up only the local database; it does not configure AI clients. Other platforms should follow the current official starter kit. Inspect the Personal terms and host preparation steps reported by the launcher.
 
-Copy the configuration template and edit it locally:
+This workspace already has a private `.env` created from the local deployment. Do not overwrite it. For a fresh clone, copy the template and edit it locally:
 
 ```sh
 cp .env.example .env
@@ -51,7 +52,7 @@ pnpm dev
 
 `db:migrate` creates the schema and records a migration checksum. It does not reset an existing database or accept changed applied migrations. `db:seed` inserts public synthetic fixtures and two isolation workspaces; if the primary fixture workspace already exists, it leaves it untouched. Do not run migrations concurrently or against an unrelated populated schema. Rehearse against the installed Exasol release before trusting the SQL.
 
-`db:check` exercises TLS, prepared bindings, primary-key rejection, rollback, and scalar mappings. `test:db` uses the actual configured Exasol connection and creates fresh UUID-scoped fixtures; cleanup deletes only those fixture workspaces. It checks request isolation, internal-comment filtering, command replay/conflicts, concurrent versions, history counts, and rollback. It deliberately fails when no database is configured. These checks have **not passed on a live database yet**.
+`db:check` exercises TLS, prepared bindings, prepare-error recovery, primary-key rejection, rollback, scalar mappings, and UTC timestamp round trips. It reports the actual database version. `test:db` uses the actual configured Exasol connection and creates fresh UUID-scoped fixtures; cleanup deletes only those fixture workspaces. It checks request isolation, internal-comment filtering, command replay/conflicts, concurrent versions, history counts, and rollback. It deliberately fails when no database is configured. These checks passed against the current local deployment. The separate production-browser suite verifies the application/server boundary.
 
 ## Use the manual desk
 
@@ -90,15 +91,36 @@ pnpm test
 pnpm format:check
 pnpm build
 pnpm test:e2e
+pnpm test:e2e:connected
 ```
 
-Browser tests use `/usr/bin/google-chrome` by default; set `CHROME_PATH` if needed. They start the production build on loopback port 3100 with public synthetic test configuration and no database credentials. They verify the actual preview UI/API boundary; they do not establish live SQL correctness. Run `pnpm build` before browser tests. Screenshots and reports are ignored by Git.
+Browser tests use `/usr/bin/google-chrome` by default; set `CHROME_PATH` if needed. The preview suite starts the production build on loopback port 3100 with public synthetic test configuration and no database credentials. The connected suite uses port 3200. The preview suite verifies the UI/API boundary without database credentials. The connected suite loads private `.env`, uses local Exasol and seeded synthetic personas, and exercises actual saves and denied API operations. Run `pnpm build` before browser tests. Screenshots and reports are ignored by Git.
 
 Do not run a build and a development server in the same app directory concurrently; they share `.next`. Formatting is available through `pnpm format`. The lockfile pins resolved dependencies.
 
+## Verified checkpoint
+
+| Component/check | Result |
+| --- | --- |
+| Runtime/package manager | Node 24.15.0; pnpm 10.31.0 |
+| Application | Next.js 16.4.2, one Node process |
+| Local database | Launcher 2.3.0; Personal 2026.2.0-nano.3; rootless Podman |
+| Adapter | Official TypeScript driver 0.8.1; verified private CA and hostname |
+| Static checks | TypeScript, ESLint, formatting, production build passed |
+| Unit/service tests | 20 passed; mocked SQL/driver boundaries clearly separated |
+| Real SQL integration | 2 passed; temporary UUID-scoped workspaces cleaned up |
+| Preview browser suite | 4 passed, including mobile and denied API calls |
+| Connected production journey | 1 passed: create, comment, assign, complete, reload, denied actions, competing command IDs across routes |
+
+The adapter uses the official driver's public prepared-statement command API because its 0.8.1 `prepare()` error path can retain a connection. Values follow returned parameter metadata. Next config selects `ws`'s supported JavaScript masking fallback for its production bundle. No TLS bypass is used.
+
+Synthetic browser runs create demonstration records; failed runs may leave their test requests in the desk. They do not reset other records. `test:db` creates and removes separate temporary workspaces. A full reset/export/restore workflow is still planned.
+
+Use `pnpm db:status`, `pnpm db:stop`, and `pnpm db:start` to manage the project-local database. Keep `.local` and `.env` private and ignored by Git. The helper pins Linux x86_64; use official platform setup for other hosts.
+
 ## Next implementation gates
 
-1. Finish current Linux Personal setup and pass `db:check` and `test:db`.
-2. Verify production cross-route mutation coordination, real SQL collision codes, timestamp/large-number behavior, and ambiguous-commit recovery.
+1. Finish the remaining M0 contracts, invalid composite-reference checks, and durable agent checkpoint.
+2. Extend precision limits, forced database collision, lost-acknowledgement, restart, and backup/restore checks. The current cross-route command-conflict journey already passes.
 3. Complete pagination, CSV mapping/import/export, owner eligibility updates, and remaining M1 checks.
 4. Add evidence-backed agent proposals only after the manual persistence checks pass. No model credentials are needed for this checkpoint.

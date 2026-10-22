@@ -1,6 +1,6 @@
 # Loom implementation plan
 
-Status: implementation resumed; M0 is partially implemented and live Exasol checks remain blocked by setup. Updated: 2026-10-21.
+Status: manual request workflow implemented and verified locally; M0/M1 still have unchecked scope. Updated: 2026-10-21.
 
 ## Objective
 
@@ -14,8 +14,8 @@ Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.m
 
 - Basic queue, search/status filters, intake, details, description editing, owner/priority/due-date/status controls, comments, and activity UI implemented.
 - Signed local synthetic sessions, scoped SQL reads, versioned commands, atomic receipt/history/audit/outbox code, migrations, seed/check scripts, and a named Exasol summary query implemented.
-- TypeScript, lint, production build, 15 unit/service tests, and four browser tests passed. Service tests use a scripted SQL boundary and are not real Exasol verification.
-- Live SQL checks pending: installed launcher 2.2.0 rejects Linux local deployment; current Linux starter kit requires missing Podman. Installation attempt needs interactive sudo. See RUNBOOK for the exact next steps.
+- TypeScript, lint, formatting, production build, 20 unit/service tests, two live Exasol integration tests, four preview browser tests, and one connected production-browser journey passed. Mocked unit tests and real SQL tests remain separate.
+- Linux setup completed with Podman and verified launcher 2.3.0; Personal reports database version 2026.2.0-nano.3. Migration/replay, synthetic seeding, TLS, bindings, prepare-error recovery, enabled primary key, rollback, UTC/scalars, isolation, command replay, and browser persistence pass. RUNBOOK records setup and remaining limits.
 - No agent, generation/publication, CSV import/export, knowledge lifecycle, or production identity yet. M0 and M1 remain incomplete.
 
 ## Delivery rules
@@ -32,34 +32,36 @@ Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.m
 
 Dependencies: documentation revision complete; user resumed implementation on 2026-10-21.
 
-- [ ] Verify the current local Personal starter kit on Linux/Podman, edition terms, hardware needs, and actual database/launcher versions. Do not provision cloud resources by default.
-- [ ] Test the official TypeScript driver with supported Node LTS, TLS trust/hostname checks, prepared value bindings, explicit transactions, rollback, affected-row reporting, and connection cleanup.
+- [x] Verify the current local Personal starter kit on Linux/Podman, edition terms, hardware needs, and actual database/launcher versions. Do not provision cloud resources by default.
+- [x] Test the official TypeScript driver with supported Node LTS, TLS trust/hostname checks, prepared value bindings, explicit transactions, rollback, affected-row reporting, and connection cleanup.
 - [ ] Test exact numeric/UTC/JSON-text mappings and empty-string/null behavior against the real database.
 - [ ] Prove enabled primary/composite keys reject invalid inserts; do not assume UNIQUE/CHECK, JSONB, RLS, row locks, or PostgreSQL queue syntax.
 - [ ] Verify command receipt replay, rollback after a partial command, collision retry, and reconciliation after an ambiguous commit response.
 - [x] Set up pnpm, TypeScript, Next.js App Router, and Node Route Handlers with server-only Exasol access. Keep the UI basic and easy to redesign.
 - [ ] Prove distinct mutation routes share one process-wide coordinator in the production Node build. No replicas or serverless deployment in this baseline.
 - [ ] Define ToolSpec, action/proposal/event/error contracts and the owner/operator/requester/viewer matrix.
-- [ ] Seed two workspaces and synthetic role identities. Verify API and repository isolation, including direct forged requests.
+- [x] Seed two workspaces and synthetic role identities. Verify API and repository isolation, including direct forged requests.
 - [ ] Render a fixed request template without an LLM; evaluate json-render only as a thin optional adapter.
 - [ ] Persist one bounded run/checkpoint and resume it after a server restart through an authenticated advance request.
 
 Acceptance: a real Exasol connection passes transaction, key, identity-isolation, and concurrent-route checks; a static tool renders in Next.js; persisted state survives restart. Record tested versions and limitations. Mock-only success does not satisfy this milestone. If the TypeScript driver blocks progress, record the failing contract before evaluating PyExasol as a narrow fallback.
 
+Remaining M0 gates include complete proposal/event contracts, deliberately invalid composite references, forced database collision/ambiguous-commit cases, and a resumable agent checkpoint. The working manual workflow does not imply those later capabilities are complete.
+
 ## M1 — Usable request desk without AI
 
 Dependencies: M0.
 
-- [ ] Implement workspace membership and current-permission checks.
-- [ ] Create request, comment, revision, activity, and audit tables with enabled composite workspace keys verified on Exasol.
-- [ ] Implement request creation, own-request listing, team queue listing, details, comments, and controlled updates.
+- [x] Implement workspace membership and current-permission checks.
+- [x] Create request, comment, revision, activity, and audit tables with enabled composite workspace keys verified on Exasol.
+- [x] Implement request creation, own-request listing, team queue listing, details, comments, and controlled updates.
 - [ ] Render intake form, table, details, filters, and summary cards from `ToolSpec`.
-- [ ] Support statuses `new`, `needs_info`, `ready`, `in_progress`, `done`, and `cancelled`.
+- [x] Support statuses `new`, `needs_info`, `ready`, `in_progress`, `done`, and `cancelled`.
 - [ ] Separate hard intake requirements from readiness requirements; imported historical records may be incomplete and must be marked accordingly.
 - [ ] Implement owner and due-date controls, pagination, and requester-visible status.
 - [ ] Implement CSV column mapping, bounded upload parsing, validation preview, explicit import commit, and authorized export.
-- [ ] Add compare-and-swap record versions and Exasol-backed command receipts with enabled primary keys for mutations.
-- [ ] Write audit and outbox events in the same transaction as successful changes.
+- [x] Add compare-and-swap record versions and Exasol-backed command receipts with enabled primary keys for mutations.
+- [x] Write audit and outbox events in the same transaction as successful changes.
 
 Acceptance: a requester submits a record; an operator clarifies, assigns, and completes it; the requester sees their own progress. A requester cannot change owner, priority, or status through a forged API call. A viewer cannot mutate. Invalid transitions and stale versions fail without partial writes. Duplicate import submission does not create duplicate rows.
 

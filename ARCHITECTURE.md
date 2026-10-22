@@ -4,7 +4,7 @@ Status: implementation resumed; this document combines implemented foundation an
 
 Loom is a shared internal-tool workspace. The first workflow is a data-request desk: collect requirements, clarify missing details, retrieve team guidance, propose ownership, and track resolution. The design preserves a reusable request-and-review engine while limiting the first product to one workflow family.
 
-The Next.js manual desk and Exasol adapter are implemented, but live Exasol verification is pending setup. Agent, generated-tool publication, knowledge lifecycle, and durable runner sections remain proposed. [RUNBOOK.md](RUNBOOK.md) distinguishes actual behavior from future design. [TECH_STACK.md](TECH_STACK.md) selects the proposed dependencies; [PLAN.md](PLAN.md) defines delivery and acceptance checks.
+The Next.js manual desk and Exasol adapter are implemented and verified with live SQL and a connected production-browser journey. Agent, generated-tool publication, knowledge lifecycle, and durable runner sections remain proposed. [RUNBOOK.md](RUNBOOK.md) distinguishes actual behavior from future design. [TECH_STACK.md](TECH_STACK.md) selects the proposed dependencies; [PLAN.md](PLAN.md) defines delivery and acceptance checks.
 
 ## 1. Research method and limits
 
@@ -66,7 +66,7 @@ Exasol is the sole canonical domain store and analytical engine. There is no req
 
 Agent runs use persisted Exasol checkpoints and bounded authenticated advance requests. Provider calls occur outside database transactions and the write coordinator. Disconnects/crashes leave resumable state; neither detached promises nor Next.js `after()` constitute a durable queue. A future unattended runner requires explicit scheduling/recovery and coordination design.
 
-The single write coordinator serializes all mutations, including membership/rule publication and run persistence. This is an intentionally small single-instance baseline, not a distributed lock. M0 must verify the production Next build shares it across routes. Replicas, serverless instances, and direct database writers are outside this contract. See [Next.js Node deployment](https://nextjs.org/docs/app/getting-started/deploying), [Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), and [`after()`](https://nextjs.org/docs/app/api-reference/functions/after).
+The single write coordinator serializes all mutations, including membership/rule publication and run persistence. This is an intentionally small single-instance baseline, not a distributed lock. The production-browser suite verifies conflicting shared command IDs across create/update routes commit one effect and reject the other; no distributed coordination guarantee follows. Replicas, serverless instances, and direct database writers are outside this contract. See [Next.js Node deployment](https://nextjs.org/docs/app/getting-started/deploying), [Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), and [`after()`](https://nextjs.org/docs/app/api-reference/functions/after).
 
 ## 5. Modules and contracts
 
@@ -405,7 +405,7 @@ Required integration scenarios include two-workspace isolation; own-request rest
 
 Correlate API request, workspace, run, step, proposal, command, and outbox IDs. Track queue age, retries, validation failures, blocked/stale proposals, review time, provider usage, and completed work. Keep credentials and full private content out of ordinary logs; observability exports require the same data-handling review as any other third-party service.
 
-Deploy one self-hosted Next.js Node process alongside local Exasol Personal for the synthetic event demo. Verify connection limits, TLS trust, health/readiness, graceful shutdown, explicit migrations, and backup/restore. The implementation setup attempt found the installed local launcher does not support Linux and the current Linux starter kit requires missing Podman; no database deployment completed. Keep any future licensed shared environment separate. Database audits are append-only to ordinary product roles, not cryptographically immutable against database administrators. Retention and deletion must cover uploaded sources, derived chunks, cached context, and provider/log copies where applicable.
+Deploy one self-hosted Next.js Node process alongside local Exasol Personal for the synthetic event demo. Verify connection limits, TLS trust, health/readiness, graceful shutdown, explicit migrations, and backup/restore. After the initial old-launcher failure, Podman and a verified local launcher 2.3.0 brought up Personal 2026.2.0-nano.3. The database adapter, migrations, seeded request workflow, and production-browser path pass the recorded checks. Keep any future licensed shared environment separate. Database audits are append-only to ordinary product roles, not cryptographically immutable against database administrators. Retention and deletion must cover uploaded sources, derived chunks, cached context, and provider/log copies where applicable.
 
 ## 17. Architecture decisions and expansion triggers
 
@@ -489,7 +489,7 @@ Status means a proposed relationship to Loom: **Adopt** = intended dependency/se
 | R23 | [promptfoo/promptfoo](https://github.com/promptfoo/promptfoo), README | Adopt | Model/prompt comparisons and adversarial evaluation. Judge scores supplement final-state assertions. |
 
 | R24 | [exasol/exasol-personal](https://github.com/exasol/exasol-personal), repository overview and linked setup docs | Adopt | Official Personal launcher; verify current Linux/Podman setup, hardware, version, and edition terms. |
-| R25 | [exasol/exasol-driver-ts](https://github.com/exasol/exasol-driver-ts), README and driver user guide | Adopt | Server-only TypeScript adapter, prepared bindings, explicit connection transactions, TLS. Must pass M0 against actual installed Exasol. |
+| R25 | [exasol/exasol-driver-ts](https://github.com/exasol/exasol-driver-ts), README and driver user guide | Adopt | Server-only TypeScript adapter, prepared bindings, explicit connection transactions, TLS. The 0.8.1 adapter passes current live checks; public protocol commands avoid a prepare-error connection leak. |
 | R26 | [exasol/pyexasol](https://github.com/exasol/pyexasol), README | Defer | Python fallback only if a documented TypeScript compatibility blocker warrants a second runtime. |
 
 ## 20. Primary implementation documentation
@@ -503,7 +503,7 @@ Status means a proposed relationship to Loom: **Adopt** = intended dependency/se
 - [Next.js Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), [deployment](https://nextjs.org/docs/app/getting-started/deploying), and [after](https://nextjs.org/docs/app/api-reference/functions/after): application/server boundaries and background execution limits.
 - [AI SDK structured generation](https://ai-sdk.dev/docs/ai-sdk-core/generating-structured-data): provider integration; semantic/action validation remains Loom's responsibility.
 
-Before implementation resumes, pin compatible versions, verify actual SQL/driver behavior, and record tested setup. Research findings above are not completed technical spikes.
+RUNBOOK records pinned/tested versions and current verification. The research register is distinct from the live implementation checks; remaining PLAN gates are not implied complete.
 
 ## 21. Exasol analytical pipeline and evidence contract
 
