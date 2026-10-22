@@ -21,6 +21,7 @@ export async function POST(request: Request, context: Context) {
       body.commandId,
       body.expectedVersion,
       body.action,
+      request.signal,
     );
   }, true)(request);
 }

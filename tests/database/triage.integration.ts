@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import type { Actor, KnowledgeInput } from "@loom/contracts";
 import { isConfigured, readDatabase, writeDatabase } from "@loom/db-exasol";
 import {
@@ -52,6 +52,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await writeDatabase(async (sql) => {
     for (const table of [
+      "MODEL_ATTEMPTS",
       "AGENT_STEPS",
       "TRIAGE_PROPOSALS",
       "AGENT_RUNS",
@@ -100,8 +101,49 @@ async function rule(
   };
   return createKnowledge(operator, randomUUID(), values);
 }
+
+const task =
+  "Review this request and propose a priority change, explaining your reasoning.";
+const model = vi.hoisted(() => ({ infer: vi.fn() }));
+vi.mock("../../apps/web/server/openrouter", () => ({
+  promptVersion: "triage-llm-v1",
+  modelConfiguration: () => ({
+    key: "test-only",
+    model: "fixture/test-only",
+    maxTokens: 4096,
+    timeoutMs: 60_000,
+  }),
+  inferProposal: (...args: unknown[]) => model.infer(...args),
+}));
+// Only the external provider is mocked. Every permission, checkpoint, proposal, and write uses real Exasol.
+function output(context: { knowledge: { id: string }[] }) {
+  return {
+    suggestion: {
+      summary: "Provider fixture recommendation",
+      reasons: ["Provider-authored rationale"],
+      uncertainty: [],
+      evidenceIds: context.knowledge.map((entry) => entry.id),
+      commands: [{ type: "set_priority", priority: "high" }],
+    },
+    inference: {
+      requestedModel: "fixture/test-only",
+      actualModel: "fixture/test-only",
+      generationId: "test-generation",
+      promptVersion: "triage-llm-v1",
+      promptTokens: 20,
+      completionTokens: 30,
+      cost: null,
+      durationMs: 1,
+    },
+  };
+}
+beforeEach(() => {
+  model.infer
+    .mockReset()
+    .mockImplementation(async (context) => output(context));
+});
 async function proposed(id: string, initiator = owner) {
-  const run = await startRun(initiator, randomUUID(), [id]);
+  const run = await startRun(initiator, randomUUID(), [id], task);
   const result = await changeRun(
     initiator,
     run.id,
@@ -111,46 +153,41 @@ async function proposed(id: string, initiator = owner) {
   );
   return { run: result.run, proposal: result.proposals[0] };
 }
-it("persists checkpoints and exact proposals without writes, then applies once with permission checks", async () => {
+it("persists actual provider outputs, binds review, and executes once without model re-inference", async () => {
   const record = await request(),
     draft = await rule(record.dataset);
   await expect(
     changeKnowledge(operator, draft.id, randomUUID(), 1, "approve"),
   ).rejects.toThrow("Only an owner");
-  const approved = await changeKnowledge(
-    owner,
-    draft.id,
-    randomUUID(),
-    1,
-    "approve",
-  );
-  expect(approved.state).toBe("approved");
+  await changeKnowledge(owner, draft.id, randomUUID(), 1, "approve");
   const commandId = randomUUID(),
-    run = await startRun(owner, commandId, [record.id]);
-  expect((await startRun(owner, commandId, [record.id])).id).toBe(run.id);
+    run = await startRun(owner, commandId, [record.id], task);
+  expect((await startRun(owner, commandId, [record.id], task)).id).toBe(run.id);
   await expect(
-    startRun(owner, commandId, [record.id, record.id]),
-  ).rejects.toThrow();
+    startRun(owner, commandId, [record.id], "different task"),
+  ).rejects.toThrow("different action");
   await expect(
     changeRun(operator, run.id, randomUUID(), 1, "advance"),
   ).rejects.toThrow("initiator or a workspace owner");
-  const advanceId = randomUUID();
-  const advanced = await changeRun(owner, run.id, advanceId, 1, "advance");
+  const advanceId = randomUUID(),
+    advanced = await changeRun(owner, run.id, advanceId, 1, "advance");
   expect(
     (await changeRun(owner, run.id, advanceId, 1, "advance")).steps,
   ).toHaveLength(1);
-  expect((await readRun(owner, run.id)).run).toMatchObject({
+  expect(model.infer).toHaveBeenCalledTimes(1);
+  expect(model.infer.mock.calls[0][0].task).toBe(task);
+  expect(advanced.run).toMatchObject({
+    engine: "openrouter-v1",
+    model: "fixture/test-only",
     status: "completed",
     checkpoint: 1,
-    version: 2,
+    version: 3,
   });
   expect((await details(owner, record.id)).request).toMatchObject({
     version: 1,
-    status: "new",
-    ownerId: null,
+    priority: "normal",
   });
   const proposal = advanced.proposals[0];
-  expect(proposal.content.commands).toHaveLength(3);
   await expect(
     reviewProposal(
       owner,
@@ -184,15 +221,15 @@ it("persists checkpoints and exact proposals without writes, then applies once w
       "approve",
     ),
   ).rejects.toThrow("not found");
-  const approvalId = randomUUID();
-  const applied = await reviewProposal(
-    operator,
-    proposal.content.id,
-    approvalId,
-    proposal.hash,
-    "approve",
-  );
-  expect(applied.requestVersion).toBe(4);
+  const approvalId = randomUUID(),
+    applied = await reviewProposal(
+      operator,
+      proposal.content.id,
+      approvalId,
+      proposal.hash,
+      "approve",
+    );
+  expect(applied.requestVersion).toBe(2);
   expect(
     await reviewProposal(
       operator,
@@ -209,30 +246,26 @@ it("persists checkpoints and exact proposals without writes, then applies once w
     proposal.hash,
     "approve",
   );
-  const saved = await details(owner, record.id);
-  expect(saved.request).toMatchObject({
-    version: 4,
-    status: "needs_info",
-    ownerId: operator.userId,
+  expect((await details(owner, record.id)).request).toMatchObject({
+    version: 2,
+    priority: "high",
   });
-  expect(saved.comments).toHaveLength(1);
-  expect(saved.comments[0].visibility).toBe("internal");
-  expect((await details(requester, record.id)).comments).toHaveLength(0);
+  expect(model.infer).toHaveBeenCalledTimes(1);
   await expect(
     createRequest(operator, approvalId, {
-      title: "Conflicting receipt",
+      title: "Conflicting",
       businessQuestion: "Why?",
       reportingPeriod: "",
       dataset: "",
     }),
   ).rejects.toThrow("different action");
 });
-it("rejects a stale target and a retired evidence source without partial request changes", async () => {
+it("blocks stale request/knowledge proposals and preserves immutable source replacement history", async () => {
   const stale = await request(),
     first = await proposed(stale.id);
   await mutateRequest(owner, stale.id, randomUUID(), 1, {
-    type: "set_priority",
-    priority: "high",
+    type: "set_due_date",
+    dueAt: "2026-12-01",
   });
   await expect(
     reviewProposal(
@@ -243,24 +276,24 @@ it("rejects a stale target and a retired evidence source without partial request
       "approve",
     ),
   ).rejects.toThrow("changed after triage");
-  expect((await details(owner, stale.id)).comments).toHaveLength(0);
   const record = await request(),
-    draft = await rule(record.dataset);
-  const approved = await changeKnowledge(
-    owner,
-    draft.id,
-    randomUUID(),
-    1,
-    "approve",
-  );
+    draft = await rule(record.dataset),
+    approved = await changeKnowledge(
+      owner,
+      draft.id,
+      randomUUID(),
+      1,
+      "approve",
+    );
   const second = await proposed(record.id);
-  await changeKnowledge(
-    owner,
-    approved.id,
-    randomUUID(),
-    approved.version,
-    "retire",
-  );
+  const replacement = await rule(record.dataset, owner.userId, approved.id);
+  expect(
+    await readDatabase((sql) => getKnowledge(sql, owner, approved.id)),
+  ).toMatchObject({ state: "approved", version: 2 });
+  await changeKnowledge(owner, replacement.id, randomUUID(), 1, "approve");
+  expect(
+    await readDatabase((sql) => getKnowledge(sql, owner, approved.id)),
+  ).toMatchObject({ state: "superseded", version: 3 });
   await expect(
     reviewProposal(
       owner,
@@ -278,113 +311,124 @@ it("rejects a stale target and a retired evidence source without partial request
     second.proposal.hash,
     "reject",
   );
-  expect((await readRun(owner, second.run.id)).proposals[0].state).toBe(
-    "rejected",
-  );
 });
-it("keeps the approved source active until a replacement is approved, then invalidates pending evidence", async () => {
-  const record = await request(),
-    draft = await rule(record.dataset);
-  const old = await changeKnowledge(
-    owner,
-    draft.id,
-    randomUUID(),
-    1,
-    "approve",
-  );
-  const first = await proposed(record.id);
-  const replacement = await rule(record.dataset, owner.userId, old.id);
-  expect(
-    await readDatabase((sql) => getKnowledge(sql, owner, old.id)),
-  ).toMatchObject({ state: "approved", version: 2 });
-  await changeKnowledge(owner, replacement.id, randomUUID(), 1, "approve");
-  expect(
-    await readDatabase((sql) => getKnowledge(sql, owner, old.id)),
-  ).toMatchObject({ state: "superseded", version: 3, content: old.content });
-  await expect(
-    reviewProposal(
-      owner,
-      first.proposal.content.id,
-      randomUUID(),
-      first.proposal.hash,
-      "approve",
-    ),
-  ).rejects.toThrow("knowledge changed");
-  expect((await details(owner, record.id)).request.ownerId).toBeNull();
-});
-it("cancels an unfinished run durably and prevents its already generated proposal from executing", async () => {
-  const first = await request(),
-    second = await request();
-  const run = await startRun(operator, randomUUID(), [first.id, second.id]);
-  const advanced = await changeRun(
-    operator,
-    run.id,
-    randomUUID(),
-    1,
-    "advance",
-  );
-  expect(advanced.run).toMatchObject({ checkpoint: 1, status: "running" });
-  const cancelled = await changeRun(
-    operator,
-    run.id,
-    randomUUID(),
-    2,
-    "cancel",
-  );
-  expect(cancelled.run.status).toBe("cancelled");
-  expect((await readRun(owner, run.id)).steps).toHaveLength(1);
-  await expect(
-    changeRun(operator, run.id, randomUUID(), 3, "advance"),
-  ).rejects.toThrow("finished");
-  const proposal = advanced.proposals[0];
-  await expect(
-    reviewProposal(
-      owner,
-      proposal.content.id,
-      randomUUID(),
-      proposal.hash,
-      "approve",
-    ),
-  ).rejects.toThrow("Cancelled or expired");
-  expect((await details(owner, first.id)).request.version).toBe(1);
-});
-it("rechecks initiator permissions before delivery and approval, and persists timeouts", async () => {
-  const record = await request(),
-    first = await proposed(record.id, operator);
-  await writeDatabase((sql) =>
-    sql.execute(
-      "UPDATE MEMBERSHIPS SET ACTIVE = FALSE WHERE WORKSPACE_ID = ? AND USER_ID = ?",
-      [ws, operator.userId],
-    ),
-  );
-  try {
-    await expect(readRun(owner, first.run.id)).rejects.toThrow("access");
+it("rejects hallucinated evidence and invalid actions instead of manufacturing a fallback", async () => {
+  for (const invalid of ["evidence", "action"]) {
+    const record = await request(),
+      run = await startRun(owner, randomUUID(), [record.id], task);
+    model.infer.mockImplementationOnce(async (context) => {
+      const result = output(context);
+      if (invalid === "evidence")
+        result.suggestion.evidenceIds = [randomUUID()];
+      else
+        result.suggestion.commands = [
+          { type: "set_owner", ownerId: foreign.userId },
+        ] as never;
+      return result;
+    });
     await expect(
-      reviewProposal(
-        owner,
-        first.proposal.content.id,
-        randomUUID(),
-        first.proposal.hash,
-        "approve",
-      ),
-    ).rejects.toThrow("access");
-  } finally {
-    await writeDatabase((sql) =>
-      sql.execute(
-        "UPDATE MEMBERSHIPS SET ACTIVE = TRUE WHERE WORKSPACE_ID = ? AND USER_ID = ?",
-        [ws, operator.userId],
-      ),
+      changeRun(owner, run.id, randomUUID(), 1, "advance"),
+    ).rejects.toThrow(
+      invalid === "evidence" ? "unavailable evidence" : "violates",
     );
+    expect((await readRun(owner, run.id)).proposals).toEqual([]);
+    expect((await details(owner, record.id)).request.version).toBe(1);
   }
-  expect((await details(owner, record.id)).request.version).toBe(1);
-  const run = await startRun(owner, randomUUID(), [record.id]);
+});
+it("does not hold the write coordinator during inference and discards context changed mid-call", async () => {
+  const record = await request(),
+    run = await startRun(owner, randomUUID(), [record.id], task);
+  let finish!: () => void, seen!: () => void;
+  const called = new Promise<void>((resolve) => {
+    seen = resolve;
+  });
+  model.infer.mockImplementationOnce((context) => {
+    seen();
+    return new Promise((resolve) => {
+      finish = () => resolve(output(context));
+    });
+  });
+  const advancing = changeRun(owner, run.id, randomUUID(), 1, "advance");
+  await called;
+  await mutateRequest(owner, record.id, randomUUID(), 1, {
+    type: "set_priority",
+    priority: "low",
+  });
+  await expect(
+    changeRun(owner, run.id, randomUUID(), 2, "advance"),
+  ).rejects.toThrow("already processing");
+  finish();
+  await expect(advancing).rejects.toThrow("changed during inference");
+  expect((await readRun(owner, run.id)).steps).toEqual([]);
+  expect((await details(owner, record.id)).request).toMatchObject({
+    priority: "low",
+  });
+});
+it("cancels or revokes while a provider call is in flight and never saves its proposal", async () => {
+  for (const scenario of ["cancel", "revoke"]) {
+    const record = await request(),
+      run = await startRun(operator, randomUUID(), [record.id], task);
+    let finish!: () => void, seen!: () => void;
+    const called = new Promise<void>((resolve) => {
+      seen = resolve;
+    });
+    model.infer.mockImplementationOnce((context) => {
+      seen();
+      return new Promise((resolve) => {
+        finish = () => resolve(output(context));
+      });
+    });
+    const advancing = changeRun(operator, run.id, randomUUID(), 1, "advance");
+    await called;
+    if (scenario === "cancel")
+      await changeRun(operator, run.id, randomUUID(), 2, "cancel");
+    else
+      await writeDatabase((sql) =>
+        sql.execute(
+          "UPDATE MEMBERSHIPS SET ACTIVE = FALSE WHERE WORKSPACE_ID = ? AND USER_ID = ?",
+          [ws, operator.userId],
+        ),
+      );
+    finish();
+    try {
+      await expect(advancing).rejects.toThrow(
+        scenario === "cancel" ? "cancelled" : "access",
+      );
+    } finally {
+      if (scenario === "revoke")
+        await writeDatabase((sql) =>
+          sql.execute(
+            "UPDATE MEMBERSHIPS SET ACTIVE = TRUE WHERE WORKSPACE_ID = ? AND USER_ID = ?",
+            [ws, operator.userId],
+          ),
+        );
+    }
+    expect((await readRun(owner, run.id)).proposals).toEqual([]);
+    expect((await details(owner, record.id)).request.version).toBe(1);
+  }
+});
+it("caps explicit provider retries and persists timeouts without a model fallback", async () => {
+  const record = await request(),
+    run = await startRun(owner, randomUUID(), [record.id], task);
+  model.infer.mockRejectedValue(new Error("Provider fixture outage"));
+  for (const version of [1, 2])
+    await expect(
+      changeRun(owner, run.id, randomUUID(), version, "advance"),
+    ).rejects.toThrow("outage");
+  await expect(
+    changeRun(owner, run.id, randomUUID(), 3, "advance"),
+  ).rejects.toThrow("two provider-call");
+  expect(model.infer).toHaveBeenCalledTimes(2);
+  expect((await readRun(owner, run.id)).steps).toEqual([]);
+  const expired = await startRun(owner, randomUUID(), [record.id], task);
   await writeDatabase((sql) =>
     sql.execute(
       "UPDATE AGENT_RUNS SET EXPIRES_AT = CAST(? AS TIMESTAMP) WHERE WORKSPACE_ID = ? AND ID = ?",
-      ["2020-01-01 00:00:00", ws, run.id],
+      ["2020-01-01 00:00:00", ws, expired.id],
     ),
   );
-  const timed = await changeRun(owner, run.id, randomUUID(), 1, "advance");
-  expect(timed.run.status).toBe("timed_out");
-  expect(timed.steps).toEqual([]);
+  expect(
+    (await changeRun(owner, expired.id, randomUUID(), 1, "advance")).run.status,
+  ).toBe("timed_out");
+  expect(model.infer).toHaveBeenCalledTimes(2);
 });

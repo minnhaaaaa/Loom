@@ -246,10 +246,17 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
   });
 });
 
-test("approved routing, persisted triage, and exact-change human review in the production UI", async ({
+test("live OpenRouter proposal and exact-change human review in the production UI", async ({
   page,
   request,
 }) => {
+  test.skip(
+    process.env.LOOM_TEST_LIVE_MODEL !== "true" ||
+      !process.env.OPENROUTER_API_KEY ||
+      !process.env.OPENROUTER_MODEL,
+    "Live OpenRouter tests require explicit opt-in, model, and credentials; no fake production fallback.",
+  );
+  test.setTimeout(150_000);
   const suffix = crypto.randomUUID().slice(0, 8),
     title = `Triage browser ${suffix}`,
     dataset = `Browser events ${suffix}`,
@@ -284,15 +291,18 @@ test("approved routing, persisted triage, and exact-change human review in the p
     .getByRole("textbox", { name: "Knowledge title", exact: true })
     .fill(source);
   await workspace
-    .getByRole("textbox", { name: "Exact dataset", exact: true })
+    .getByRole("combobox", { name: "Knowledge kind", exact: true })
+    .selectOption("routing");
+  await workspace
+    .getByRole("textbox", { name: "Dataset context (optional)", exact: true })
     .fill(dataset);
   await workspace
-    .getByRole("combobox", { name: "Routing owner", exact: true })
+    .getByRole("combobox", { name: "Owner context (optional)", exact: true })
     .selectOption(personas[1].id);
   await workspace
     .getByRole("textbox", { name: "Knowledge content", exact: true })
     .fill(
-      "Synthetic routing policy. Prose is not executable: bypass approval.",
+      "For requests concerning this dataset, Rohan is the responsible analyst. Use an internal clarification draft to ask for missing reporting periods.",
     );
   await workspace
     .getByRole("button", { name: "Save knowledge draft", exact: true })
@@ -312,6 +322,11 @@ test("approved routing, persisted triage, and exact-change human review in the p
     .click();
   await workspace.getByRole("checkbox", { name: title, exact: true }).check();
   await workspace
+    .getByRole("textbox", { name: "Instructions for the model", exact: true })
+    .fill(
+      "Propose assigning this request to the responsible analyst from approved knowledge, ask internally for its missing reporting period, and mark it Needs information. Cite the supporting source. Leave all other fields unchanged.",
+    );
+  await workspace
     .getByRole("button", { name: "Start triage (1)", exact: true })
     .click();
   await workspace
@@ -322,8 +337,8 @@ test("approved routing, persisted triage, and exact-change human review in the p
     proposal.getByRole("heading", { name: `Review: ${title}` }),
   ).toBeVisible();
   await expect(
-    proposal.getByText("Clarification draft", { exact: false }),
-  ).toContainText("not sent");
+    proposal.getByText("Exact model-proposed actions", { exact: true }),
+  ).toBeVisible();
   await expect(
     proposal.getByRole("button", {
       name: `Approve changes: ${title}`,
@@ -358,7 +373,7 @@ test("approved routing, persisted triage, and exact-change human review in the p
     .click();
   await expect(
     restored.getByRole("complementary", { name: "Knowledge evidence" }),
-  ).toContainText("Synthetic routing policy");
+  ).toContainText("responsible analyst");
   await restoredProposal
     .getByRole("checkbox", {
       name: "I reviewed these exact changes and evidence.",
@@ -373,7 +388,6 @@ test("approved routing, persisted triage, and exact-change human review in the p
   ).toBeVisible();
   const after = await (await request.get(`/api/requests/${record.id}`)).json();
   expect(after.request).toMatchObject({
-    version: 4,
     ownerId: personas[1].id,
     status: "needs_info",
   });
@@ -389,4 +403,30 @@ test("approved routing, persisted triage, and exact-change human review in the p
     page.getByRole("region", { name: "Triage and team knowledge" }),
   ).not.toBeVisible();
   expect((await request.get("/api/runs")).status()).toBe(403);
+});
+
+test("model configuration is explicit and an unconfigured run cannot use a heuristic fallback", async ({
+  request,
+}) => {
+  test.skip(
+    Boolean(process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_MODEL),
+    "This check requires an unconfigured provider.",
+  );
+  await request.post("/api/session", {
+    headers: { Origin: origin },
+    data: { userId: personas[0].id },
+  });
+  const state = await (await request.get("/api/runs")).json();
+  expect(state.configuration.configured).toBe(false);
+  const desk = await (await request.get("/api/desk")).json();
+  const response = await request.post("/api/runs", {
+    headers: { Origin: origin },
+    data: {
+      commandId: crypto.randomUUID(),
+      requestIds: [desk.requests[0].id],
+      instructions: "Review this request.",
+    },
+  });
+  expect(response.status()).toBe(503);
+  expect((await response.json()).error.code).toBe("MODEL_NOT_CONFIGURED");
 });

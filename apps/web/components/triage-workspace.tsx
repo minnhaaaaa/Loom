@@ -36,7 +36,7 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
 function emptyKnowledge(): KnowledgeInput {
   return {
     title: "",
-    kind: "routing",
+    kind: "procedure",
     content: "",
     dataset: "",
     ownerId: null,
@@ -67,18 +67,37 @@ export function TriageWorkspace({
     [error, setError] = useState("");
   const [evidence, setEvidence] = useState<KnowledgeEntry | null>(null),
     [reviewed, setReviewed] = useState<string[]>([]);
+  const [instructions, setInstructions] = useState("");
+  const [inferring, setInferring] = useState(false);
+  const [configuration, setConfiguration] = useState<{
+    configured: boolean;
+    model: string | null;
+    message: string;
+  }>({
+    configured: false,
+    model: null,
+    message: "Loading model configuration.",
+  });
   const pending = useRef<{ payload: string; id: string } | null>(null);
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const [sources, recent] = await Promise.all([
       api<{ entries: KnowledgeEntry[]; hasMore: boolean }>("/api/knowledge", {
         signal,
       }),
-      api<{ runs: TriageRun[] }>("/api/runs", { signal }),
+      api<{
+        runs: TriageRun[];
+        configuration: {
+          configured: boolean;
+          model: string | null;
+          message: string;
+        };
+      }>("/api/runs", { signal }),
     ]);
     if (signal?.aborted) return;
     setKnowledge(sources.entries);
     setHasMore(sources.hasMore);
     setRuns(recent.runs);
+    setConfiguration(recent.configuration);
   }, []);
   useEffect(() => {
     const controller = new AbortController();
@@ -154,6 +173,7 @@ export function TriageWorkspace({
     await work(async () => {
       const run = await command<TriageRun>("/api/runs", {
         requestIds: selection,
+        instructions,
       });
       setDetail(await api<RunDetails>(`/api/runs/${run.id}`));
       setReviewed([]);
@@ -172,21 +192,45 @@ export function TriageWorkspace({
   }
   async function advance(action: "advance" | "cancel") {
     if (!detail) return;
-    await work(async () => {
+    setInferring(action === "advance");
+    try {
+      await work(async () => {
+        setDetail(
+          await command<RunDetails>(`/api/runs/${detail.run.id}`, {
+            expectedVersion: detail.run.version,
+            action,
+          }),
+        );
+        setReviewed([]);
+        await refresh();
+        setMessage(
+          action === "cancel"
+            ? "Run cancelled. In-flight output cannot be applied."
+            : "Model checkpoint saved. Review its proposed changes before applying.",
+        );
+      });
+    } finally {
+      setInferring(false);
+    }
+  }
+  async function cancelInFlight() {
+    if (!detail) return;
+    try {
+      const latest = await api<RunDetails>(`/api/runs/${detail.run.id}`);
       setDetail(
-        await command<RunDetails>(`/api/runs/${detail.run.id}`, {
-          expectedVersion: detail.run.version,
-          action,
+        await api<RunDetails>(`/api/runs/${detail.run.id}`, {
+          method: "POST",
+          body: JSON.stringify({
+            commandId: crypto.randomUUID(),
+            expectedVersion: latest.run.version,
+            action: "cancel",
+          }),
         }),
       );
-      setReviewed([]);
-      await refresh();
-      setMessage(
-        action === "cancel"
-          ? "Run cancelled. Its pending proposals cannot apply changes."
-          : "Checkpoint saved. Requests remain unchanged until a proposal is approved.",
-      );
-    });
+      setMessage("Run cancelled. In-flight model output cannot be applied.");
+    } catch (error) {
+      setError((error as Error).message);
+    }
   }
   async function review(
     proposal: TriageProposal,
@@ -217,15 +261,32 @@ export function TriageWorkspace({
     >
       <h2>Triage and team knowledge</h2>
       <p>
-        Rule-based baseline · no language model connected. Triage checks
-        readiness and exact-dataset routing rules. It never changes requests
-        before your review.
+        Model-generated proposals through OpenRouter. Your instructions and
+        approved team knowledge guide the model. Changes require your review.
       </p>
       {error && (
         <p className="alert" role="alert">
           {error}
         </p>
       )}
+      <p>
+        {configuration.configured
+          ? `OpenRouter · ${configuration.model}`
+          : configuration.message}
+      </p>
+      <button
+        className="secondary"
+        disabled={busy}
+        onClick={() =>
+          void work(async () => {
+            await refresh();
+            if (detail)
+              setDetail(await api<RunDetails>(`/api/runs/${detail.run.id}`));
+          })
+        }
+      >
+        Refresh model and saved state
+      </button>
       <p className="notice" role="status" aria-live="polite">
         {busy ? "Working…" : message}
       </p>
@@ -233,8 +294,8 @@ export function TriageWorkspace({
         <summary>Team knowledge</summary>
         <p>
           Operators can draft. Only owners can approve, supersede, or retire
-          guidance. Source text is displayed as plain text. Rules use the
-          dataset and owner fields, never instructions embedded in prose.
+          guidance. Approved source content and optional metadata are supplied
+          to the model as reference material.
         </p>
         <form onSubmit={(event) => void draft(event)}>
           <div className="triage-form">
@@ -264,7 +325,7 @@ export function TriageWorkspace({
                   })
                 }
               >
-                <option value="routing">Routing rule</option>
+                <option value="routing">Routing guidance</option>
                 <option value="procedure">Procedure</option>
                 <option value="glossary">Glossary</option>
               </select>
@@ -272,9 +333,8 @@ export function TriageWorkspace({
             {values.kind === "routing" && (
               <>
                 <label>
-                  Exact dataset
+                  Dataset context (optional)
                   <input
-                    required
                     maxLength={200}
                     disabled={busy}
                     value={values.dataset}
@@ -284,9 +344,8 @@ export function TriageWorkspace({
                   />
                 </label>
                 <label>
-                  Routing owner
+                  Owner context (optional)
                   <select
-                    required
                     disabled={busy}
                     value={values.ownerId || ""}
                     onChange={(event) =>
@@ -461,8 +520,24 @@ export function TriageWorkspace({
             </label>
           ))}
         </div>
+        <label>
+          Instructions for the model
+          <textarea
+            required
+            maxLength={4000}
+            rows={3}
+            value={instructions}
+            disabled={busy}
+            onChange={(event) => setInstructions(event.target.value)}
+          />
+        </label>
         <button
-          disabled={busy || !selection.length}
+          disabled={
+            busy ||
+            !configuration.configured ||
+            !selection.length ||
+            !instructions.trim()
+          }
           onClick={() => void start()}
         >
           Start triage ({selection.length})
@@ -493,20 +568,30 @@ export function TriageWorkspace({
               {detail.run.requestIds.length} processed · v{detail.run.version} ·
               expires {new Date(detail.run.expiresAt).toLocaleTimeString()}
             </p>
-            {["queued", "running"].includes(detail.run.status) && (
-              <>
-                <button disabled={busy} onClick={() => void advance("advance")}>
-                  Process next request
-                </button>{" "}
-                <button
-                  className="secondary"
-                  disabled={busy}
-                  onClick={() => void advance("cancel")}
-                >
-                  Cancel triage run
-                </button>
-              </>
-            )}{" "}
+            <p>
+              {detail.run.model || "Legacy engine"} ·{" "}
+              {detail.run.instructions || "Historical run — read-only"}
+            </p>
+            {detail.run.engine === "openrouter-v1" &&
+              ["queued", "running"].includes(detail.run.status) && (
+                <>
+                  <button
+                    disabled={busy}
+                    onClick={() => void advance("advance")}
+                  >
+                    Process next request
+                  </button>{" "}
+                  <button
+                    className="secondary"
+                    disabled={busy && !inferring}
+                    onClick={() =>
+                      void (inferring ? cancelInFlight() : advance("cancel"))
+                    }
+                  >
+                    Cancel triage run
+                  </button>
+                </>
+              )}{" "}
             <button
               className="secondary"
               disabled={busy}
@@ -531,6 +616,19 @@ export function TriageWorkspace({
                 {proposal.content.uncertainty.map((reason) => (
                   <p key={reason}>{reason}</p>
                 ))}
+                <p>
+                  Generated by{" "}
+                  {proposal.content.inference?.actualModel ||
+                    "historical engine"}{" "}
+                  · {proposal.content.inference?.completionTokens ?? "unknown"}{" "}
+                  output tokens
+                </p>
+                <details open>
+                  <summary>Exact model-proposed actions</summary>
+                  <pre className="source-text">
+                    {JSON.stringify(proposal.content.commands, null, 2)}
+                  </pre>
+                </details>
                 <dl>
                   <dt>Status</dt>
                   <dd>
@@ -575,7 +673,7 @@ export function TriageWorkspace({
                           {source.title} · v{source.version}
                         </button>
                       ))
-                    : "Readiness checks only; no routing source supports an owner change."}
+                    : "The model cited no approved source. Review its reasoning and uncertainty."}
                 </p>
                 <p className="small">
                   Review hash: <code>{proposal.hash}</code>
@@ -602,6 +700,7 @@ export function TriageWorkspace({
                     <button
                       disabled={
                         busy ||
+                        detail.run.engine !== "openrouter-v1" ||
                         detail.run.status !== "completed" ||
                         !reviewed.includes(proposal.hash)
                       }

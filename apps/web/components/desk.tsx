@@ -661,9 +661,9 @@ export function Desk({
                 />
               )}
               <p className="scope-note">
-                Manual intake, coordination, and reviewed rule-based triage are
-                available. Language-model integration and tool generation are
-                planned.
+                Manual intake, coordination, and reviewed model-generated
+                proposals are available. Language-model integration and tool
+                generation are planned.
               </p>
             </>
           )}

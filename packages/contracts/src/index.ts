@@ -221,17 +221,6 @@ export const knowledgeInputSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (value.kind === "routing" && (!value.dataset || !value.ownerId))
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "Routing rules require an exact dataset and an eligible owner.",
-      });
-    if (value.kind !== "routing" && (value.dataset || value.ownerId))
-      ctx.addIssue({
-        code: "custom",
-        message: "Dataset and owner apply only to routing rules.",
-      });
     if (value.effectiveUntil && value.effectiveUntil < value.effectiveFrom)
       ctx.addIssue({
         code: "custom",
@@ -262,6 +251,7 @@ export const knowledgeActionSchema = z
 export const runStartSchema = z
   .object({
     commandId: z.uuid(),
+    instructions: z.string().trim().min(1).max(4000),
     requestIds: z
       .array(z.uuid())
       .min(1)
@@ -283,7 +273,10 @@ export type TriageRun = {
   workspaceId: string;
   initiatorId: string;
   requestIds: string[];
-  engine: "rules-v1";
+  engine: string;
+  model: string | null;
+  instructions: string;
+  promptVersion: string | null;
   toolRevision: "request-desk-v1";
   status: "queued" | "running" | "completed" | "cancelled" | "timed_out";
   version: number;
@@ -297,7 +290,8 @@ export type ProposalContent = {
   id: string;
   revision: 1;
   initiatorId: string;
-  engine: "rules-v1";
+  engine: "openrouter-v1";
+  inference: ModelInference;
   toolRevision: "request-desk-v1";
   requestId: string;
   expectedVersion: number;
@@ -310,8 +304,7 @@ export type ProposalContent = {
     contentHash: string;
     title: string;
   }[];
-  // All exact-dataset routing candidates, including scheduled/draft entries, bind future rule changes.
-  routingDigest: string;
+  knowledgeDigest: string;
   reasons: string[];
   uncertainty: string[];
   expiresAt: string;
@@ -329,6 +322,7 @@ export type TriageStep = {
   summary: string;
   uncertainty: string[];
   proposalId: string | null;
+  inference?: ModelInference;
 };
 export type RunDetails = {
   run: TriageRun;
@@ -342,3 +336,24 @@ export const proposalReviewSchema = z
     action: z.enum(["approve", "reject"]),
   })
   .strict();
+
+export const modelSuggestionSchema = z
+  .object({
+    summary: z.string().trim().min(1).max(2000),
+    reasons: z.array(z.string().trim().min(1).max(1000)).max(8),
+    uncertainty: z.array(z.string().trim().min(1).max(1000)).max(8),
+    evidenceIds: z.array(z.uuid()).max(50),
+    commands: z.array(commandSchema).max(6),
+  })
+  .strict();
+export type ModelSuggestion = z.infer<typeof modelSuggestionSchema>;
+export type ModelInference = {
+  requestedModel: string;
+  actualModel: string;
+  generationId: string;
+  promptVersion: string;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  cost: number | null;
+  durationMs: number;
+};

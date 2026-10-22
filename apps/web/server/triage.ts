@@ -9,8 +9,17 @@ import {
   type TriageRun,
   type TriageStep,
   runStartSchema,
+  toolSpec,
+  modelSuggestionSchema,
+  type Membership,
+  type KnowledgeEntry,
 } from "@loom/contracts";
-import { activeKnowledge, DomainError, triageRequest } from "@loom/domain";
+import {
+  activeKnowledge,
+  applyCommand,
+  transitions,
+  DomainError,
+} from "@loom/domain";
 import {
   fromTimestamp,
   readDatabase,
@@ -30,17 +39,26 @@ import {
   agentEvent,
   getKnowledge,
   requireOperator,
-  routingCandidates,
-  routingDigest,
+  approvedKnowledge,
+  knowledgeDigest,
   saveReceipt,
 } from "./knowledge";
+import {
+  inferProposal,
+  modelConfiguration,
+  promptVersion,
+  type ModelResult,
+} from "./openrouter";
 function mapRun(row: Row): TriageRun {
   return {
     id: String(row.ID),
     workspaceId: String(row.WORKSPACE_ID),
     initiatorId: String(row.INITIATOR_ID),
     requestIds: JSON.parse(String(row.REQUEST_IDS_JSON)),
-    engine: row.ENGINE as TriageRun["engine"],
+    engine: String(row.ENGINE),
+    model: row.MODEL ? String(row.MODEL) : null,
+    instructions: String(row.INSTRUCTIONS || ""),
+    promptVersion: row.PROMPT_VERSION ? String(row.PROMPT_VERSION) : null,
     toolRevision: row.TOOL_REVISION as TriageRun["toolRevision"],
     status: row.STATUS as TriageRun["status"],
     version: Number(row.VERSION),
@@ -57,12 +75,6 @@ async function getRun(sql: SqlSession, actor: Actor, id: string) {
   );
   if (!row) throw new DomainError("NOT_FOUND", "Triage run not found.", 404);
   const run = mapRun(row);
-  if (run.engine !== "rules-v1" || run.toolRevision !== "request-desk-v1")
-    throw new DomainError(
-      "UNSUPPORTED_RUN",
-      "This run requires an unsupported engine or tool revision.",
-      409,
-    );
   await requireOperator(sql, { ...actor, userId: run.initiatorId });
   return run;
 }
@@ -103,26 +115,46 @@ export async function listRuns(actor: Actor) {
       "SELECT * FROM AGENT_RUNS WHERE WORKSPACE_ID = ? AND INITIATOR_ID = ? ORDER BY CREATED_AT DESC,ID LIMIT 10",
       [actor.workspaceId, actor.userId],
     );
-    return { runs: rows.map(mapRun) };
+    let configuration;
+    try {
+      const config = modelConfiguration();
+      configuration = { configured: true, model: config.model, message: "" };
+    } catch (error) {
+      configuration = {
+        configured: false,
+        model: null,
+        message:
+          error instanceof DomainError
+            ? error.message
+            : "Model configuration is invalid.",
+      };
+    }
+    return { runs: rows.map(mapRun), configuration };
   });
 }
 export async function startRun(
   actor: Actor,
   commandId: string,
   requestIds: string[],
+  instructions: string,
 ) {
-  runStartSchema.parse({ commandId, requestIds });
-  const hash = digest({ type: "triage-start", requestIds });
+  instructions = runStartSchema.parse({
+    commandId,
+    requestIds,
+    instructions,
+  }).instructions;
+  const hash = digest({ type: "triage-start", requestIds, instructions });
   return writeDatabase(async (sql) => {
     const member = await requireOperator(sql, actor);
     const existing = await receipt<{ id: string }>(sql, actor, commandId, hash);
     if (existing) return getRun(sql, actor, existing.id);
+    const config = modelConfiguration();
     for (const id of requestIds) await getRequest(sql, actor, member, id);
     const id = randomUUID(),
       now = new Date().toISOString(),
       expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
     await sql.execute(
-      "INSERT INTO AGENT_RUNS (WORKSPACE_ID,ID,INITIATOR_ID,REQUEST_IDS_JSON,STATUS,VERSION,CHECKPOINT,CREATED_AT,EXPIRES_AT,ENGINE,TOOL_REVISION) VALUES (?,?,?,?,'queued',1,0,?,?,'rules-v1','request-desk-v1')",
+      "INSERT INTO AGENT_RUNS (WORKSPACE_ID,ID,INITIATOR_ID,REQUEST_IDS_JSON,STATUS,VERSION,CHECKPOINT,CREATED_AT,EXPIRES_AT,ENGINE,TOOL_REVISION,MODEL,INSTRUCTIONS,PROMPT_VERSION) VALUES (?,?,?,?,'queued',1,0,?,?,'openrouter-v1','request-desk-v1',?,?,?)",
       [
         actor.workspaceId,
         id,
@@ -130,6 +162,9 @@ export async function startRun(
         JSON.stringify(requestIds),
         sqlTimestamp(now),
         sqlTimestamp(expiresAt),
+        config.model,
+        instructions,
+        promptVersion,
       ],
     );
     await agentEvent(sql, actor, id, "triage_started", 1);
@@ -137,26 +172,138 @@ export async function startRun(
     return getRun(sql, actor, id);
   });
 }
+function supportedRun(run: TriageRun) {
+  if (
+    run.engine !== "openrouter-v1" ||
+    !run.model ||
+    run.promptVersion !== promptVersion ||
+    run.toolRevision !== "request-desk-v1"
+  )
+    throw new DomainError(
+      "UNSUPPORTED_RUN",
+      "This historical run is read-only. Start a new model-backed run.",
+      409,
+    );
+}
+async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
+  const member = await requireOperator(sql, actor);
+  const request = await getRequest(
+    sql,
+    actor,
+    member,
+    run.requestIds[run.checkpoint],
+  );
+  const knowledge = await approvedKnowledge(sql, actor),
+    members = await membersFor(sql, actor);
+  const comments = await sql.query(
+    "SELECT BODY,VISIBILITY,AUTHOR_ID,CREATED_AT FROM COMMENTS WHERE WORKSPACE_ID = ? AND REQUEST_ID = ? ORDER BY CREATED_AT DESC,ID DESC LIMIT 21",
+    [actor.workspaceId, request.id],
+  );
+  if (comments.length > 20)
+    throw new DomainError(
+      "MODEL_CONTEXT_LIMIT",
+      "This request has more than 20 comments. A bounded conversation retrieval strategy is required before model triage.",
+      422,
+    );
+  const context = {
+    task: run.instructions,
+    today: new Date().toISOString().slice(0, 10),
+    request,
+    comments,
+    knowledge,
+    members,
+    tool: toolSpec,
+    allowedTransitions: transitions,
+    promptVersion,
+  };
+  if (Buffer.byteLength(JSON.stringify(context), "utf8") > 120_000)
+    throw new DomainError(
+      "MODEL_CONTEXT_LIMIT",
+      "The model context exceeds 120 KB. Shorten the request or knowledge corpus before continuing.",
+      422,
+    );
+  return context;
+}
+function validateSuggestion(
+  result: ModelResult,
+  request: RequestRecord,
+  member: Membership,
+  members: Membership[],
+  knowledge: KnowledgeEntry[],
+) {
+  const suggestion = modelSuggestionSchema.parse(result.suggestion);
+  if (
+    new Set(suggestion.evidenceIds).size !== suggestion.evidenceIds.length ||
+    suggestion.evidenceIds.some(
+      (id) => !knowledge.some((entry) => entry.id === id),
+    )
+  )
+    throw new DomainError(
+      "MODEL_EVIDENCE_INVALID",
+      "The model cited unavailable evidence. No proposal was saved.",
+      502,
+    );
+  let after = request;
+  try {
+    for (const command of suggestion.commands)
+      after = applyCommand(member, after, command, members);
+  } catch {
+    throw new DomainError(
+      "MODEL_ACTION_INVALID",
+      "The model proposed an action that violates current field, transition, or permission constraints. No proposal was saved.",
+      502,
+    );
+  }
+  return {
+    suggestion,
+    after,
+    evidence: knowledge.filter((entry) =>
+      suggestion.evidenceIds.includes(entry.id),
+    ),
+  };
+}
+const controllers = new Map<string, AbortController>();
 export async function changeRun(
   actor: Actor,
   id: string,
   commandId: string,
   expectedVersion: number,
   action: "advance" | "cancel",
-) {
+  signal?: AbortSignal,
+): Promise<RunDetails> {
   const hash = digest({ type: "triage-step", id, expectedVersion, action });
-  return writeDatabase(async (sql) => {
-    const run = await getRun(sql, actor, id);
-    const actorMember = await requireOperator(sql, actor);
-    if (run.initiatorId !== actor.userId && actorMember.role !== "owner")
+  const reservation = await writeDatabase(async (sql) => {
+    const run = await getRun(sql, actor, id),
+      member = await requireOperator(sql, actor);
+    if (run.initiatorId !== actor.userId && member.role !== "owner")
       throw new DomainError(
         "ACCESS_DENIED",
         "Only the initiator or a workspace owner can advance or cancel this run.",
         403,
       );
     if (await receipt(sql, actor, commandId, hash))
-      return runDetails(sql, actor, id);
-    if (run.version !== expectedVersion)
+      return { cached: await runDetails(sql, actor, id) };
+    const attempts = await sql.query(
+      "SELECT * FROM MODEL_ATTEMPTS WHERE WORKSPACE_ID = ? AND RUN_ID = ? AND STEP_INDEX = ? ORDER BY ATTEMPT_NO",
+      [actor.workspaceId, id, run.checkpoint],
+    );
+    const [sameCommand] = await sql.query(
+      "SELECT * FROM MODEL_ATTEMPTS WHERE WORKSPACE_ID = ? AND COMMAND_ID = ? ORDER BY ATTEMPT_NO DESC LIMIT 1",
+      [actor.workspaceId, commandId],
+    );
+    if (
+      sameCommand &&
+      (sameCommand.PAYLOAD_HASH !== hash ||
+        sameCommand.ACTOR_ID !== actor.userId ||
+        sameCommand.RUN_ID !== id ||
+        Number(sameCommand.STEP_INDEX) !== run.checkpoint)
+    )
+      throw new DomainError(
+        "IDEMPOTENCY_CONFLICT",
+        "This command ID was already used for a different action.",
+        409,
+      );
+    if (run.version !== expectedVersion && !sameCommand)
       throw new DomainError(
         "VERSION_CONFLICT",
         "Run changed. Refresh its checkpoint before continuing.",
@@ -168,48 +315,139 @@ export async function changeRun(
         "This run has finished. Reject pending proposals or start a new run.",
         409,
       );
-    let status: TriageRun["status"] =
-        action === "cancel" ? "cancelled" : "running",
-      checkpoint = run.checkpoint;
-    if (new Date().toISOString() >= run.expiresAt) status = "timed_out";
-    else if (action === "advance") {
-      const member = await requireOperator(sql, actor);
-      const request = await getRequest(
-        sql,
-        actor,
-        member,
-        run.requestIds[checkpoint],
+    if (action === "cancel" || run.expiresAt <= new Date().toISOString()) {
+      const status = action === "cancel" ? "cancelled" : "timed_out";
+      await sql.execute(
+        "UPDATE AGENT_RUNS SET STATUS = ?,VERSION = VERSION + 1 WHERE WORKSPACE_ID = ? AND ID = ? AND VERSION = ?",
+        [status, actor.workspaceId, id, run.version],
       );
-      const candidates = await routingCandidates(sql, actor, request.dataset);
-      const suggestion = triageRequest(
-        request,
-        candidates,
-        await membersFor(sql, actor),
-        new Date().toISOString().slice(0, 10),
+      await agentEvent(sql, actor, id, `triage_${status}`, run.version + 1);
+      await saveReceipt(sql, actor, commandId, hash, { id });
+      return { cached: await runDetails(sql, actor, id) };
+    }
+    supportedRun(run);
+    modelConfiguration();
+    if (
+      attempts.some(
+        (attempt) =>
+          attempt.LIFECYCLE === "pending" &&
+          fromTimestamp(attempt.LEASE_UNTIL) > new Date().toISOString(),
+      )
+    )
+      throw new DomainError(
+        "STEP_IN_PROGRESS",
+        "A model call is already processing this checkpoint. Refresh its saved state; do not submit another paid call yet.",
+        409,
+      );
+    if (attempts.length >= 2)
+      throw new DomainError(
+        "MODEL_RETRY_LIMIT",
+        "This checkpoint has used its two provider-call attempts. Inspect the errors and start a new run if needed.",
+        409,
+      );
+    const context = await contextFor(sql, actor, run),
+      attemptId = randomUUID(),
+      leaseUntil = new Date(Date.now() + 120_000).toISOString();
+    const changed = await sql.execute(
+      "UPDATE AGENT_RUNS SET STATUS = 'running',VERSION = VERSION + 1 WHERE WORKSPACE_ID = ? AND ID = ? AND VERSION = ?",
+      [actor.workspaceId, id, run.version],
+    );
+    if (changed !== 1)
+      throw new DomainError(
+        "VERSION_CONFLICT",
+        "Run changed before inference. Refresh its saved state.",
+        409,
+      );
+    await sql.execute(
+      "INSERT INTO MODEL_ATTEMPTS (WORKSPACE_ID,ID,RUN_ID,STEP_INDEX,ATTEMPT_NO,COMMAND_ID,ACTOR_ID,PAYLOAD_HASH,INPUT_HASH,CONTEXT_JSON,LIFECYCLE,LEASE_UNTIL,RESULT_JSON,ERROR_CODE,CREATED_AT) VALUES (?,?,?,?,?,?,?,?,?,?,'pending',?,NULL,NULL,?)",
+      [
+        actor.workspaceId,
+        attemptId,
+        id,
+        run.checkpoint,
+        attempts.length + 1,
+        commandId,
+        actor.userId,
+        hash,
+        digest(context),
+        JSON.stringify(context),
+        sqlTimestamp(leaseUntil),
+        sqlTimestamp(new Date().toISOString()),
+      ],
+    );
+    await agentEvent(sql, actor, id, "model_call_reserved", run.version + 1);
+    return { attemptId, run: { ...run, version: run.version + 1 }, context };
+  });
+  if ("cached" in reservation) {
+    if (action === "cancel")
+      controllers.get(`${actor.workspaceId}/${id}`)?.abort();
+    return reservation.cached!;
+  }
+  const controller = new AbortController(),
+    key = `${actor.workspaceId}/${id}`;
+  controllers.set(key, controller);
+  try {
+    // No SQL connection, transaction, or write-coordinator slot is held during inference.
+    const result = await inferProposal(
+      reservation.context,
+      reservation.run.model!,
+      AbortSignal.any([controller.signal, ...(signal ? [signal] : [])]),
+    );
+    return await writeDatabase(async (sql) => {
+      const run = await getRun(sql, actor, id),
+        member = await requireOperator(sql, actor);
+      if (await receipt(sql, actor, commandId, hash))
+        return runDetails(sql, actor, id);
+      supportedRun(run);
+      if (
+        run.version !== reservation.run.version ||
+        run.checkpoint !== reservation.run.checkpoint ||
+        run.status !== "running" ||
+        run.expiresAt <= new Date().toISOString()
+      )
+        throw new DomainError(
+          "RUN_CHANGED",
+          "The run changed, expired, or was cancelled during inference. Model output was discarded.",
+          409,
+        );
+      const context = await contextFor(sql, actor, run);
+      if (digest(context) !== digest(reservation.context))
+        throw new DomainError(
+          "STALE_CONTEXT",
+          "The request, members, comments, or approved knowledge changed during inference. Model output was discarded; refresh and retry.",
+          409,
+        );
+      const { suggestion, after, evidence } = validateSuggestion(
+        result,
+        context.request,
+        member,
+        context.members,
+        context.knowledge,
       );
       let proposalId: string | null = null;
       if (suggestion.commands.length) {
         proposalId = randomUUID();
         const content: ProposalContent = {
           workspaceId: actor.workspaceId,
-          runId: run.id,
+          runId: id,
           id: proposalId,
           revision: 1,
           initiatorId: run.initiatorId,
-          engine: "rules-v1",
+          engine: "openrouter-v1",
+          inference: result.inference,
           toolRevision: "request-desk-v1",
-          requestId: request.id,
-          expectedVersion: request.version,
-          before: request,
+          requestId: context.request.id,
+          expectedVersion: context.request.version,
+          before: context.request,
           commands: suggestion.commands,
-          after: suggestion.after,
-          evidence: suggestion.evidence.map((entry) => ({
+          after,
+          evidence: evidence.map((entry) => ({
             id: entry.id,
             version: entry.version,
             contentHash: entry.contentHash,
             title: entry.title,
           })),
-          routingDigest: routingDigest(candidates),
+          knowledgeDigest: knowledgeDigest(context.knowledge),
           reasons: suggestion.reasons,
           uncertainty: suggestion.uncertainty,
           expiresAt: run.expiresAt,
@@ -220,7 +458,7 @@ export async function changeRun(
             actor.workspaceId,
             proposalId,
             id,
-            request.id,
+            context.request.id,
             JSON.stringify(content),
             digest(content),
           ],
@@ -228,42 +466,62 @@ export async function changeRun(
         await agentEvent(sql, actor, proposalId, "proposal_created", 1);
       }
       const step: TriageStep = {
-        index: checkpoint,
-        requestId: request.id,
-        requestVersion: request.version,
-        summary: suggestion.reasons.join(" ") || "No changes proposed.",
+        index: run.checkpoint,
+        requestId: context.request.id,
+        requestVersion: context.request.version,
+        summary: suggestion.summary,
         uncertainty: suggestion.uncertainty,
         proposalId,
+        inference: result.inference,
       };
       await sql.execute(
         "INSERT INTO AGENT_STEPS (WORKSPACE_ID,RUN_ID,STEP_INDEX,REQUEST_ID,REQUEST_VERSION,OUTPUT_JSON,PROPOSAL_ID) VALUES (?,?,?,?,?,?,?)",
         [
           actor.workspaceId,
           id,
-          checkpoint,
-          request.id,
-          request.version,
+          run.checkpoint,
+          context.request.id,
+          context.request.version,
           JSON.stringify(step),
           proposalId,
         ],
       );
-      checkpoint++;
-      if (checkpoint === run.requestIds.length) status = "completed";
-    }
-    const changed = await sql.execute(
-      "UPDATE AGENT_RUNS SET STATUS = ?,CHECKPOINT = ?,VERSION = VERSION + 1 WHERE WORKSPACE_ID = ? AND ID = ? AND VERSION = ?",
-      [status, checkpoint, actor.workspaceId, id, expectedVersion],
-    );
-    if (changed !== 1)
-      throw new DomainError(
-        "VERSION_CONFLICT",
-        "Run changed. Refresh before continuing.",
-        409,
+      await sql.execute(
+        "UPDATE MODEL_ATTEMPTS SET LIFECYCLE = 'completed',RESULT_JSON = ? WHERE WORKSPACE_ID = ? AND ID = ?",
+        [JSON.stringify(result), actor.workspaceId, reservation.attemptId],
       );
-    await agentEvent(sql, actor, id, `triage_${status}`, expectedVersion + 1);
-    await saveReceipt(sql, actor, commandId, hash, { id });
-    return runDetails(sql, actor, id);
-  });
+      const status =
+        run.checkpoint + 1 === run.requestIds.length ? "completed" : "running";
+      const advanced = await sql.execute(
+        "UPDATE AGENT_RUNS SET STATUS = ?,CHECKPOINT = CHECKPOINT + 1,VERSION = VERSION + 1 WHERE WORKSPACE_ID = ? AND ID = ? AND VERSION = ?",
+        [status, actor.workspaceId, id, run.version],
+      );
+      if (advanced !== 1)
+        throw new DomainError(
+          "VERSION_CONFLICT",
+          "Run changed before checkpoint persistence.",
+          409,
+        );
+      await agentEvent(sql, actor, id, `triage_${status}`, run.version + 1);
+      await saveReceipt(sql, actor, commandId, hash, { id });
+      return runDetails(sql, actor, id);
+    });
+  } catch (error) {
+    // An unknown commit acknowledgement must leave a possibly completed attempt intact.
+    await writeDatabase(async (sql) => {
+      await sql.execute(
+        "UPDATE MODEL_ATTEMPTS SET LIFECYCLE = 'failed',ERROR_CODE = ? WHERE WORKSPACE_ID = ? AND ID = ? AND LIFECYCLE = 'pending'",
+        [
+          error instanceof DomainError ? error.code : "MODEL_STEP_FAILED",
+          actor.workspaceId,
+          reservation.attemptId,
+        ],
+      );
+    }).catch(() => undefined);
+    throw error;
+  } finally {
+    if (controllers.get(key) === controller) controllers.delete(key);
+  }
 }
 export async function reviewProposal(
   actor: Actor,
@@ -330,7 +588,7 @@ export async function reviewProposal(
         content.runId !== run.id ||
         content.requestId !== row.REQUEST_ID ||
         content.id !== id ||
-        content.engine !== "rules-v1" ||
+        content.engine !== "openrouter-v1" ||
         content.toolRevision !== "request-desk-v1" ||
         content.initiatorId !== run.initiatorId
       )
@@ -346,13 +604,13 @@ export async function reviewProposal(
           "Request changed after triage. Reject this proposal and run triage again.",
           409,
         );
-      const candidates = await routingCandidates(sql, actor, next.dataset),
-        members = await membersFor(sql, actor),
+      supportedRun(run);
+      const knowledge = await approvedKnowledge(sql, actor),
         today = new Date().toISOString().slice(0, 10);
-      if (routingDigest(candidates) !== content.routingDigest)
+      if (knowledgeDigest(knowledge) !== content.knowledgeDigest)
         throw new DomainError(
           "STALE_KNOWLEDGE",
-          "Routing knowledge changed after triage. Run triage again.",
+          "Approved knowledge changed after inference. Run the model again.",
           409,
         );
       for (const dependency of content.evidence) {
@@ -368,16 +626,6 @@ export async function reviewProposal(
             409,
           );
       }
-      // Also catches newly effective rules, conflicting routes, and owner eligibility changes.
-      if (
-        digest(triageRequest(next, candidates, members, today).commands) !==
-        digest(content.commands)
-      )
-        throw new DomainError(
-          "STALE_PROPOSAL",
-          "The current rules or eligible owners no longer support these actions. Run triage again.",
-          409,
-        );
       for (const command of content.commands)
         next = await applyRequestCommand(
           sql,

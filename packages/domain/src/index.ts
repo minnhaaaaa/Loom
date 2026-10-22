@@ -42,7 +42,7 @@ export function readiness(
     !request.dataset && "dataset",
   ].filter((v): v is string => Boolean(v));
 }
-const transitions: Record<Status, readonly Status[]> = {
+export const transitions: Record<Status, readonly Status[]> = {
   new: ["needs_info", "ready", "cancelled"],
   needs_info: ["new", "ready", "cancelled"],
   ready: ["needs_info", "in_progress", "cancelled"],
@@ -141,4 +141,4 @@ export function applyCommand(
   return next;
 }
 
-export { activeKnowledge, routingKey, triageRequest } from "./triage";
+export { activeKnowledge } from "./triage";

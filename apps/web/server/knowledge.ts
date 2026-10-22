@@ -7,7 +7,7 @@ import {
   type KnowledgeInput,
   type Membership,
 } from "@loom/contracts";
-import { canOperate, DomainError, routingKey } from "@loom/domain";
+import { canOperate, DomainError, activeKnowledge } from "@loom/domain";
 import {
   fromTimestamp,
   readDatabase,
@@ -110,30 +110,28 @@ export async function listKnowledge(actor: Actor) {
     };
   });
 }
-export async function routingCandidates(
-  sql: SqlSession,
-  actor: Actor,
-  dataset: string,
-) {
-  if (!dataset.trim()) return [];
+export async function approvedKnowledge(sql: SqlSession, actor: Actor) {
   const rows = await sql.query(
-    "SELECT * FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID = ? AND KIND = 'routing' AND LOWER(TRIM(DATASET)) = ? AND LIFECYCLE IN ('draft','approved') ORDER BY ID LIMIT 101",
-    [actor.workspaceId, routingKey(dataset)],
+    "SELECT * FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID = ? AND LIFECYCLE = 'approved' ORDER BY ID LIMIT 51",
+    [actor.workspaceId],
   );
-  if (rows.length > 100)
+  if (rows.length > 50)
     throw new DomainError(
       "KNOWLEDGE_LIMIT",
-      "More than 100 routing candidates match this dataset. Consolidate approved rules before triage.",
+      "Model context currently supports at most 50 approved sources. Narrow the knowledge corpus before continuing.",
       422,
     );
-  return rows.map(mapKnowledge);
+  return rows
+    .map(mapKnowledge)
+    .filter((entry) =>
+      activeKnowledge(entry, new Date().toISOString().slice(0, 10)),
+    );
 }
-export function routingDigest(entries: KnowledgeEntry[]) {
+export function knowledgeDigest(entries: KnowledgeEntry[]) {
   return digest(
     entries.map((entry) => ({
       id: entry.id,
       version: entry.version,
-      state: entry.state,
       hash: entry.contentHash,
     })),
   );
@@ -143,7 +141,7 @@ async function eligibleOwner(
   actor: Actor,
   values: KnowledgeInput,
 ) {
-  if (values.kind !== "routing") return;
+  if (!values.ownerId) return;
   const member = await membership(sql, { ...actor, userId: values.ownerId! });
   if (!canOperate(member))
     throw new DomainError(
