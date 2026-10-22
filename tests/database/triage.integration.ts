@@ -107,6 +107,7 @@ const task =
 const model = vi.hoisted(() => ({ infer: vi.fn() }));
 vi.mock("../../apps/web/server/openrouter", () => ({
   promptVersion: "triage-llm-v1",
+  modelInput: (context: unknown) => JSON.stringify(context),
   modelConfiguration: () => ({
     key: "test-only",
     model: "fixture/test-only",
@@ -313,13 +314,30 @@ it("blocks stale request/knowledge proposals and preserves immutable source repl
   );
 });
 it("rejects hallucinated evidence and invalid actions instead of manufacturing a fallback", async () => {
-  for (const invalid of ["evidence", "action"]) {
+  for (const invalid of ["evidence", "action", "noop", "duplicate"]) {
     const record = await request(),
       run = await startRun(owner, randomUUID(), [record.id], task);
     model.infer.mockImplementationOnce(async (context) => {
       const result = output(context);
       if (invalid === "evidence")
         result.suggestion.evidenceIds = [randomUUID()];
+      else if (invalid === "noop")
+        result.suggestion.commands = [
+          { type: "set_priority", priority: context.request.priority },
+        ] as never;
+      else if (invalid === "duplicate")
+        result.suggestion.commands = [
+          {
+            type: "add_comment",
+            body: "Repeated model action",
+            visibility: "internal",
+          },
+          {
+            type: "add_comment",
+            body: "Repeated model action",
+            visibility: "internal",
+          },
+        ] as never;
       else
         result.suggestion.commands = [
           { type: "set_owner", ownerId: foreign.userId },
@@ -329,7 +347,7 @@ it("rejects hallucinated evidence and invalid actions instead of manufacturing a
     await expect(
       changeRun(owner, run.id, randomUUID(), 1, "advance"),
     ).rejects.toThrow(
-      invalid === "evidence" ? "unavailable evidence" : "violates",
+      invalid === "evidence" ? "unavailable evidence" : "invalid actions",
     );
     expect((await readRun(owner, run.id)).proposals).toEqual([]);
     expect((await details(owner, record.id)).request.version).toBe(1);

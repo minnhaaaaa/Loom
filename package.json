@@ -25,7 +25,8 @@
     "db:status": ".local/bin/exasol status --deployment-dir .local/exasol",
     "db:start": ".local/bin/exasol start --deployment-dir .local/exasol",
     "db:stop": ".local/bin/exasol stop --deployment-dir .local/exasol",
-    "test:restart": "tsx --env-file-if-exists=.env scripts/check-triage-restart.ts"
+    "test:restart": "tsx --env-file-if-exists=.env scripts/check-triage-restart.ts",
+    "model:check": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/check-model.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

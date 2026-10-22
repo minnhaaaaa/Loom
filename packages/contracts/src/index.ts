@@ -357,3 +357,32 @@ export type ModelInference = {
   cost: number | null;
   durationMs: number;
 };
+
+// A flat, nullable parameter object avoids nested union grammars in provider decoders.
+// The action catalog remains the authority for each decoded command.
+export const modelActionParameters = Object.fromEntries(
+  commandSchema.options.flatMap((option) =>
+    Object.entries(option.shape)
+      .filter(([key]) => key !== "type")
+      .map(([key, schema]) => [key, schema.nullable()]),
+  ),
+) as Record<string, z.ZodType>;
+export const modelWireSchema = modelSuggestionSchema
+  .omit({ commands: true })
+  .extend({
+    commands: z
+      .array(
+        z
+          .object({
+            type: z.enum(
+              commandSchema.options.map(
+                (option) => option.shape.type.value,
+              ) as [string, ...string[]],
+            ),
+            parameters: z.object(modelActionParameters).strict(),
+          })
+          .strict(),
+      )
+      .max(6),
+  })
+  .strict();

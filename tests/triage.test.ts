@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { modelActionParameters } from "@loom/contracts";
 import {
   inferProposal,
   modelConfiguration,
@@ -8,6 +9,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 function configured() {
+  vi.stubEnv("OPENROUTER_FREE_ONLY", "false");
   vi.stubEnv("OPENROUTER_API_KEY", "public-test-key");
   vi.stubEnv("OPENROUTER_MODEL", "fixture/arbitrary-model");
 }
@@ -18,8 +20,20 @@ const suggestion = {
   evidenceIds: [],
   commands: [{ type: "set_priority", priority: "high" }],
 };
+const toWire = (value: typeof suggestion) => ({
+  ...value,
+  commands: value.commands.map(({ type, ...argumentsObject }) => ({
+    type,
+    parameters: {
+      ...Object.fromEntries(
+        Object.keys(modelActionParameters).map((key) => [key, null]),
+      ),
+      ...argumentsObject,
+    },
+  })),
+});
 const envelope = (
-  content = JSON.stringify(suggestion),
+  content = JSON.stringify(toWire(suggestion)),
   finish_reason = "stop",
 ) => ({
   id: "fixture-generation",
@@ -58,7 +72,7 @@ describe("OpenRouter model adapter (HTTP fixtures, no live model calls)", () => 
       data_collection: "deny",
     });
     expect(body.response_format.json_schema.strict).toBe(true);
-    expect(JSON.parse(body.messages[1].content)).toEqual(context);
+    expect(JSON.parse(body.messages[1].content).context).toEqual(context);
     expect(body.messages[0].content).not.toContain("<script>");
     expect(result.suggestion).toEqual(suggestion);
     expect(result.inference).toMatchObject({
@@ -120,4 +134,79 @@ describe("OpenRouter model adapter (HTTP fixtures, no live model calls)", () => 
     vi.stubEnv("OPENROUTER_TIMEOUT_MS", "999999");
     expect(() => modelConfiguration()).toThrow("model timeout");
   });
+});
+
+it("blocks paid or previously pinned paid models in free-only mode and sends zero-price limits", async () => {
+  configured();
+  vi.stubEnv("OPENROUTER_FREE_ONLY", "true");
+  expect(() => modelConfiguration()).toThrow("Paid models are blocked");
+  vi.stubEnv("OPENROUTER_MODEL", "provider/model:free");
+  const fetch = vi.fn().mockResolvedValue(Response.json(envelope()));
+  vi.stubGlobal("fetch", fetch);
+  await expect(inferProposal({}, "pinned/paid-model")).rejects.toMatchObject({
+    code: "MODEL_COST_POLICY",
+  });
+  expect(fetch).not.toHaveBeenCalled();
+  await inferProposal({}, "provider/model:free");
+  expect(JSON.parse(fetch.mock.calls[0][1].body).provider.max_price).toEqual({
+    prompt: 0,
+    completion: 0,
+    request: 0,
+  });
+});
+
+it("reports a privacy-policy block without exposing upstream diagnostics", async () => {
+  configured();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      Response.json(
+        {
+          error: {
+            message:
+              "No endpoints found matching your data policy (Free model training)",
+            metadata: { raw: "private upstream diagnostic" },
+          },
+        },
+        { status: 404 },
+      ),
+    ),
+  );
+  await expect(inferProposal({}, "configured/model")).rejects.toMatchObject({
+    code: "MODEL_PRIVACY",
+  });
+});
+
+it("uses the free router without pinning a provider or overriding reasoning", async () => {
+  configured();
+  vi.stubEnv("OPENROUTER_FREE_ONLY", "true");
+  vi.stubEnv("OPENROUTER_MODEL", "openrouter/free");
+  vi.stubEnv("OPENROUTER_REASONING_ENABLED", "");
+  const fetch = vi.fn().mockResolvedValue(Response.json(envelope()));
+  vi.stubGlobal("fetch", fetch);
+  const result = await inferProposal({}, modelConfiguration().model);
+  const body = JSON.parse(fetch.mock.calls[0][1].body);
+  expect(body.model).toBe("openrouter/free");
+  expect(body.reasoning).toBeUndefined();
+  expect(body.provider.only).toBeUndefined();
+  expect(result.inference.requestedModel).toBe("openrouter/free");
+  expect(result.inference.actualModel).toBe("fixture/provider-model");
+});
+
+it("rejects unrelated or invalid action parameters instead of repairing model decisions", async () => {
+  configured();
+  for (const parameters of [
+    { priority: "high", body: "Unrelated to priority" },
+    { priority: "unsupported" },
+  ]) {
+    const wire = toWire(suggestion);
+    Object.assign(wire.commands[0].parameters, parameters);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(Response.json(envelope(JSON.stringify(wire)))),
+    );
+    await expect(inferProposal({}, "fixture/model")).rejects.toMatchObject({
+      code: "MODEL_OUTPUT_INVALID",
+    });
+  }
 });

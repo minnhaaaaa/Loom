@@ -46,6 +46,7 @@ import {
 import {
   inferProposal,
   modelConfiguration,
+  modelInput,
   promptVersion,
   type ModelResult,
 } from "./openrouter";
@@ -216,7 +217,7 @@ async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
     allowedTransitions: transitions,
     promptVersion,
   };
-  if (Buffer.byteLength(JSON.stringify(context), "utf8") > 120_000)
+  if (Buffer.byteLength(modelInput(context), "utf8") > 120_000)
     throw new DomainError(
       "MODEL_CONTEXT_LIMIT",
       "The model context exceeds 120 KB. Shorten the request or knowledge corpus before continuing.",
@@ -244,13 +245,32 @@ function validateSuggestion(
       502,
     );
   let after = request;
+  const seen = new Set<string>();
   try {
-    for (const command of suggestion.commands)
-      after = applyCommand(member, after, command, members);
+    for (const command of suggestion.commands) {
+      const key = digest(command);
+      if (seen.has(key)) throw new Error("Duplicate action");
+      seen.add(key);
+      const next = applyCommand(member, after, command, members);
+      const stateValues = (value: typeof request) =>
+        Object.fromEntries(
+          Object.entries(value).filter(
+            ([key]) => key !== "version" && key !== "updatedAt",
+          ),
+        );
+      const beforeValues = stateValues(after);
+      const afterValues = stateValues(next);
+      if (
+        command.type !== "add_comment" &&
+        digest(beforeValues) === digest(afterValues)
+      )
+        throw new Error("No-op action");
+      after = next;
+    }
   } catch {
     throw new DomainError(
       "MODEL_ACTION_INVALID",
-      "The model proposed an action that violates current field, transition, or permission constraints. No proposal was saved.",
+      "The model proposed duplicate, ineffective, or invalid actions. No proposal was saved.",
       502,
     );
   }

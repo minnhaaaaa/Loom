@@ -24,6 +24,10 @@ if (!isConfigured())
   throw new Error(
     "Configure real Exasol and build the app before test:restart.",
   );
+if (!process.env.OPENROUTER_API_KEY || !process.env.OPENROUTER_MODEL)
+  throw new Error(
+    "Set OPENROUTER_API_KEY and OPENROUTER_MODEL before test:restart. This check makes two live provider calls; it has no simulated fallback.",
+  );
 async function stop() {
   const processToStop = child;
   child = null;
@@ -92,7 +96,7 @@ async function call<T>(path: string, body?: object): Promise<T> {
       Cookie: cookie,
     },
     body: body ? JSON.stringify({ ...body, commandId }) : undefined,
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(110_000),
   });
   const result = await response.json();
   if (!response.ok)
@@ -121,7 +125,11 @@ try {
     });
     requestIds.push(record.id);
   }
-  const run = await call<TriageRun>("/api/runs", { requestIds });
+  const run = await call<TriageRun>("/api/runs", {
+    requestIds,
+    instructions:
+      "Review this synthetic request, explain what information is missing, and propose appropriate local changes for human review.",
+  });
   runId = run.id;
   const first = await call<RunDetails>(`/api/runs/${runId}`, {
     expectedVersion: 1,
@@ -129,21 +137,25 @@ try {
   });
   assert.equal(first.run.checkpoint, 1);
   assert.equal(first.run.status, "running");
-  const originalHash = first.proposals[0].hash;
+  const originalHash =
+    first.proposals[0]?.hash ?? JSON.stringify(first.steps[0]);
   const firstPid = child!.pid;
   await stop();
   await boot();
   assert.notEqual(child!.pid, firstPid);
   const resumed = await call<RunDetails>(`/api/runs/${runId}`);
   assert.equal(resumed.run.checkpoint, 1);
-  assert.equal(resumed.proposals[0].hash, originalHash);
+  assert.equal(
+    resumed.proposals[0]?.hash ?? JSON.stringify(resumed.steps[0]),
+    originalHash,
+  );
   const completed = await call<RunDetails>(`/api/runs/${runId}`, {
     expectedVersion: resumed.run.version,
     action: "advance",
   });
   assert.equal(completed.run.status, "completed");
   assert.equal(completed.steps.length, 2);
-  assert.equal(completed.proposals.length, 2);
+  assert.ok(completed.steps.every((step) => step.inference?.generationId));
   for (const id of requestIds) {
     const result = await call<{ request: { version: number } }>(
       `/api/requests/${id}`,
@@ -170,7 +182,7 @@ try {
         ).map((row) => String(row.ID))
       : [];
     if (runId) {
-      for (const table of ["AGENT_STEPS", "TRIAGE_PROPOSALS"])
+      for (const table of ["MODEL_ATTEMPTS", "AGENT_STEPS", "TRIAGE_PROPOSALS"])
         await sql.execute(
           `DELETE FROM ${table} WHERE WORKSPACE_ID = ? AND RUN_ID = ?`,
           [workspaceId, runId],

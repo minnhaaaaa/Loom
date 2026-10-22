@@ -335,7 +335,7 @@ test("live OpenRouter proposal and exact-change human review in the production U
   const proposal = workspace.locator(".proposal-review");
   await expect(
     proposal.getByRole("heading", { name: `Review: ${title}` }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 105_000 });
   await expect(
     proposal.getByText("Exact model-proposed actions", { exact: true }),
   ).toBeVisible();
