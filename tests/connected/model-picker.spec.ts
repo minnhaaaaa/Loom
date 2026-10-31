@@ -73,9 +73,6 @@ test("company model choices use the selected provider, keep the theme, and send 
   await settings
     .locator('input[type="password"]')
     .fill("synthetic-picker-api-key");
-  await settings
-    .getByRole("button", { name: "Load models", exact: true })
-    .click();
   const picker = settings.getByRole("combobox", {
     name: "Model ID",
     exact: true,
@@ -106,7 +103,7 @@ test("company model choices use the selected provider, keep the theme, and send 
     settings.getByRole("combobox", { name: "Provider", exact: true }),
     "deepseek",
   );
-  await expect(picker).toHaveText("Load models to choose");
+  await expect(picker).toHaveText("Enter an API key first");
   await expect(picker).toBeDisabled();
   await expect(settings.locator('input[type="password"]')).toHaveValue("");
   expect(errors).toEqual([]);
@@ -291,12 +288,10 @@ test("identity-only ChatGPT sign-in offers explicit plan consent without an API 
     }),
   );
   await createWorkspace(page);
+  await page
+    .getByRole("link", { name: "Connect ChatGPT No API key", exact: true })
+    .click();
   const setup = page.locator("#company-setup");
-  if ((await setup.getAttribute("open")) === null)
-    await setup.locator(":scope > summary").click();
-  await setup.getByRole("button", { name: "Continue", exact: true }).click();
-  await setup.getByRole("button", { name: "Continue", exact: true }).click();
-  await setup.getByRole("button", { name: /ChatGPT Use your plan/ }).click();
   await expect(
     setup.getByText("Use your ChatGPT plan. No API key required."),
   ).toBeVisible();
@@ -307,4 +302,92 @@ test("identity-only ChatGPT sign-in offers explicit plan consent without an API 
     /https:\/\/auth.openai.com\/api\/accounts\/authorize/,
   );
   expect(consentRequested).toBe(true);
+});
+
+test("Claude's model dropdown loads on open and offers recovery instead of staying disabled", async ({
+  page,
+}) => {
+  let attempts = 0;
+  await page.route("**/api/workspaces/provider/models", (route) => {
+    attempts++;
+    expect(route.request().postDataJSON()).toEqual({
+      provider: "anthropic",
+      apiKey: "synthetic-claude-api-key",
+    });
+    return attempts === 1
+      ? route.fulfill({
+          status: 503,
+          json: {
+            error: {
+              message: "Models could not be loaded. Try again shortly.",
+            },
+          },
+        })
+      : route.fulfill({
+          json: {
+            models: [{ id: "claude-synthetic", name: "Claude test model" }],
+          },
+        });
+  });
+  await createWorkspace(page);
+  await page
+    .getByRole("link", {
+      name: "Connect Claude or another API API key",
+      exact: true,
+    })
+    .click();
+  const settings = page.locator(".company-provider");
+  const picker = settings.getByRole("combobox", {
+    name: "Model ID",
+    exact: true,
+  });
+  await selectOption(
+    settings.getByRole("combobox", { name: "Provider", exact: true }),
+    "anthropic",
+  );
+  await expect(picker).toHaveText("Enter an API key first");
+  await settings
+    .locator('input[type="password"]')
+    .fill("synthetic-claude-api-key");
+  await expect(picker).toBeEnabled();
+  expect(attempts).toBe(0);
+  await picker.click();
+  await expect(settings.getByRole("alert")).toHaveText(
+    "Models could not be loaded. Try again shortly.",
+  );
+  await page.keyboard.press("Escape");
+  await expect(picker).toBeEnabled();
+  await settings
+    .getByRole("button", { name: "Enter model ID", exact: true })
+    .click();
+  await settings
+    .getByRole("textbox", { name: "Model ID", exact: true })
+    .fill("claude-known-id");
+  await expect(
+    settings.getByRole("button", {
+      name: "Test and save connection",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await settings
+    .getByRole("button", { name: "Choose from list", exact: true })
+    .click();
+  await settings
+    .getByRole("button", { name: "Retry loading models", exact: true })
+    .click();
+  await picker.click();
+  await page
+    .getByRole("option", {
+      name: "Claude test model · claude-synthetic",
+      exact: true,
+    })
+    .click();
+  await expect(picker).toHaveAttribute("data-value", "claude-synthetic");
+  expect(attempts).toBe(2);
+  await settings
+    .locator('input[type="password"]')
+    .fill("another-synthetic-key");
+  await expect(picker).toHaveAttribute("data-value", "");
+  await expect(picker).toHaveText("Choose a model");
+  expect(attempts).toBe(2);
 });

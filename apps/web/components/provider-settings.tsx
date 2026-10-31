@@ -34,18 +34,31 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
   const [models, setModels] = useState<ModelChoice[] | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
   const [modelError, setModelError] = useState("");
+  const [manualModel, setManualModel] = useState(false);
+  const canLoadModels = Boolean(
+    settings?.available &&
+    (apiKey.trim().length >= 10 ||
+      (settings.active && settings.provider === provider && !apiKey.trim())),
+  );
   function clearModels() {
     catalogRequest.current?.abort();
     setModels(null);
     setLoadingModels(false);
     setModelError("");
+    setManualModel(false);
   }
   async function loadModels() {
+    if (!canLoadModels || busyRef.current) return;
     catalogRequest.current?.abort();
     const controller = new AbortController();
     catalogRequest.current = controller;
     setLoadingModels(true);
     setModelError("");
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 20_000);
     try {
       const value = await accessRequest<{ models: ModelChoice[] }>(
         "/api/workspaces/provider/models",
@@ -61,14 +74,22 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
       );
       if (!controller.signal.aborted) setModels(value.models);
     } catch (reason) {
-      if (!controller.signal.aborted)
+      if (
+        mounted.current &&
+        catalogRequest.current === controller &&
+        (!controller.signal.aborted || timedOut)
+      )
         setModelError(
-          reason instanceof Error
-            ? reason.message
-            : "Models could not be loaded.",
+          timedOut
+            ? "Loading models timed out. Try again."
+            : reason instanceof Error
+              ? reason.message
+              : "Models could not be loaded.",
         );
     } finally {
-      if (!controller.signal.aborted) setLoadingModels(false);
+      clearTimeout(timeout);
+      if (mounted.current && catalogRequest.current === controller)
+        setLoadingModels(false);
     }
   }
   function adopt(value: ProviderSettingsSnapshot) {
@@ -220,6 +241,7 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
                 value={apiKey}
                 onChange={(event) => {
                   setApiKey(event.target.value);
+                  setModel("");
                   clearModels();
                 }}
                 disabled={busy || !settings?.available}
@@ -239,59 +261,92 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
                 saving.
               </small>
             </label>
-            <button
-              type="button"
-              className="quiet provider-load-models"
-              disabled={
-                busy ||
-                loadingModels ||
-                !settings?.available ||
-                (apiKey.trim().length < 10 &&
-                  !(
-                    settings?.active &&
-                    settings.provider === provider &&
-                    !apiKey.trim()
-                  ))
-              }
-              onClick={() => void loadModels()}
-            >
-              {loadingModels ? "Loading models…" : "Load models"}
-            </button>
-            {modelError && <small role="alert">{modelError}</small>}
           </div>
-          <label htmlFor={`${id}-model`}>
-            Model ID
-            <LoomSelect
-              id={`${id}-model`}
-              aria-label="Model ID"
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              disabled={
-                busy || loadingModels || !settings?.available || !models?.length
-              }
-              required
-            >
-              <option value="" disabled>
+          <div className="provider-model-field">
+            <label htmlFor={`${id}-model`}>
+              Model ID
+              {manualModel ? (
+                <input
+                  id={`${id}-model`}
+                  aria-label="Model ID"
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  required
+                  maxLength={150}
+                  placeholder="Enter the exact model ID"
+                  disabled={busy || !settings?.available}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              ) : (
+                <LoomSelect
+                  id={`${id}-model`}
+                  aria-label="Model ID"
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  onOpenChange={(open) => {
+                    if (open && models === null && !loadingModels)
+                      void loadModels();
+                  }}
+                  disabled={busy || !canLoadModels}
+                  required
+                >
+                  <option value="" disabled>
+                    {loadingModels
+                      ? "Loading models…"
+                      : modelError
+                        ? "Could not load models"
+                        : models?.length === 0
+                          ? "No models returned"
+                          : canLoadModels
+                            ? "Choose a model"
+                            : "Enter an API key first"}
+                  </option>
+                  {model && !models?.some((item) => item.id === model) && (
+                    <option value={model}>{model}</option>
+                  )}
+                  {models?.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name === item.id
+                        ? item.id
+                        : `${item.name} · ${item.id}`}
+                    </option>
+                  ))}
+                </LoomSelect>
+              )}
+            </label>
+            {modelError && (
+              <p className="provider-model-error" role="alert">
+                {modelError}
+              </p>
+            )}
+            <div className="provider-model-actions">
+              <button
+                type="button"
+                className="quiet provider-load-models"
+                disabled={busy || loadingModels || !canLoadModels}
+                onClick={() => void loadModels()}
+              >
                 {loadingModels
                   ? "Loading models…"
-                  : models?.length === 0
-                    ? "No models available"
+                  : modelError
+                    ? "Retry loading models"
                     : models
-                      ? "Choose a model"
-                      : "Load models to choose"}
-              </option>
-              {model && !models?.some((item) => item.id === model) && (
-                <option value={model}>{model}</option>
+                      ? "Refresh models"
+                      : "Load models"}
+              </button>
+              {(modelError || models?.length === 0 || manualModel) && (
+                <button
+                  type="button"
+                  className="quiet"
+                  disabled={busy || !canLoadModels}
+                  onClick={() => setManualModel((value) => !value)}
+                >
+                  {manualModel ? "Choose from list" : "Enter model ID"}
+                </button>
               )}
-              {models?.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name === item.id
-                    ? item.id
-                    : `${item.name} · ${item.id}`}
-                </option>
-              ))}
-            </LoomSelect>
-          </label>
+            </div>
+          </div>
           <label htmlFor={`${id}-tokens`}>
             Maximum output tokens per request
             <input

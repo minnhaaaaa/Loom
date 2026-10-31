@@ -174,6 +174,10 @@ export function WorkspaceSetup({
   useEffect(() => {
     const followHash = () => {
       if (window.location.hash === "#company-setup") setOpen(true);
+      if (window.location.hash === "#company-provider") {
+        const panel = document.getElementById("company-provider");
+        if (panel instanceof HTMLDetailsElement) panel.open = true;
+      }
       if (window.location.hash === "#codex-connection") {
         setOpen(true);
         setStep(2);

@@ -38,6 +38,7 @@ type Props = AriaAttributes & {
   children: ReactNode;
   value: string | number;
   onChange: (event: { target: { value: string } }) => void;
+  onOpenChange?: (open: boolean) => void;
   id?: string;
   name?: string;
   disabled?: boolean;
@@ -50,6 +51,7 @@ export function LoomSelect({
   children,
   value,
   onChange,
+  onOpenChange,
   id,
   name,
   disabled,
@@ -74,6 +76,7 @@ export function LoomSelect({
       disabled={disabled}
       required={required}
       items={options}
+      onOpenChange={onOpenChange}
       onValueChange={(next) => {
         if (next !== null) onChange({ target: { value: next } });
       }}

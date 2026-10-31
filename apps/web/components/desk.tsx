@@ -839,6 +839,26 @@ export function Desk({
               )}
             </div>
           )}
+          {view === "settings" && !preview && member?.role === "owner" && (
+            <div
+              className="settings-ai-shortcuts"
+              role="group"
+              aria-label="AI connections"
+            >
+              <a href="#codex-connection">
+                Connect ChatGPT <span>No API key</span>
+              </a>
+              <a
+                href="#company-provider"
+                onClick={() => {
+                  const panel = document.getElementById("company-provider");
+                  if (panel instanceof HTMLDetailsElement) panel.open = true;
+                }}
+              >
+                Connect Claude or another API <span>API key</span>
+              </a>
+            </div>
+          )}
           {view === "settings" && !preview && member && workspaceControls && (
             <details
               className="dashboard-settings-section"
@@ -937,7 +957,10 @@ export function Desk({
             !preview &&
             member?.role === "owner" &&
             desk.workspace && (
-              <details className="dashboard-settings-section">
+              <details
+                className="dashboard-settings-section"
+                id="company-provider"
+              >
                 <summary>Company AI connection</summary>
                 <div className="dashboard-settings-body">
                   <ProviderSettings
