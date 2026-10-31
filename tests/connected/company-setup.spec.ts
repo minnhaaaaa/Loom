@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test, type Page } from "@playwright/test";
 import type {
   WorkspaceInvitation,
@@ -78,10 +79,14 @@ test("admin onboarding persists company branding, connects a real MCP client, an
   ).toBeVisible();
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
   await setup.getByRole("button", { name: "Indigo", exact: true }).click();
-  await setup.getByLabel("Typography", { exact: true }).selectOption("classic");
-  await setup
-    .getByLabel("Corner style", { exact: true })
-    .selectOption("square");
+  await selectOption(
+    setup.getByLabel("Typography", { exact: true }),
+    "classic",
+  );
+  await selectOption(
+    setup.getByLabel("Corner style", { exact: true }),
+    "square",
+  );
   await setup.screenshot({
     path: "test-results-connected/company-branding-desktop.png",
   });
@@ -206,12 +211,13 @@ test("admin onboarding persists company branding, connects a real MCP client, an
     await page
       .getByRole("button", { name: "Refresh agent proposals", exact: true })
       .click();
-    await page
-      .getByRole("combobox", {
+    await selectOption(
+      page.getByRole("combobox", {
         name: "Recent runs (workspace latest 10)",
         exact: true,
-      })
-      .selectOption(proposal.runId);
+      }),
+      proposal.runId,
+    );
     const review = page.locator(".proposal-review");
     await expect(
       review.getByText("Submitted by", { exact: false }),

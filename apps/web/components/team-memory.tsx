@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import { workspaceFetch } from "./workspace-fetch";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -182,7 +183,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
               </label>
               <label>
                 Knowledge type
-                <select
+                <LoomSelect
                   value={kind}
                   onChange={(event) => setKind(event.target.value)}
                 >
@@ -190,7 +191,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                   <option value="procedure">Procedures</option>
                   <option value="routing">Routing guidance</option>
                   <option value="glossary">Glossary</option>
-                </select>
+                </LoomSelect>
               </label>
               <label>
                 Context or dataset
@@ -330,7 +331,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                       <>
                         <label>
                           Explore a saved item
-                          <select
+                          <LoomSelect
                             value={node?.id || ""}
                             onChange={(event) =>
                               setSelected(event.target.value)
@@ -341,7 +342,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                                 {item.kind} · {item.label}
                               </option>
                             ))}
-                          </select>
+                          </LoomSelect>
                         </label>
                         {node && (
                           <div className="memory-map">

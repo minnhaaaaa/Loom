@@ -7,6 +7,19 @@ export const companyProviders = [
   "deepseek",
 ] as const;
 export type CompanyProvider = (typeof companyProviders)[number];
+export type ModelChoice = { id: string; name: string };
+export const providerModelsInputSchema = z
+  .object({
+    provider: z.enum(companyProviders),
+    apiKey: z
+      .string()
+      .trim()
+      .min(10)
+      .max(4096)
+      .regex(/^[\x21-\x7E]+$/)
+      .optional(),
+  })
+  .strict();
 export const providerLabels: Record<CompanyProvider, string> = {
   openai: "OpenAI API",
   anthropic: "Claude API",

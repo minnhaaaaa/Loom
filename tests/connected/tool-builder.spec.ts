@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test } from "@playwright/test";
 import {
   personas,
@@ -23,9 +24,10 @@ test("an owner publishes a reviewed tool and a requester opens the same definiti
   const title = `Support desk ${crypto.randomUUID().slice(0, 8)}`;
   try {
     await page.goto("/app?view=settings");
-    await page
-      .getByRole("combobox", { name: "Demo persona" })
-      .selectOption(personas[0].id);
+    await selectOption(
+      page.getByRole("combobox", { name: "Demo persona" }),
+      personas[0].id,
+    );
     const builder = page.locator(".tool-builder");
     await builder.getByText("Customize this desk", { exact: true }).click();
     await builder.getByText("Advanced settings", { exact: true }).click();
@@ -78,9 +80,10 @@ test("an owner publishes a reviewed tool and a requester opens the same definiti
     await expect(page.locator(".current-tool-label")).toContainText(title);
     await page.reload();
     await expect(page.locator(".current-tool-label")).toContainText(title);
-    await page
-      .getByRole("combobox", { name: "Demo persona" })
-      .selectOption(personas[2].id);
+    await selectOption(
+      page.getByRole("combobox", { name: "Demo persona" }),
+      personas[2].id,
+    );
     await expect(page.locator(".tool-builder")).toHaveCount(0);
     await page.goto("/app?view=records");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);

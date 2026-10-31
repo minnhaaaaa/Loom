@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import { workspaceFetch } from "./workspace-fetch";
 import { useRef, useState } from "react";
 import { toolSpec, type ToolSpec } from "@loom/contracts";
@@ -193,7 +194,7 @@ export function CsvTransfer({
               {csvFields.map((field) => (
                 <label key={field.id}>
                   {field.label}
-                  <select
+                  <LoomSelect
                     disabled={busy}
                     value={mapping[field.id] ?? ""}
                     onChange={(event) => {
@@ -215,7 +216,7 @@ export function CsvTransfer({
                         {header}
                       </option>
                     ))}
-                  </select>
+                  </LoomSelect>
                 </label>
               ))}
               <button disabled={busy} onClick={() => void review()}>

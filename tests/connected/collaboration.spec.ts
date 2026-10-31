@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test, type Page } from "@playwright/test";
 import type {
   AccountContext,
@@ -109,9 +110,10 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
         exact: true,
       }),
     ).toBeDisabled();
-    await share
-      .getByRole("combobox", { name: "Invitation role", exact: true })
-      .selectOption("operator");
+    await selectOption(
+      share.getByRole("combobox", { name: "Invitation role", exact: true }),
+      "operator",
+    );
     await share
       .getByRole("button", { name: "Create invitation link", exact: true })
       .click();
@@ -340,9 +342,10 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     await expect(
       owner.getByText("Calculated in Exasol", { exact: true }),
     ).toBeVisible();
-    await owner
-      .getByRole("combobox", { name: /Reporting period/ })
-      .selectOption("90");
+    await selectOption(
+      owner.getByRole("combobox", { name: /Reporting period/ }),
+      "90",
+    );
     await expect(
       owner.getByRole("table", { name: /Weekly request flow/ }),
     ).toBeVisible();
@@ -379,7 +382,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
         exact: true,
         includeHidden: true,
       }),
-    ).not.toHaveValue(primaryId);
+    ).not.toHaveAttribute("data-value", primaryId);
     await openPeopleAccess(owner);
     const changedAccount = await read<AccountContext>(owner, "/api/account");
     const otherWorkspace = changedAccount.workspaces.find(
@@ -388,7 +391,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     expect(otherWorkspace.name).toBe(otherName);
     await expect(
       owner.getByRole("combobox", { name: "Current workspace", exact: true }),
-    ).toHaveValue(otherWorkspace.id);
+    ).toHaveAttribute("data-value", otherWorkspace.id);
     const otherTool = (await read<ToolWorkspace>(owner, "/api/tool")).published;
     const isolated = await post<RequestRecord>(owner, "/api/requests", {
       commandId: crypto.randomUUID(),
@@ -459,12 +462,16 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     await openPeopleAccess(owner);
     await expect(
       owner.getByRole("combobox", { name: "Current workspace", exact: true }),
-    ).toHaveValue(primaryId);
+    ).toHaveAttribute("data-value", primaryId);
 
     share = await openSharing(owner);
-    await share
-      .getByRole("combobox", { name: `Role for ${colleagueName}`, exact: true })
-      .selectOption("requester");
+    await selectOption(
+      share.getByRole("combobox", {
+        name: `Role for ${colleagueName}`,
+        exact: true,
+      }),
+      "requester",
+    );
     await share
       .getByRole("button", {
         name: `Save role for ${colleagueName}`,
@@ -535,9 +542,10 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     );
 
     share = await openSharing(owner);
-    await share
-      .getByRole("combobox", { name: "Invitation role", exact: true })
-      .selectOption("viewer");
+    await selectOption(
+      share.getByRole("combobox", { name: "Invitation role", exact: true }),
+      "viewer",
+    );
     const revokedResponse = owner.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === "/api/workspaces/invitations" &&

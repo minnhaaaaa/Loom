@@ -1,0 +1,112 @@
+.app-shell .loom-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 9px 12px;
+  margin: 6px 0 0;
+  border: 1px solid var(--dashboard-control-line, #6b6372);
+  border-radius: 6px;
+  background: var(--dashboard-surface, #111);
+  color: var(--dashboard-text, #f5f1eb);
+  font:
+    400 13px/1.4 var(--font-editorial),
+    Arial,
+    sans-serif;
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+  cursor: pointer;
+}
+.app-shell .loom-select:hover:not(:disabled),
+.app-shell .loom-select[data-popup-open] {
+  border-color: var(--dashboard-focus, #e1bdff);
+  background: var(--dashboard-raised, #19181b);
+}
+.app-shell .loom-select:focus-visible {
+  outline: 2px solid var(--dashboard-focus, #e1bdff);
+  outline-offset: 3px;
+}
+.app-shell .loom-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.loom-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.loom-select-caret {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  margin: -3px 2px 0 0;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
+.loom-select-positioner {
+  z-index: 200;
+  outline: none;
+}
+.loom-select-popup {
+  box-sizing: border-box;
+  min-width: var(--anchor-width);
+  max-width: min(560px, var(--available-width));
+  max-height: min(320px, var(--available-height));
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid var(--dashboard-line, #302c35);
+  border-radius: 7px;
+  background: var(--dashboard-raised, #19181b);
+  color: var(--dashboard-text, #f5f1eb);
+  box-shadow: 0 12px 32px #0006;
+  font:
+    400 13px/1.4 var(--font-editorial),
+    Arial,
+    sans-serif;
+  text-transform: none;
+  letter-spacing: normal;
+  color-scheme: dark;
+}
+.loom-select-list {
+  max-height: min(308px, calc(var(--available-height) - 12px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #6b6372 transparent;
+}
+.loom-select-option {
+  min-height: 36px;
+  padding: 9px 12px;
+  border-left: 2px solid transparent;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.loom-select-option[data-highlighted] {
+  background: var(--dashboard-hover, #252129);
+}
+.loom-select-option[data-selected] {
+  color: var(--dashboard-focus, #e1bdff);
+  border-left-color: currentColor;
+}
+.loom-select-option[data-disabled] {
+  color: var(--dashboard-muted, #aca5b1);
+  opacity: 0.55;
+  cursor: default;
+}
+.app-shell .mobile-workspace-navigation .loom-select {
+  margin: 0;
+  min-height: 36px;
+}
+.app-shell .provider-fields .loom-select {
+  margin: 0;
+  min-height: 44px;
+}

@@ -1,9 +1,11 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
   companyProviders,
   providerLabels,
   type CompanyProvider,
+  type ModelChoice,
   type ProviderSettingsSnapshot,
 } from "@loom/contracts";
 import { accessRequest } from "./account-access";
@@ -28,6 +30,47 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
   const [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const pending = useRef<{ signature: string; commandId: string } | null>(null);
+  const catalogRequest = useRef<AbortController | null>(null);
+  const [models, setModels] = useState<ModelChoice[] | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelError, setModelError] = useState("");
+  function clearModels() {
+    catalogRequest.current?.abort();
+    setModels(null);
+    setLoadingModels(false);
+    setModelError("");
+  }
+  async function loadModels() {
+    catalogRequest.current?.abort();
+    const controller = new AbortController();
+    catalogRequest.current = controller;
+    setLoadingModels(true);
+    setModelError("");
+    try {
+      const value = await accessRequest<{ models: ModelChoice[] }>(
+        "/api/workspaces/provider/models",
+        {
+          method: "POST",
+          signal: controller.signal,
+          headers: { "X-Loom-Workspace": workspaceId },
+          body: JSON.stringify({
+            provider,
+            ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+          }),
+        },
+      );
+      if (!controller.signal.aborted) setModels(value.models);
+    } catch (reason) {
+      if (!controller.signal.aborted)
+        setModelError(
+          reason instanceof Error
+            ? reason.message
+            : "Models could not be loaded.",
+        );
+    } finally {
+      if (!controller.signal.aborted) setLoadingModels(false);
+    }
+  }
   function adopt(value: ProviderSettingsSnapshot) {
     setSettings(value);
     if (value.provider) setProvider(value.provider);
@@ -55,6 +98,7 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
     return () => {
       mounted.current = false;
       controller.abort();
+      catalogRequest.current?.abort();
     };
   }, [workspaceId]);
   async function submit(event: FormEvent) {
@@ -97,6 +141,7 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
       );
       if (!mounted.current) return;
       adopt(value);
+      if (!value.active) clearModels();
       setApiKey("");
       setAcknowledge(false);
       pending.current = null;
@@ -132,11 +177,6 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
           {settings?.active ? "Connected" : "Not connected"}
         </span>
       </div>
-      <p>
-        Your team uses Loom normally. AI requests are billed to your company’s
-        API account. Chat subscriptions and external coding agents are separate
-        connections.
-      </p>
       {settings?.active && (
         <p className="provider-current">
           {providerLabels[settings.provider!]} ·{" "}
@@ -147,12 +187,12 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
           </small>
         </p>
       )}
-      {settings && <p className="provider-note">{settings.message}</p>}
+      {settings?.message && <p className="provider-note">{settings.message}</p>}
       <form onSubmit={(event) => void submit(event)}>
         <div className="provider-fields">
           <label htmlFor={`${id}-provider`}>
             Provider
-            <select
+            <LoomSelect
               id={`${id}-provider`}
               value={provider}
               disabled={busy || !settings?.available}
@@ -160,6 +200,7 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
                 setProvider(event.target.value as CompanyProvider);
                 setModel("");
                 setApiKey("");
+                clearModels();
                 pending.current = null;
               }}
             >
@@ -168,44 +209,88 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
                   {providerLabels[item]}
                 </option>
               ))}
-            </select>
+            </LoomSelect>
           </label>
+          <div className="provider-key-field">
+            <label htmlFor={`${id}-key`}>
+              Company API key
+              <input
+                id={`${id}-key`}
+                type="password"
+                value={apiKey}
+                onChange={(event) => {
+                  setApiKey(event.target.value);
+                  clearModels();
+                }}
+                disabled={busy || !settings?.available}
+                required
+                minLength={10}
+                maxLength={4096}
+                placeholder={
+                  settings?.active
+                    ? "Enter a new key to replace this connection"
+                    : "Paste your company API key"
+                }
+                autoComplete="new-password"
+                spellCheck={false}
+              />
+              <small>
+                Encrypted on the server. Never shown to staff or returned after
+                saving.
+              </small>
+            </label>
+            <button
+              type="button"
+              className="quiet provider-load-models"
+              disabled={
+                busy ||
+                loadingModels ||
+                !settings?.available ||
+                (apiKey.trim().length < 10 &&
+                  !(
+                    settings?.active &&
+                    settings.provider === provider &&
+                    !apiKey.trim()
+                  ))
+              }
+              onClick={() => void loadModels()}
+            >
+              {loadingModels ? "Loading models…" : "Load models"}
+            </button>
+            {modelError && <small role="alert">{modelError}</small>}
+          </div>
           <label htmlFor={`${id}-model`}>
             Model ID
-            <input
+            <LoomSelect
               id={`${id}-model`}
+              aria-label="Model ID"
               value={model}
               onChange={(event) => setModel(event.target.value)}
-              disabled={busy || !settings?.available}
-              required
-              maxLength={150}
-              placeholder="Enter a model from your provider account"
-              autoComplete="off"
-            />
-          </label>
-          <label htmlFor={`${id}-key`}>
-            Company API key
-            <input
-              id={`${id}-key`}
-              type="password"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              disabled={busy || !settings?.available}
-              required
-              minLength={10}
-              maxLength={4096}
-              placeholder={
-                settings?.active
-                  ? "Enter a new key to replace this connection"
-                  : "Paste your company API key"
+              disabled={
+                busy || loadingModels || !settings?.available || !models?.length
               }
-              autoComplete="new-password"
-              spellCheck={false}
-            />
-            <small>
-              Encrypted on the server. Never shown to staff or returned after
-              saving.
-            </small>
+              required
+            >
+              <option value="" disabled>
+                {loadingModels
+                  ? "Loading models…"
+                  : models?.length === 0
+                    ? "No models available"
+                    : models
+                      ? "Choose a model"
+                      : "Load models to choose"}
+              </option>
+              {model && !models?.some((item) => item.id === model) && (
+                <option value={model}>{model}</option>
+              )}
+              {models?.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name === item.id
+                    ? item.id
+                    : `${item.name} · ${item.id}`}
+                </option>
+              ))}
+            </LoomSelect>
           </label>
           <label htmlFor={`${id}-tokens`}>
             Maximum output tokens per request
@@ -241,7 +326,13 @@ function ProviderSettingsForm({ workspaceId }: { workspaceId: string }) {
         <div className="provider-actions">
           <button
             type="submit"
-            disabled={busy || !settings?.available || !acknowledge}
+            disabled={
+              busy ||
+              loadingModels ||
+              !settings?.available ||
+              !acknowledge ||
+              !model.trim()
+            }
           >
             {busy ? "Working…" : "Test and save connection"}
           </button>

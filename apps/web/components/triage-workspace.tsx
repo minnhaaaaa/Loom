@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import { workspaceFetch } from "./workspace-fetch";
 import {
   useCallback,
@@ -451,7 +452,7 @@ export function TriageWorkspace({
               </label>
               <label>
                 Knowledge kind
-                <select
+                <LoomSelect
                   disabled={busy}
                   value={values.kind}
                   onChange={(event) =>
@@ -466,7 +467,7 @@ export function TriageWorkspace({
                   <option value="routing">Routing guidance</option>
                   <option value="procedure">Procedure</option>
                   <option value="glossary">Glossary</option>
-                </select>
+                </LoomSelect>
               </label>
               {values.kind === "routing" && (
                 <>
@@ -483,7 +484,7 @@ export function TriageWorkspace({
                   </label>
                   <label>
                     Owner context (optional)
-                    <select
+                    <LoomSelect
                       disabled={busy}
                       value={values.ownerId || ""}
                       onChange={(event) =>
@@ -501,7 +502,7 @@ export function TriageWorkspace({
                             {m.name}
                           </option>
                         ))}
-                    </select>
+                    </LoomSelect>
                   </label>
                 </>
               )}
@@ -744,7 +745,7 @@ export function TriageWorkspace({
           </button>
           <label>
             Recent runs (workspace latest 10)
-            <select
+            <LoomSelect
               disabled={busy}
               value={detail?.run.id || ""}
               onChange={(event) => void loadRun(event.target.value)}
@@ -758,7 +759,7 @@ export function TriageWorkspace({
                   {new Date(run.createdAt).toLocaleString()}
                 </option>
               ))}
-            </select>
+            </LoomSelect>
           </label>
           {detail && (
             <div className="run-review">

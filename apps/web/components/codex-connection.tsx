@@ -1,7 +1,9 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 
 import { useEffect, useRef, useState } from "react";
 import { workspaceFetch } from "./workspace-fetch";
+import type { ModelChoice } from "@loom/contracts";
 
 type Connection = {
   configured: boolean;
@@ -65,6 +67,42 @@ export function CodexConnection({
   const dismissed = useRef(new Set<string>());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [catalog, setCatalog] = useState<{
+    key: string;
+    models: ModelChoice[];
+    error: string;
+  } | null>(null);
+  const [catalogRetry, setCatalogRetry] = useState(0);
+  const catalogKey = `${workspaceId}:${connection?.clientId}`;
+  const modelCatalog = catalog?.key === catalogKey ? catalog : null;
+  const canLoadModels = Boolean(connection?.inferenceAvailable);
+  useEffect(() => {
+    if (preview || !workspaceId || !canLoadModels) return;
+    const controller = new AbortController();
+    void connectionRequest<{ models: ModelChoice[] }>(
+      "/api/workspaces/codex/models",
+      {
+        signal: controller.signal,
+        headers: { "X-Loom-Workspace": workspaceId },
+      },
+    )
+      .then((value) => {
+        if (!controller.signal.aborted)
+          setCatalog({ key: catalogKey, models: value.models, error: "" });
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted)
+          setCatalog({
+            key: catalogKey,
+            models: [],
+            error:
+              reason instanceof Error
+                ? reason.message
+                : "Models could not be loaded.",
+          });
+      });
+    return () => controller.abort();
+  }, [preview, workspaceId, canLoadModels, catalogKey, catalogRetry]);
   useEffect(() => {
     if (preview || !workspaceId) return;
     const controller = new AbortController();
@@ -193,7 +231,7 @@ export function CodexConnection({
       {Boolean(connection?.accounts?.length) && (
         <label className="codex-account-picker">
           ChatGPT account
-          <select
+          <LoomSelect
             value={selectedClient}
             disabled={busy}
             onChange={(event) => setSelectedClient(event.target.value)}
@@ -205,7 +243,7 @@ export function CodexConnection({
                 {account.active ? " (active)" : ""}
               </option>
             ))}
-          </select>
+          </LoomSelect>
         </label>
       )}
       {wrongHost ? (
@@ -257,17 +295,52 @@ export function CodexConnection({
         <div className="codex-model-settings">
           <label>
             ChatGPT model ID
-            <input
+            <LoomSelect
+              aria-label="ChatGPT model ID"
               value={model}
-              maxLength={200}
               onChange={(event) => setModel(event.target.value)}
-              placeholder="Model ID available to your ChatGPT plan"
-              disabled={busy}
-            />
+              disabled={busy || !modelCatalog?.models.length}
+            >
+              <option value="" disabled>
+                {!modelCatalog
+                  ? "Loading models…"
+                  : modelCatalog.models.length
+                    ? "Choose a model"
+                    : "No models available"}
+              </option>
+              {model &&
+                !modelCatalog?.models.some((item) => item.id === model) && (
+                  <option value={model} disabled>
+                    {model}
+                  </option>
+                )}
+              {modelCatalog?.models.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </LoomSelect>
           </label>
+          {modelCatalog?.error && (
+            <p className="alert" role="alert">
+              {modelCatalog.error}{" "}
+              <button
+                type="button"
+                className="quiet"
+                onClick={() => {
+                  setCatalog(null);
+                  setCatalogRetry((value) => value + 1);
+                }}
+              >
+                Retry
+              </button>
+            </p>
+          )}
           <button
             type="button"
-            disabled={busy || !model.trim()}
+            disabled={
+              busy || !modelCatalog?.models.some((item) => item.id === model)
+            }
             onClick={() => void update("PATCH")}
           >
             Save ChatGPT model

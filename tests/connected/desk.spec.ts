@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test } from "@playwright/test";
 import { personas } from "../../packages/contracts/src/index";
 const origin = "http://127.0.0.1:3200";
@@ -7,9 +8,10 @@ test("real Exasol workflow through the production UI and protected API", async (
 }) => {
   const title = `Browser fixture ${crypto.randomUUID().slice(0, 8)}`;
   await page.goto("/app?view=records");
-  await page
-    .getByRole("combobox", { name: "Demo persona" })
-    .selectOption(personas[2].id);
+  await selectOption(
+    page.getByRole("combobox", { name: "Demo persona" }),
+    personas[2].id,
+  );
   await expect(
     page.getByRole("button", { name: "New request", exact: true }),
   ).toBeEnabled();
@@ -48,30 +50,33 @@ test("real Exasol workflow through the production UI and protected API", async (
     panel.getByRole("heading", { name: "Coordination" }),
   ).not.toBeVisible();
   await panel.getByRole("button", { name: "Close request panel" }).click();
-  await page
-    .getByRole("combobox", { name: "Demo persona" })
-    .selectOption(personas[0].id);
+  await selectOption(
+    page.getByRole("combobox", { name: "Demo persona" }),
+    personas[0].id,
+  );
   await expect(page.getByText(/Exasol · queue-summary-v1/)).toBeVisible();
   await page.getByRole("button", { name: title, exact: true }).click();
   await expect(
     panel.getByRole("combobox", { name: "Owner", exact: true }),
   ).toBeEnabled();
-  await panel
-    .getByRole("combobox", { name: "Owner", exact: true })
-    .selectOption(personas[1].id);
+  await selectOption(
+    panel.getByRole("combobox", { name: "Owner", exact: true }),
+    personas[1].id,
+  );
   await expect(
     panel.getByRole("combobox", { name: "Owner", exact: true }),
-  ).toHaveValue(personas[1].id);
+  ).toHaveAttribute("data-value", personas[1].id);
   for (const status of ["ready", "in_progress", "done"]) {
     await expect(
       panel.getByRole("combobox", { name: "Status", exact: true }),
     ).toBeEnabled();
-    await panel
-      .getByRole("combobox", { name: "Status", exact: true })
-      .selectOption(status);
+    await selectOption(
+      panel.getByRole("combobox", { name: "Status", exact: true }),
+      status,
+    );
     await expect(
       panel.getByRole("combobox", { name: "Status", exact: true }),
-    ).toHaveValue(status);
+    ).toHaveAttribute("data-value", status);
   }
   await page.screenshot({
     path: "test-results/connected-desk.png",
@@ -166,9 +171,10 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
 }) => {
   const title = `CSV browser ${crypto.randomUUID().slice(0, 8)}`;
   await page.goto("/app?view=records");
-  await page
-    .getByRole("combobox", { name: "Demo persona" })
-    .selectOption(personas[0].id);
+  await selectOption(
+    page.getByRole("combobox", { name: "Demo persona" }),
+    personas[0].id,
+  );
   await expect(
     page.getByRole("button", { name: "New request", exact: true }),
   ).toBeEnabled();
@@ -190,9 +196,10 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
     ["Reporting period", "2"],
     ["Dataset", "3"],
   ])
-    await transfer
-      .getByRole("combobox", { name: field, exact: true })
-      .selectOption(value);
+    await selectOption(
+      transfer.getByRole("combobox", { name: field, exact: true }),
+      value,
+    );
   await transfer
     .getByRole("button", { name: "Generate import preview" })
     .click();
@@ -230,9 +237,10 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
   const csv = Buffer.concat(chunks).toString("utf8");
   expect(csv).toContain(title);
   expect(csv).toContain('"needs_info"');
-  await page
-    .getByRole("combobox", { name: "Demo persona" })
-    .selectOption(personas[2].id);
+  await selectOption(
+    page.getByRole("combobox", { name: "Demo persona" }),
+    personas[2].id,
+  );
   await expect(
     page.getByText("Your work, in view", { exact: true }),
   ).toBeVisible();
@@ -282,9 +290,10 @@ test("live OpenRouter proposal and exact-change human review in the production U
   expect(created.status()).toBe(200);
   const record = await created.json();
   await page.goto("/app?view=settings");
-  await page
-    .getByRole("combobox", { name: "Demo persona" })
-    .selectOption(personas[0].id);
+  await selectOption(
+    page.getByRole("combobox", { name: "Demo persona" }),
+    personas[0].id,
+  );
   await page.locator(".advanced-administration > summary").click();
   const workspace = page.getByRole("region", {
     name: "Triage and team knowledge",
@@ -294,15 +303,20 @@ test("live OpenRouter proposal and exact-change human review in the production U
   await workspace
     .getByRole("textbox", { name: "Knowledge title", exact: true })
     .fill(source);
-  await workspace
-    .getByRole("combobox", { name: "Knowledge kind", exact: true })
-    .selectOption("routing");
+  await selectOption(
+    workspace.getByRole("combobox", { name: "Knowledge kind", exact: true }),
+    "routing",
+  );
   await workspace
     .getByRole("textbox", { name: "Dataset context (optional)", exact: true })
     .fill(dataset);
-  await workspace
-    .getByRole("combobox", { name: "Owner context (optional)", exact: true })
-    .selectOption(personas[1].id);
+  await selectOption(
+    workspace.getByRole("combobox", {
+      name: "Owner context (optional)",
+      exact: true,
+    }),
+    personas[1].id,
+  );
   await workspace
     .getByRole("textbox", { name: "Knowledge content", exact: true })
     .fill(
@@ -363,8 +377,12 @@ test("live OpenRouter proposal and exact-change human review in the production U
     name: "Recent runs (workspace latest 10)",
     exact: true,
   });
-  await expect(recent.locator("option").nth(1)).toHaveAttribute("value", /.+/);
-  await recent.selectOption({ index: 1 });
+  await recent.click();
+  await expect(
+    page.locator(".loom-select-popup").getByRole("option").nth(1),
+  ).toHaveAttribute("data-value", /.+/);
+  await page.keyboard.press("Escape");
+  await selectOption(recent, { index: 1 });
   const restoredProposal = restored.locator(".proposal-review");
   await expect(
     restoredProposal.getByRole("heading", { name: `Review: ${title}` }),
@@ -397,9 +415,10 @@ test("live OpenRouter proposal and exact-change human review in the production U
     path: "test-results/connected-triage.png",
     fullPage: true,
   });
-  await page
-    .getByRole("combobox", { name: "Demo persona" })
-    .selectOption(personas[2].id);
+  await selectOption(
+    page.getByRole("combobox", { name: "Demo persona" }),
+    personas[2].id,
+  );
   await expect(
     page.getByRole("region", { name: "Triage and team knowledge" }),
   ).not.toBeVisible();

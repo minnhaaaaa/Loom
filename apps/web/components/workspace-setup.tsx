@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import { CodexConnection } from "./codex-connection";
 
 import {
@@ -601,7 +602,7 @@ export function WorkspaceSetup({
                   <div className="setup-color-grid">
                     <label>
                       Typography
-                      <select
+                      <LoomSelect
                         aria-label="Typography"
                         value={draft.font}
                         disabled={busy}
@@ -617,11 +618,11 @@ export function WorkspaceSetup({
                         <option value="technical">
                           Technical · IBM Plex Mono
                         </option>
-                      </select>
+                      </LoomSelect>
                     </label>
                     <label>
                       Corner style
-                      <select
+                      <LoomSelect
                         aria-label="Corner style"
                         value={draft.corners}
                         disabled={busy}
@@ -634,7 +635,7 @@ export function WorkspaceSetup({
                       >
                         <option value="rounded">Rounded</option>
                         <option value="square">Square</option>
-                      </select>
+                      </LoomSelect>
                     </label>
                   </div>
                   {!valid.success && (

@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import { workspaceFetch } from "./workspace-fetch";
 
 import { useEffect, useRef, useState } from "react";
@@ -530,7 +531,7 @@ export function ToolBuilder({
                       </label>
                       <label>
                         Required
-                        <select
+                        <LoomSelect
                           aria-label={`Requirement: ${field.label}`}
                           value={field.requiredAt}
                           disabled={busy}
@@ -546,7 +547,7 @@ export function ToolBuilder({
                           {field.requiredAt === "intake" && (
                             <option value="intake">On new requests</option>
                           )}
-                        </select>
+                        </LoomSelect>
                       </label>
                       {!current.spec.fields.some(
                         (item) => item.id === field.id,
@@ -601,7 +602,7 @@ export function ToolBuilder({
                 </label>
                 <label>
                   Answer format
-                  <select
+                  <LoomSelect
                     value={fieldType}
                     disabled={busy}
                     onChange={(event) =>
@@ -610,7 +611,7 @@ export function ToolBuilder({
                   >
                     <option value="text">Short text</option>
                     <option value="textarea">Long text</option>
-                  </select>
+                  </LoomSelect>
                 </label>
                 <button
                   className="secondary"

@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test } from "@playwright/test";
 
 test("the assistant view is one prompt instead of knowledge and triage forms", async ({
@@ -52,13 +53,15 @@ test("the single prompt fits a narrow screen without exposing administrative con
     path: "test-results/prompt-workspace-mobile.png",
     fullPage: true,
   });
-  await page
-    .getByRole("combobox", { name: "Workspace view", exact: true })
-    .selectOption("settings");
+  await selectOption(
+    page.getByRole("combobox", { name: "Workspace view", exact: true }),
+    "settings",
+  );
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
-  await page
-    .getByRole("combobox", { name: "Workspace view", exact: true })
-    .selectOption("assistant");
+  await selectOption(
+    page.getByRole("combobox", { name: "Workspace view", exact: true }),
+    "assistant",
+  );
   await expect(
     page.getByRole("textbox", { name: "Ask your workspace", exact: true }),
   ).toBeVisible();

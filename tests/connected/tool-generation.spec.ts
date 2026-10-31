@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test } from "@playwright/test";
 import {
   personas,
@@ -41,9 +42,10 @@ test("a live model generates a persisted draft that an owner reviews and publish
 
   try {
     await page.goto("/app?view=settings");
-    await page
-      .getByRole("combobox", { name: "Demo persona" })
-      .selectOption(personas[0].id);
+    await selectOption(
+      page.getByRole("combobox", { name: "Demo persona" }),
+      personas[0].id,
+    );
     const builder = page.locator(".tool-builder");
     await builder.getByText("Customize this desk", { exact: true }).click();
     await builder.getByText("Ask AI", { exact: true }).click();
@@ -174,9 +176,10 @@ test("a live model generates a persisted draft that an owner reviews and publish
     expect(published.spec).toEqual(draft.spec);
     await expect(page.locator(".current-tool-label")).toContainText(title);
 
-    await page
-      .getByRole("combobox", { name: "Demo persona" })
-      .selectOption(personas[2].id);
+    await selectOption(
+      page.getByRole("combobox", { name: "Demo persona" }),
+      personas[2].id,
+    );
     await expect(builder).toHaveCount(0);
     await page.goto("/app?view=records");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
@@ -307,9 +310,10 @@ test("browser-only failure fixtures preserve a draft and require explicit rate-l
   });
 
   await page.goto("/app?view=settings");
-  await page
-    .getByRole("combobox", { name: "Demo persona" })
-    .selectOption(personas[0].id);
+  await selectOption(
+    page.getByRole("combobox", { name: "Demo persona" }),
+    personas[0].id,
+  );
   const builder = page.locator(".tool-builder");
   await builder.getByText("Customize this desk", { exact: true }).click();
   await builder.getByText("Ask AI", { exact: true }).click();

@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test } from "@playwright/test";
 
 test("company setup previews brand colors, typography and identity without saving sample state", async ({
@@ -27,10 +28,14 @@ test("company setup previews brand colors, typography and identity without savin
     "--brand-primary",
     "#3832a0",
   );
-  await setup.getByLabel("Typography", { exact: true }).selectOption("classic");
-  await setup
-    .getByLabel("Corner style", { exact: true })
-    .selectOption("square");
+  await selectOption(
+    setup.getByLabel("Typography", { exact: true }),
+    "classic",
+  );
+  await selectOption(
+    setup.getByLabel("Corner style", { exact: true }),
+    "square",
+  );
   await expect(page.locator(".app-shell")).toHaveCSS(
     "--brand-control-radius",
     "2px",

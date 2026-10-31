@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   companyProviders,
   providerSettingsInputSchema,
+  providerModelsInputSchema,
   type Actor,
   type ProviderSettingsInput,
   type ProviderSettingsSnapshot,
@@ -32,6 +33,8 @@ import {
 } from "./provider-transport";
 import { modelResponseError } from "./model-errors";
 import { settingsFor } from "./settings";
+import { fetchModelCatalog } from "./model-catalog";
+import { limitCredentialAttempt } from "./auth-limits";
 
 function encryptionKey() {
   const value = process.env.LOOM_PROVIDER_ENCRYPTION_KEY;
@@ -115,8 +118,7 @@ function associated(
 }
 function snapshot(row?: Row): ProviderSettingsSnapshot {
   let available = true,
-    message =
-      "Connect a company API account. Test and save sends one small request and may incur a provider charge.";
+    message = "";
   try {
     encryptionKey();
   } catch (error) {
@@ -140,6 +142,50 @@ export async function readProviderSettings(actor: Actor) {
     await owner(sql, actor);
     return snapshot(await connectionRow(sql, actor));
   });
+}
+export async function listCompanyModels(
+  actor: Actor,
+  input: z.infer<typeof providerModelsInputSchema>,
+) {
+  const values = providerModelsInputSchema.parse(input);
+  const credential = await readDatabase(async (sql) => {
+    await owner(sql, actor);
+    if (values.apiKey) return { key: values.apiKey, version: null };
+    const row = await connectionRow(sql, actor);
+    if (!row?.ACTIVE || row.PROVIDER !== values.provider || !row.CREDENTIAL)
+      throw new DomainError(
+        "PROVIDER_KEY_REQUIRED",
+        "Enter your API key to load models.",
+        400,
+      );
+    return {
+      key: decryptProviderCredential(
+        String(row.CREDENTIAL),
+        associated(
+          actor.workspaceId,
+          Number(row.VERSION),
+          values.provider,
+          String(row.MODEL),
+        ),
+      ),
+      version: Number(row.VERSION),
+    };
+  });
+  limitCredentialAttempt(`models:${actor.workspaceId}:${actor.userId}`);
+  const models = await fetchModelCatalog(values.provider, credential.key);
+  await readDatabase(async (sql) => {
+    await owner(sql, actor);
+    if (credential.version !== null) {
+      const row = await connectionRow(sql, actor);
+      if (!row?.ACTIVE || Number(row.VERSION) !== credential.version)
+        throw new DomainError(
+          "WORKSPACE_CHANGED",
+          "Your connection changed. Reload its models.",
+          409,
+        );
+    }
+  });
+  return { models };
 }
 // Call only inside an already-authorized workspace transaction. Secrets remain server-side.
 export async function workspaceProvider(

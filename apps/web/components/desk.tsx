@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CsvTransfer } from "./csv-transfer";
@@ -731,7 +732,7 @@ export function Desk({
         </nav>
         <label className="mobile-workspace-navigation">
           <span className="sr-only">Workspace view</span>
-          <select
+          <LoomSelect
             aria-label="Workspace view"
             value={view}
             onChange={(event) => router.push(viewHref(event.target.value))}
@@ -745,7 +746,7 @@ export function Desk({
               </>
             )}
             {(preview || member) && <option value="settings">Settings</option>}
-          </select>
+          </LoomSelect>
         </label>
         {member && (
           <p className="dashboard-member">
@@ -780,7 +781,7 @@ export function Desk({
                 </span>
                 <label className="inline-label">
                   View as{" "}
-                  <select
+                  <LoomSelect
                     aria-label="Demo persona"
                     value={member?.userId || ""}
                     disabled={busy}
@@ -794,7 +795,7 @@ export function Desk({
                         {p.name} · {p.role}
                       </option>
                     ))}
-                  </select>
+                  </LoomSelect>
                 </label>
                 {member && (
                   <button
@@ -1062,7 +1063,7 @@ export function Desk({
                   {filters?.id === "filters" && filters.status && (
                     <label className="inline-label">
                       Status{" "}
-                      <select
+                      <LoomSelect
                         value={status}
                         onChange={(e) => {
                           setStatus(e.target.value);
@@ -1076,7 +1077,7 @@ export function Desk({
                             {spec.statusLabels[s]}
                           </option>
                         ))}
-                      </select>
+                      </LoomSelect>
                     </label>
                   )}
                   <Button
@@ -1199,6 +1200,14 @@ export function Desk({
             }}
             tabIndex={-1}
             onKeyDown={(event) => {
+              if (event.defaultPrevented) return;
+              if (
+                event.key === "Escape" &&
+                event.target instanceof HTMLElement &&
+                (event.target.closest(".loom-select-popup") ||
+                  event.target.closest('.loom-select[aria-expanded="true"]'))
+              )
+                return;
               if (event.key === "Escape" && !busy) closePanel();
               if (event.key === "Tab") {
                 const nodes = event.currentTarget.querySelectorAll<HTMLElement>(
@@ -1427,7 +1436,7 @@ export function Desk({
                       <div className="form-grid">
                         <label>
                           Status
-                          <select
+                          <LoomSelect
                             value={detail.request.status}
                             disabled={
                               !operates || busy || !actionEnabled("set_status")
@@ -1444,11 +1453,11 @@ export function Desk({
                                 {currentDetailTool.spec.statusLabels[s]}
                               </option>
                             ))}
-                          </select>
+                          </LoomSelect>
                         </label>
                         <label>
                           Owner
-                          <select
+                          <LoomSelect
                             value={detail.request.ownerId || ""}
                             disabled={
                               !operates || busy || !actionEnabled("set_owner")
@@ -1471,11 +1480,11 @@ export function Desk({
                                   {m.name}
                                 </option>
                               ))}
-                          </select>
+                          </LoomSelect>
                         </label>
                         <label>
                           Priority
-                          <select
+                          <LoomSelect
                             value={detail.request.priority || "normal"}
                             disabled={
                               !operates ||
@@ -1493,7 +1502,7 @@ export function Desk({
                             {["low", "normal", "high"].map((p) => (
                               <option key={p}>{p}</option>
                             ))}
-                          </select>
+                          </LoomSelect>
                         </label>
                         <label>
                           Due date
@@ -1558,7 +1567,7 @@ export function Desk({
                         {!own && (
                           <label className="inline-label">
                             Visibility
-                            <select
+                            <LoomSelect
                               value={visibility}
                               disabled={!canWrite || busy}
                               onChange={(e) =>
@@ -1571,7 +1580,7 @@ export function Desk({
                                 Visible to requester
                               </option>
                               <option value="internal">Internal team</option>
-                            </select>
+                            </LoomSelect>
                           </label>
                         )}
                         <button

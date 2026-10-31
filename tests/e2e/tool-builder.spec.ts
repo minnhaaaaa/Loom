@@ -1,3 +1,4 @@
+import { selectOption } from "../helpers/select";
 import { expect, test } from "@playwright/test";
 
 test("customization starts with a desk name and collapsed controls, preserving edits when reopened", async ({
@@ -163,9 +164,10 @@ test("preview builder adds an optional long-text field without changing the publ
   await builder
     .getByLabel("New field label", { exact: true })
     .fill("Escalation notes");
-  await builder
-    .getByRole("combobox", { name: "Answer format", exact: true })
-    .selectOption("textarea");
+  await selectOption(
+    builder.getByRole("combobox", { name: "Answer format", exact: true }),
+    "textarea",
+  );
   await builder.getByRole("button", { name: "Add field", exact: true }).click();
   const field = builder.locator(".tool-simple-field").filter({
     has: page.getByLabel("Requirement: Escalation notes", { exact: true }),
@@ -173,7 +175,7 @@ test("preview builder adds an optional long-text field without changing the publ
   await field.locator(":scope > summary").click();
   await expect(
     field.getByLabel("Requirement: Escalation notes", { exact: true }),
-  ).toHaveValue("optional");
+  ).toHaveText("Optional");
   await builder.getByText("Preview", { exact: true }).click();
   await expect(
     builder.getByLabel("Preview: System or service", { exact: true }),

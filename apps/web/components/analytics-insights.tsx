@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 import { workspaceFetch } from "./workspace-fetch";
 
 import { useEffect, useState } from "react";
@@ -103,7 +104,7 @@ export function AnalyticsInsights({ refreshKey }: { refreshKey: string }) {
           <div className="insights-toolbar">
             <label>
               Reporting period
-              <select
+              <LoomSelect
                 value={days}
                 onChange={(event) =>
                   setDays(Number(event.target.value) as 30 | 90)
@@ -111,7 +112,7 @@ export function AnalyticsInsights({ refreshKey }: { refreshKey: string }) {
               >
                 <option value="30">Last 30 days</option>
                 <option value="90">Last 90 days</option>
-              </select>
+              </LoomSelect>
             </label>
             <button
               type="button"

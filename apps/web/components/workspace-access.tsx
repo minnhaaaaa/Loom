@@ -1,4 +1,5 @@
 "use client";
+import { LoomSelect } from "./ui/loom-select";
 
 import {
   useCallback,
@@ -240,7 +241,7 @@ export function WorkspaceAccess({
       <div className="workspace-access-bar">
         <label>
           Current workspace
-          <select
+          <LoomSelect
             aria-label="Current workspace"
             value={context.currentWorkspaceId || ""}
             disabled={busy || !context.workspaces.length}
@@ -254,7 +255,7 @@ export function WorkspaceAccess({
                 {workspace.name} · {workspace.role}
               </option>
             ))}
-          </select>
+          </LoomSelect>
         </label>
         <span className="workspace-access-identity">
           <strong>{context.user.name}</strong>
@@ -322,7 +323,7 @@ export function WorkspaceAccess({
               <form onSubmit={(event) => void invite(event)}>
                 <label>
                   Invitation role
-                  <select
+                  <LoomSelect
                     value={invitationRole}
                     disabled={busy}
                     onChange={(event) =>
@@ -334,7 +335,7 @@ export function WorkspaceAccess({
                         {role}
                       </option>
                     ))}
-                  </select>
+                  </LoomSelect>
                 </label>
                 <button type="submit" disabled={busy}>
                   Create invitation link
@@ -409,7 +410,7 @@ export function WorkspaceAccess({
                       </div>
                       <label>
                         Role
-                        <select
+                        <LoomSelect
                           aria-label={`Role for ${member.name}`}
                           value={nextRole}
                           disabled={busy || !member.active}
@@ -428,7 +429,7 @@ export function WorkspaceAccess({
                               {role}
                             </option>
                           ))}
-                        </select>
+                        </LoomSelect>
                       </label>
                       <button
                         className="secondary"
