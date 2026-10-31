@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { LoomSculpture } from "./loom-sculpture";
+import { LoomWeave } from "./loom-weave";
 import { LandingIntro, type IntroPhase } from "./landing-intro";
 
 if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger);
@@ -25,8 +25,6 @@ function Arrow({ diagonal = false }: { diagonal?: boolean }) {
 export function LandingPage() {
   const root = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<IntroPhase>("loading");
-  const [sceneReady, setSceneReady] = useState(false);
-  const markSceneReady = useCallback(() => setSceneReady(true), []);
   const introComplete = phase === "complete";
   useGSAP(
     () => {
@@ -73,12 +71,7 @@ export function LandingPage() {
 
   return (
     <div className="loom-landing" ref={root} data-intro-phase={phase}>
-      <LandingIntro
-        root={root}
-        sceneReady={sceneReady}
-        phase={phase}
-        onPhaseChange={setPhase}
-      />
+      <LandingIntro root={root} phase={phase} onPhaseChange={setPhase} />
       <noscript>
         <style>{`.loom-intro{display:none!important}.loom-landing .loom-site,.loom-landing .loom-hero-title,.loom-landing .loom-headline-letter,.loom-landing [data-entrance]{visibility:visible!important;opacity:1!important}`}</style>
       </noscript>
@@ -124,7 +117,7 @@ export function LandingPage() {
               </h1>
             </div>
             <div className="loom-hero-art" data-entrance>
-              <LoomSculpture onReady={markSceneReady} active={introComplete} />
+              <LoomWeave active={introComplete} />
             </div>
             <div className="loom-hero-actions" data-entrance>
               <Link href="/register" className="loom-button">

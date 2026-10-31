@@ -25,7 +25,18 @@ test("landing explains the analytics workflow and offers account entry without s
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 900 });
   await openLanding(page);
+  await expect(page.locator(".loom-weave")).toBeVisible();
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await expect(page.locator(".loom-thread-weft").last()).toHaveCSS(
+    "opacity",
+    "0.95",
+  );
+  await page.screenshot({
+    path: "test-results/landing-weave-desktop.png",
+    fullPage: true,
+  });
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     /DATA REQUESTS\.\s*ONE WORKSPACE\./,
   );
@@ -104,6 +115,11 @@ test("landing and company entry fit a phone with reduced motion", async ({
         await expect(link).toBeInViewport();
       }
       await expect(page.locator(".loom-intro")).toHaveCount(0);
+      await expect(page.locator(".loom-weave")).toBeVisible();
+      await page.screenshot({
+        path: "test-results/landing-weave-mobile.png",
+        fullPage: true,
+      });
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -182,6 +198,8 @@ test("landing remains available without JavaScript", async ({ browser }) => {
   const page = await context.newPage();
   await page.goto("/");
   await expect(page.locator(".loom-intro")).toBeHidden();
+  await expect(page.locator(".loom-weave")).toBeVisible();
+  await expect(page.locator("canvas")).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page
     .getByRole("link", { name: "Create your company", exact: true })

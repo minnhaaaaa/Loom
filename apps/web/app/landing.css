@@ -1,4 +1,4 @@
-/* The object supplies the depth. Everything around it stays quiet. */
+/* Fine warp and weft carry the landing page. Typography stays quiet around them. */
 .loom-landing {
   --loom-night: #090909;
   --loom-text: #ffedd7;
@@ -249,37 +249,19 @@
 }
 .loom-hero-art {
   position: absolute;
-  top: 35%;
+  top: 36%;
   left: 50%;
   translate: -50% 0;
-  width: min(100%, 720px);
-  height: 48%;
+  width: min(100%, 1240px);
+  height: 46%;
   transform-origin: center;
+  pointer-events: none;
 }
-.loom-sculpture {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-}
-.loom-sculpture-stage,
-.loom-sculpture-fallback {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.loom-sculpture-stage canvas {
+.loom-weave {
   display: block;
   width: 100%;
   height: 100%;
-}
-.loom-sculpture-fallback {
-  transition: opacity 350ms ease;
-}
-.loom-sculpture.is-ready .loom-sculpture-fallback {
-  opacity: 0;
-  pointer-events: none;
+  overflow: visible;
 }
 .loom-hero-actions {
   position: absolute;
@@ -364,10 +346,10 @@
     font-size: clamp(44px, 7.6vw, 68px);
   }
   .loom-hero-art {
-    top: 35%;
+    top: 36%;
     left: 50%;
-    width: min(100%, 720px);
-    height: 48%;
+    width: 100%;
+    height: 46%;
   }
 }
 @media (max-width: 600px) {
@@ -414,6 +396,7 @@
     width: calc(100% + 48px);
     height: 330px;
     margin: 16px -24px 0;
+    overflow: hidden;
   }
   .loom-hero-actions {
     position: relative;

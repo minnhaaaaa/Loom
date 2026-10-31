@@ -38,12 +38,10 @@ function chime(context: AudioContext) {
 
 export function LandingIntro({
   root,
-  sceneReady,
   phase,
   onPhaseChange,
 }: {
   root: RefObject<HTMLDivElement | null>;
-  sceneReady: boolean;
   phase: IntroPhase;
   onPhaseChange: (phase: IntroPhase) => void;
 }) {
@@ -141,7 +139,7 @@ export function LandingIntro({
     };
   }, [introIsOpen, finish, root]);
 
-  const ready = (fontsReady && sceneReady) || deadlineReached;
+  const ready = fontsReady || deadlineReached;
   useGSAP(
     () => {
       if (!ready || finished.current || started.current) return;

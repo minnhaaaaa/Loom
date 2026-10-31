@@ -32,7 +32,7 @@ This is a working prototype. Customer demand, reduced coordination time, and wil
 
 A company currently maps to one workspace and one shared request-family tool. Company-name selection alone grants no access. Domain discovery, verified-domain joining, and an organization hierarchy are not implemented.
 
-The dark workspace uses Cloudflare Kumo controls with text-only navigation: Requests, Assistant, Insights, Knowledge, and Settings. Company setup, people/access, and AI connections are grouped in Settings. The public page has one hero, a rotating box-shaped loom with a dark frame and illuminated violet warp and weft, and bold Inter display typography (the supplied reference's Halyard substitute). Its skippable GSAP opening types LOOM, then the centered headline, before revealing the page. Sound is opt-in; reduced-motion visitors bypass the opening animation.
+The dark workspace uses Cloudflare Kumo controls with text-only navigation: Requests, Assistant, Insights, Knowledge, and Settings. Company setup, people/access, and AI connections are grouped in Settings. The public page has one hero, a flat violet warp-and-weft illustration with alternating thread crossings and softly fading ends, and bold Inter display typography (the supplied reference's Halyard substitute). GSAP reveals the threads and moves a single highlight across the weave; scroll motion respects reduced-motion preferences. The illustration is SVG and remains visible without JavaScript. Its skippable GSAP opening types LOOM, then the centered headline, before revealing the page. Sound is opt-in; reduced-motion visitors bypass the opening animation.
 
 ## Completed and pending features
 
