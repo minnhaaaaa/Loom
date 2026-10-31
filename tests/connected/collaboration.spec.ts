@@ -63,6 +63,8 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
   const outsiderContext = await browser.newContext({ baseURL: origin });
   const owner = await ownerContext.newPage();
   const colleague = await colleagueContext.newPage();
+  owner.setDefaultTimeout(15_000);
+  colleague.setDefaultTimeout(15_000);
 
   try {
     await owner.goto("/register");
@@ -150,10 +152,10 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     expect(colleagueAccount.workspaces).toEqual([
       { id: primaryId, name: workspaceName, role: "operator" },
     ]);
-    const signedOut = await colleague.request.delete("/api/session", {
-      headers: { Origin: origin },
-    });
-    expect(signedOut.ok()).toBe(true);
+    await colleague
+      .getByRole("button", { name: "Sign out", exact: true })
+      .click();
+    await expect(colleague.locator(".account-access")).toBeVisible();
     await colleague.goto("/login");
     await colleague
       .getByLabel("Email address", { exact: true })
@@ -169,6 +171,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
       (await read<AccountContext>(colleague, "/api/account"))
         .currentWorkspaceId,
     ).toBe(primaryId);
+    await colleague.goto("/app?view=settings");
 
     const builder = owner.locator(".tool-builder");
     await builder.getByText("Customize this desk", { exact: true }).click();
@@ -332,7 +335,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
       owner.getByText("Calculated in Exasol", { exact: true }),
     ).toBeVisible();
     await owner
-      .getByLabel("Reporting period", { exact: true })
+      .getByRole("combobox", { name: /Reporting period/ })
       .selectOption("90");
     await expect(
       owner.getByRole("table", { name: /Weekly request flow/ }),

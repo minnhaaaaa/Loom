@@ -127,7 +127,7 @@ test("one prompt delivers real external replies, reviewed record changes, and an
     await expect(page.getByRole("textbox")).toHaveCount(1);
     await expect(page.getByRole("table")).toHaveCount(0);
     await expect(
-      page.getByText("Team knowledge", { exact: true }),
+      page.getByLabel("Knowledge content", { exact: true }),
     ).not.toBeVisible();
     await expect(page.locator(".app-shell")).toHaveCSS(
       "--brand-primary",
