@@ -1,4 +1,5 @@
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { ZodError } from "zod";
@@ -15,6 +16,16 @@ import type { SessionGrant } from "@loom/contracts";
 const cookieName = "loom_demo_session";
 const accountCookieName = "loom_session";
 const ttl = 8 * 60 * 60;
+const requestWorkspace = new AsyncLocalStorage<string | null>();
+const unscopedPaths = new Set([
+  "/api/account",
+  "/api/account/login",
+  "/api/account/register",
+  "/api/session",
+  "/api/workspaces/select",
+  "/api/invitations/preview",
+  "/api/invitations/accept",
+]);
 function sessionSecret() {
   const secret = process.env.LOOM_SESSION_SECRET;
   if (!secret || secret.length < 32)
@@ -109,6 +120,13 @@ export async function requireActor() {
       "UNAUTHENTICATED",
       "Sign in or choose a local demo persona to continue.",
       401,
+    );
+  const expectedWorkspace = requestWorkspace.getStore();
+  if (expectedWorkspace && expectedWorkspace !== actor.workspaceId)
+    throw new DomainError(
+      "WORKSPACE_CHANGED",
+      "Your active company changed in another tab. Reload this workspace before continuing.",
+      409,
     );
   return actor;
 }
@@ -255,7 +273,14 @@ export function endpoint(
     const requestId = randomUUID();
     try {
       if (mutation) checkMutation(request);
-      const result = await fn(request);
+      const expectedWorkspace = unscopedPaths.has(new URL(request.url).pathname)
+        ? null
+        : request.headers.get("x-loom-workspace");
+      // Optional for API/MCP compatibility. Browser calls bind their rendered
+      // company; requireActor checks it every time it resolves the session.
+      const result = await requestWorkspace.run(expectedWorkspace, () =>
+        fn(request),
+      );
       return result instanceof Response ? result : response(result);
     } catch (error) {
       if (error instanceof ZodError)

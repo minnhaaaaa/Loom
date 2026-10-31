@@ -65,7 +65,7 @@ test("admin onboarding persists company branding, connects a real MCP client, an
     password,
     workspaceName: company,
   });
-  await page.goto("/?view=settings");
+  await page.goto("/app?view=settings");
   const setup = page.locator("#company-setup");
   await expect(setup).toHaveAttribute("open", "");
   await setup.getByLabel("Company name", { exact: true }).fill(company);
@@ -240,7 +240,7 @@ test("admin onboarding persists company branding, connects a real MCP client, an
         email: `brand.member.${suffix}@example.com`,
         password,
       });
-      await colleague.goto("/?view=records");
+      await colleague.goto("/app?view=records");
       await expect(
         colleague.getByRole("link", { name: `${company} home`, exact: true }),
       ).toBeVisible();

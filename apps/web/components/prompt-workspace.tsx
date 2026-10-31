@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "./workspace-fetch";
 
 import Link from "next/link";
 import {
@@ -32,7 +33,7 @@ class ConversationError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await workspaceFetch(path, {
     ...options,
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -55,7 +56,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 const agentNames: Record<PreferredAgent, string> = {
-  loom: "Loom’s agent",
+  loom: "Company AI",
   codex: "Codex",
   "claude-code": "Claude Code",
   other: "Your connected agent",
@@ -739,8 +740,9 @@ export function PromptWorkspace({
         <p className="eyebrow">Your workspace, in your words</p>
         <h1>What would you like to do?</h1>
         <p>
-          Ask a question or describe what you need. Your agent uses the
-          workspace context you can access.
+          Clarify a data request, find an approved definition, or review a
+          proposed next step. Your agent uses only the workspace context you can
+          access.
         </p>
       </header>
       {loading && (
@@ -818,7 +820,7 @@ export function PromptWorkspace({
           value={prompt}
           maxLength={4000}
           rows={3}
-          placeholder="Ask a question or describe what you need…"
+          placeholder="Which requests need clarification before an analyst can start?"
           disabled={preview || !membership || busy === "sending"}
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={(event) => {
@@ -858,7 +860,7 @@ export function PromptWorkspace({
           membership?.role === "owner" &&
           snapshot &&
           !snapshot.configuration.configured && (
-            <Link href="/?view=settings#company-setup">
+            <Link href="/app?view=settings#company-setup">
               Set up your agent ↗
             </Link>
           )}

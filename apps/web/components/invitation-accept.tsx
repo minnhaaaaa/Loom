@@ -83,7 +83,7 @@ export function InvitationAccept({
       setNotice("Invitation accepted. Opening your workspace…");
       window.history.replaceState(null, "", window.location.pathname);
       if (onAuthenticated) await onAuthenticated();
-      else window.location.assign(new URL("/", window.location.origin).href);
+      else window.location.assign(new URL("/app", window.location.origin).href);
     } catch (reason) {
       setError(
         reason instanceof Error

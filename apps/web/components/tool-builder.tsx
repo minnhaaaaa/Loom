@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "./workspace-fetch";
 
 import { useEffect, useRef, useState } from "react";
 import { sampleRequests } from "@loom/contracts/fixtures";
@@ -61,7 +62,7 @@ class BuilderError extends Error {
 }
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await workspaceFetch(path, {
     ...options,
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
@@ -475,9 +476,9 @@ export function ToolBuilder({
           <div className="tool-builder-intro">
             <div>
               <p className="eyebrow">Your team’s way of working</p>
-              <h2>Make a tool fit the work.</h2>
+              <h2>Shape your analytics request desk.</h2>
               <p>
-                Start with a template or describe the changes you need. Preview
+                Describe the request fields your analytics team needs. Preview
                 the result, then publish a reviewed revision for your team.
               </p>
             </div>
@@ -530,7 +531,7 @@ export function ToolBuilder({
                   maxLength={4000}
                   value={instructions}
                   disabled={busy}
-                  placeholder="Build an onboarding tracker with employee name, joining date, department, buddy, and a text checklist. Show progress and overdue items…"
+                  placeholder="Add a decision deadline, metric definition, and business impact to our analytics request form. Show requests missing context…"
                   onChange={(event) => {
                     setInstructions(event.target.value);
                     setSavedDraft(null);

@@ -6,7 +6,7 @@ test("real Exasol workflow through the production UI and protected API", async (
   request,
 }) => {
   const title = `Browser fixture ${crypto.randomUUID().slice(0, 8)}`;
-  await page.goto("/?view=records");
+  await page.goto("/app?view=records");
   await page
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[2].id);
@@ -167,7 +167,7 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
   page,
 }) => {
   const title = `CSV browser ${crypto.randomUUID().slice(0, 8)}`;
-  await page.goto("/?view=records");
+  await page.goto("/app?view=records");
   await page
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[0].id);
@@ -283,7 +283,7 @@ test("live OpenRouter proposal and exact-change human review in the production U
   });
   expect(created.status()).toBe(200);
   const record = await created.json();
-  await page.goto("/?view=settings");
+  await page.goto("/app?view=settings");
   await page
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[0].id);

@@ -1,0 +1,160 @@
+.company-entry {
+  min-height: 100svh;
+  background: #090e0c;
+  color: #edf3e8;
+  padding: 28px clamp(24px, 7vw, 112px) 32px;
+  --surface: #131c17;
+  --ink: #edf3e8;
+  --muted: #a3b3a8;
+  --line: #314137;
+  --accent: #c9f36b;
+  --soft: #18251c;
+}
+.company-entry nav,
+.company-entry footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+.company-entry a {
+  color: #c9f36b;
+  text-decoration: none;
+}
+.company-entry a:hover {
+  text-decoration: underline;
+}
+.company-entry-wordmark {
+  font-family: var(--font-display), sans-serif;
+  font-size: 32px;
+  letter-spacing: -2px;
+  color: #edf3e8 !important;
+}
+.company-entry-wordmark span {
+  display: inline-block;
+  padding-left: 8px;
+  color: #c9f36b;
+}
+.company-entry-heading {
+  max-width: 1100px;
+  margin: 74px auto 34px;
+}
+.company-entry-heading > p {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: #b4c5b9;
+}
+.company-entry-heading h1 {
+  font-family: var(--font-body), sans-serif;
+  font-size: clamp(36px, 5vw, 68px);
+  font-weight: 500;
+  letter-spacing: -0.06em;
+  line-height: 1.07;
+  margin: 18px 0;
+}
+.company-entry .account-access {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: #111a15;
+  border: 1px solid #304037;
+  border-radius: 18px;
+  grid-template-columns: 1fr 1fr;
+  box-shadow: 0 24px 90px #0005;
+}
+.company-entry .account-access-intro {
+  padding: clamp(24px, 4vw, 54px);
+  background: radial-gradient(ellipse at 0% 100%, #2a402330, transparent 70%);
+}
+.company-entry .account-access-intro h2 {
+  font-family: var(--font-body), sans-serif;
+  font-weight: 500;
+  font-size: 32px;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+.company-entry .account-access-intro p {
+  color: #b3c2b8;
+  line-height: 1.8;
+}
+.company-entry .account-access-form {
+  padding: clamp(24px, 4vw, 48px);
+  border-left: 1px solid #304037;
+}
+.company-entry .account-access-tabs {
+  border-bottom-color: #314137;
+}
+.company-entry button {
+  background: #c9f36b;
+  color: #102015;
+  border-color: #c9f36b;
+}
+.company-entry .account-access-tabs button {
+  color: #a3b3a8;
+  background: transparent;
+}
+.company-entry .account-access-tabs button[aria-selected="true"] {
+  color: #c9f36b;
+  border-color: #c9f36b;
+}
+.company-entry input {
+  background: #090f0b;
+  border-color: #384c3e;
+  color: #edf3e8;
+}
+.company-entry input:disabled {
+  background: #18201a;
+  color: #a3b3a8;
+}
+.company-entry input::placeholder {
+  color: #7f9486;
+}
+.company-entry .hint {
+  color: #9fb1a5;
+}
+.company-entry .brand-mark {
+  color: #c9f36b;
+  border-color: #607843;
+  background: transparent;
+}
+.company-entry .alert {
+  color: #ffcac0;
+  background: #542c273d;
+  border-color: #b47466;
+}
+.company-entry .notice {
+  color: #c9f36b;
+}
+.company-entry :focus-visible {
+  outline-color: #c9f36b;
+}
+.company-entry footer {
+  max-width: 1100px;
+  margin: 32px auto 0;
+  color: #8fa697;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 700px) {
+  .company-entry .account-access {
+    grid-template-columns: 1fr;
+  }
+  .company-entry .account-access-form {
+    border-left: 0;
+    border-top: 1px solid #304037;
+  }
+  .company-entry-heading {
+    margin-top: 52px;
+  }
+  .company-entry .account-access-intro {
+    padding-bottom: 12px;
+  }
+  .company-entry nav {
+    font-size: 12px;
+  }
+  .company-entry footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}

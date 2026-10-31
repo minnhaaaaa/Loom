@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("the default workspace is one prompt instead of knowledge and triage forms", async ({
+test("the assistant view is one prompt instead of knowledge and triage forms", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/app?view=assistant");
   const assistant = page.getByRole("region", {
     name: "Workspace assistant",
     exact: true,
@@ -19,7 +19,7 @@ test("the default workspace is one prompt instead of knowledge and triage forms"
     assistant.getByRole("button", { name: "Send", exact: true }),
   ).toBeDisabled();
   await expect(
-    page.getByText("Team knowledge", { exact: true }),
+    page.getByLabel("Knowledge content", { exact: true }),
   ).not.toBeVisible();
   await expect(
     page.getByText("Run triage and review proposals", { exact: true }),
@@ -36,7 +36,7 @@ test("the single prompt fits a narrow screen without exposing administrative con
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/app?view=assistant");
   await expect(
     page.getByRole("textbox", { name: "Ask your workspace", exact: true }),
   ).toBeVisible();
@@ -69,7 +69,7 @@ test("the single prompt fits a narrow screen without exposing administrative con
 test("navigation keeps the prompt, saved work, and settings in separate views", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/app?view=assistant");
   await page
     .getByRole("link", { name: "Workspace settings", exact: true })
     .click();
@@ -79,7 +79,7 @@ test("navigation keeps the prompt, saved work, and settings in separate views", 
   await expect(
     page.getByRole("textbox", { name: "Ask your workspace", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("link", { name: /^Saved work/ }).click();
+  await page.getByRole("link", { name: /^Data requests/ }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Data requests",
   );

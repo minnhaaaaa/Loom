@@ -20,14 +20,14 @@ export function WorkspaceApp({
   initial: DeskSnapshot;
   initialError: string | null;
   initialAccount: AccountContext;
-  initialView?: "assistant" | "records" | "settings";
+  initialView?: "assistant" | "records" | "settings" | "insights" | "knowledge";
 }) {
   const [account, setAccount] = useState(initialAccount);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState("");
   const reload = useCallback(async () => {
     setLeaving(true);
-    window.location.replace(`/${window.location.search}`);
+    window.location.replace(`/app${window.location.search}`);
   }, []);
   useEffect(() => {
     if (initial.mode === "preview") return;

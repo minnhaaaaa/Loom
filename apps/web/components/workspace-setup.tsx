@@ -53,14 +53,15 @@ const agentOptions: {
   },
   {
     id: "loom",
-    label: "Loom’s agent",
-    description: "Use the model configured on this server.",
+    label: "Company AI",
+    description:
+      "Use your company API connection or the configured server model.",
     mark: "L",
   },
   {
     id: "later",
     label: "Set up later",
-    description: "Start with your team’s shared tools.",
+    description: "Start with your team’s request desk.",
     mark: "→",
   },
 ];

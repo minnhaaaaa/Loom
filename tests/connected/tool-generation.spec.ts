@@ -40,7 +40,7 @@ test("a live model generates a persisted draft that an owner reviews and publish
   ].join(" ");
 
   try {
-    await page.goto("/?view=settings");
+    await page.goto("/app?view=settings");
     await page
       .getByRole("combobox", { name: "Demo persona" })
       .selectOption(personas[0].id);
@@ -180,7 +180,7 @@ test("a live model generates a persisted draft that an owner reviews and publish
       .getByRole("combobox", { name: "Demo persona" })
       .selectOption(personas[2].id);
     await expect(builder).toHaveCount(0);
-    await page.goto("/?view=records");
+    await page.goto("/app?view=records");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     await page.reload();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
@@ -308,7 +308,7 @@ test("browser-only failure fixtures preserve a draft and require explicit rate-l
     });
   });
 
-  await page.goto("/?view=settings");
+  await page.goto("/app?view=settings");
   await page
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[0].id);

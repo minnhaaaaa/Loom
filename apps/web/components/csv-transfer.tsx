@@ -1,10 +1,11 @@
 "use client";
+import { workspaceFetch } from "./workspace-fetch";
 import { useRef, useState } from "react";
 import { toolSpec, type ToolSpec } from "@loom/contracts";
 import type { CsvMapping } from "@/server/csv";
 import type { ImportPreview } from "@/server/imports";
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
+  const response = await workspaceFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -132,7 +133,7 @@ export function CsvTransfer({
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(
+      const response = await workspaceFetch(
         `/api/requests/export?${new URLSearchParams({ search, status })}`,
         { cache: "no-store" },
       );

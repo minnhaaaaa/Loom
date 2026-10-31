@@ -1,5 +1,6 @@
 import type { AnalyticsResult, Actor } from "@loom/contracts";
 import type { SqlSession } from "@loom/db-exasol";
+export * from "./insights";
 // This query is code-owned. Callers must authorize internal queue access first.
 export const queueSummarySql = `SELECT
   COUNT(*) AS OPEN_COUNT,

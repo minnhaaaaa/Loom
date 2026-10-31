@@ -58,12 +58,12 @@ export function modelResponseError(
     );
   const messages: Record<number, string> = {
     400: "The model rejected the tool schema or structured-output settings.",
-    401: "OpenRouter rejected the API key. Check the server configuration before retrying.",
+    401: "The AI provider rejected the API key. Ask your company owner to check the connection.",
     402: "The configured model cannot run with the current account budget. Check the model and account settings before retrying.",
-    403: "OpenRouter denied this request. Check the model and provider settings before retrying.",
+    403: "The AI provider denied this request. Check the model and provider settings before retrying.",
     404: "No compatible endpoint is available for the configured model and routing settings. Choose a compatible model or retry later.",
     408: "The provider timed out. No draft was saved; you can explicitly retry.",
-    429: "OpenRouter rate-limited generation. Wait before retrying; your draft is preserved.",
+    429: "The AI provider rate-limited generation. Wait before retrying; your draft is preserved.",
     502: "The provider could not complete generation. No draft was saved; you can explicitly retry.",
     503: "No compatible model provider is currently available. Your draft is preserved; try again later.",
   };

@@ -20,7 +20,7 @@ export function WorkspaceLink({ workspaceId }: { workspaceId: string }) {
         body: JSON.stringify({ workspaceId }),
         signal,
       });
-      if (!signal?.aborted) window.location.replace("/");
+      if (!signal?.aborted) window.location.replace("/app");
       return true;
     },
     [workspaceId],
@@ -59,7 +59,7 @@ export function WorkspaceLink({ workspaceId }: { workspaceId: string }) {
       ) : (
         !signedOut && <p role="status">Opening your workspace…</p>
       )}
-      <Link href="/">Open your workspaces</Link>
+      <Link href="/app">Open your workspaces</Link>
     </main>
   );
 }

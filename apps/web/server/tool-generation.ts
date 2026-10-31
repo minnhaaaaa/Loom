@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  providerFetch,
+  modelIdentity,
+  type ProviderRuntimeConfig,
+} from "./provider-transport";
 import { z } from "zod";
 import {
   toolSpecSchema,
@@ -233,18 +238,19 @@ export async function generateDefinition(
   instructions: string,
   baseSpec: ToolSpec,
   expectedModel?: string,
+  runtimeConfig?: ProviderRuntimeConfig,
 ): Promise<{
   spec: ToolSpec;
   assumptions: string[];
   unsupported: string[];
   inference: ModelInference;
 }> {
-  const config = toolModelConfiguration(),
+  const config = runtimeConfig || toolModelConfiguration(),
     input = JSON.stringify({
       instructions,
       currentSpec: toolSpecSchema.parse(baseSpec),
     });
-  if (expectedModel && config.model !== expectedModel)
+  if (expectedModel && modelIdentity(config) !== expectedModel)
     throw new DomainError(
       "MODEL_CONFIGURATION_CHANGED",
       "The configured model changed after this generation was reserved. Start a new generation.",
@@ -259,42 +265,12 @@ export async function generateDefinition(
   const started = Date.now();
   let response: Response;
   try {
-    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      redirect: "error",
-      signal: AbortSignal.timeout(config.timeoutMs),
-      headers: {
-        Authorization: `Bearer ${config.key}`,
-        "Content-Type": "application/json",
-        "X-OpenRouter-Title": "Loom",
-      },
-      body: JSON.stringify({
-        model: config.model,
-        stream: false,
-        max_tokens: config.maxTokens,
-        ...(config.reasoningEnabled === undefined
-          ? {}
-          : { reasoning: { enabled: config.reasoningEnabled } }),
-        provider: {
-          require_parameters: true,
-          data_collection: "deny",
-          ...(config.freeOnly
-            ? { max_price: { prompt: 0, completion: 0, request: 0 } }
-            : {}),
-        },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: input },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "loom_tool",
-            strict: true,
-            schema: jsonSchema(),
-          },
-        },
-      }),
+    response = await providerFetch(config, {
+      model: config.model,
+      system: systemPrompt,
+      input,
+      schemaName: "loom_tool",
+      schema: jsonSchema(),
     });
   } catch {
     throw new DomainError(
@@ -373,7 +349,7 @@ export async function generateDefinition(
   return {
     ...output,
     inference: {
-      requestedModel: config.model,
+      requestedModel: modelIdentity(config),
       actualModel: envelope.data.model,
       generationId: envelope.data.id,
       promptVersion: toolGenerationPromptVersion,

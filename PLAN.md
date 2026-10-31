@@ -1,28 +1,38 @@
 # Loom implementation plan
 
-Status: first versioned tool-building slice implemented alongside the manual desk and reviewed agent workflow. Live AI tool creation/refinement and the reviewed publication browser journey pass; broad quality evaluation and remaining milestone gates are separate work. Updated: 2026-10-27.
+Updated: **2026-10-31**. The product is now focused on **small analytics teams**: clarify business requests, establish ownership, reuse approved guidance, and measure where work waits. The current checkpoint below supersedes the earlier broad tool-builder positioning. Dated test counts and live-provider outcomes belong in [RUNBOOK.md](RUNBOOK.md).
 
 ## Objective
 
-Deliver a working data-request desk that a team lead can describe, refine, and share. Requesters submit and track their own requests. Operators and an agent triage the same queue using approved procedures. Authorized people review exact proposed changes before execution.
+A business requester can submit and follow their own request. An analyst can clarify, assign, and progress authorized work with reviewed AI suggestions. A team lead can inspect Exasol-computed waiting time and backlog movement instead of estimating workflow performance from the recent record list.
 
-The user has accepted coordination pain as a promising problem. This is product direction, not evidence of willingness to pay or measured time savings. Validate those through user exercises with synthetic data; the event submission excludes employer/proprietary data.
-
-Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.md](ARCHITECTURE.md) together. Milestones are ordered by dependencies, not calendar promises. Checked tasks have a verified implementation; unchecked tasks include partial work awaiting the stated acceptance checks. Completed implementation slices and remaining acceptance gates are distinguished below. See [RUNBOOK.md](RUNBOOK.md) for the current build.
+This direction is an adoption hypothesis, not evidence of customer demand or measured savings. Validate it with small analytics teams and matched synthetic scenarios. The competition excludes employer/proprietary data.
 
 ## Current checkpoint
 
-- Basic queue, search/status filters, intake, details, description editing, owner/priority/due-date/status controls, comments, and activity UI implemented.
-- Signed local synthetic sessions, scoped SQL reads, versioned commands, atomic receipt/history/audit/outbox code, migrations, seed/check scripts, and a named Exasol summary query implemented.
-- TypeScript, lint, formatting, production build, 33 unit/service tests, ten live Exasol integration tests, four preview browser tests, manual/CSV/missing-model browser checks passed. A synthetic free-router call passed at reported cost zero; the live browser journey rejected malformed action output, and the new restart check remains unverified. Mocked unit tests and real SQL tests remain separate.
-- Linux setup completed with Podman and verified launcher 2.3.0; Personal reports database version 2026.2.0-nano.3. Migration/replay, synthetic seeding, TLS, bindings, prepare-error recovery, enabled primary key, rollback, UTC/scalars, isolation, command replay, and browser persistence pass. RUNBOOK records setup and remaining limits.
-- SQL-backed search/status filters and 25-row pagination, reviewed CSV mapping/import, atomic batch receipts, and scoped CSV export are implemented. Imports start with 100 rows per batch; exports with 500 matching records.
-- Approved internal knowledge now supports drafts, owner approval, supersession, retirement, source hashes, effective dates, and evidence inspection. OpenRouter inference saves checkpoints and exact model-generated proposals, with inference outside Exasol transactions and approval through the shared command path.
-- The heuristic engine is removed. `openrouter-v1` requires an explicit key/model and free-form task. Test-only provider fixtures verify orchestration; a live free model completed the full schema at reported cost zero. Richer retrieval/analytics, generated tool publication, proposal editing, and production identity remain planned.
+| Implemented                                                                                                        | Remaining gate                                                                     |
+| ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Public landing, `/register`, `/login`, `/app`, and `/app?demo=1` entry points                                      | Continue accessibility/responsive checks; preserve a usable non-3D fallback        |
+| Company workspace registration, individual accounts, invitation links, roles, branding                             | Email verification/delivery, password reset, SSO, verified company-domain joining  |
+| Request forms, owner/status/due-date controls, comments, CSV transfer, version conflicts, activity                 | External request ingestion and notifications                                       |
+| Exasol stage medians/p90, weekly flow/backlog, owner aging, scoped evidence                                        | Wider workload fixtures, production-scale measurements, and outcome evaluation     |
+| Compact Exasol analytics context for owner/operator conversations                                                  | Measure whether agent explanations faithfully describe the computed values         |
+| Saved conversations, reviewed proposals, approved guidance, decision reuse                                         | Reliable live-provider runs, broader quality evaluation, and live restart recovery |
+| Company OpenAI/Claude/Kimi/DeepSeek API configuration, explicit connection test, encrypted credentials, revocation | Real credential/model verification and subscription-account OAuth                  |
+| External-agent MCP connection and task/reply/proposal protocol                                                     | Hosted runner and interactive vendor-client verification                           |
+| Declarative desk configuration and reviewed publication                                                            | Additional tool families remain outside the focused product scope                  |
 
-## Tool-building checkpoint — 2026-10-27
+A company is currently one workspace; it is not a separate organization hierarchy. Joining requires an invitation/membership. Setting up an external agent does not start it. Company API billing and chat subscriptions are distinct connection modes.
 
-The next implementation slice follows Loom's core describe → assemble → refine → share workflow. See M2 and RUNBOOK for completed behavior, verification, and the remaining live-generation gate. The prior checkpoint above describes the pre-builder implementation and should not be read as the current feature boundary.
+## Next priorities
+
+1. Finish the analytics-team journey from company registration through requester submission, analyst review, and Exasol flow insights. Keep human approval and workspace isolation intact.
+2. Verify a live, explicitly chosen company provider/model with synthetic data; preserve honest provider errors and never silently switch billing accounts.
+3. Rehearse the Exasol demo with known timestamps, reopened/closed work, and calculated expected results. Explain calendar time, sample sizes, and partial weeks.
+4. Run matched manual-versus-assisted usability exercises before claiming time savings or changing the problem direction.
+5. Complete the public repository, pitch deck, three-minute demo, and run instructions for **31 October 2026, 23:59 IST**. A public production service remains a separate edition/hosting decision.
+
+The milestones below retain detailed acceptance criteria. An unchecked broad gate may include implemented components whose full failure/evaluation coverage is still incomplete. Consult the current checkpoint and RUNBOOK rather than interpreting old milestone wording as a release guarantee.
 
 ## Delivery rules
 
@@ -73,15 +83,34 @@ Acceptance: a requester submits a record; an operator clarifies, assigns, and co
 
 ## M1b — Exasol insights and evidence
 
-Dependencies: M1; required before the agent demo.
+Dependencies: M1.
 
-- [ ] Import synthetic backlog rows into bounded staging, validate mappings, deduplicate source identities, and commit reviewed rows.
-- [ ] Implement reviewed named SQL queries for queue age, SLA risk, owner workload, missing requirements, and normalized duplicate candidates.
-- [ ] Derive status durations from request events using Exasol window functions; define reopened requests, null owners, cancelled work, and UTC boundaries.
-- [ ] Compare real SQL results with hand-calculated fixture outputs. Record query ID, input digest, scope, data revisions, row count, timing, and source record references.
-- [ ] Render simple summary cards/table results and expose the same authorized query evidence to the agent. Never execute model-authored SQL.
+- [x] Import bounded synthetic CSV batches through mapping, validation, reviewed commit, and replay-safe receipts.
+- [x] Calculate workspace queue counts and current owner workload/aging in named SQL queries.
+- [x] Derive status intervals using Exasol `LEAD`, clip to 30/90-day UTC windows, sum repeated visits, and compute per-request stage medians/p90 with `PERCENTILE_CONT`.
+- [x] Use `LAG` and cumulative SQL sums for weekly arrivals, completion/cancellation/reopening transitions, carryover, and ending backlog.
+- [x] Compare SQL outputs with hand-calculated isolated fixtures covering open tails, closure/reopening, equal timestamps, UTC boundaries, role denial, and cross-company isolation.
+- [x] Show measurement definitions, sample counts, query IDs/hashes, timing, cutoff, and bounded contributing-request evidence.
+- [x] Supply a compact 30-day analytical snapshot to owner/operator conversations; omit it from requester/viewer context and retain existing action authorization.
+- [ ] Add richer filters or duplicate candidates only when pilot evidence identifies a need.
+- [ ] Measure performance on larger event histories; query timing shown in the UI is not a benchmark.
+- [ ] Evaluate real improvements in clarification, assignment, and fulfillment separately.
 
-Acceptance: changing imported or persisted requests changes verified SQL metrics; another workspace and requester-only identity cannot access internal aggregates. Demonstrate Exasol doing the actual data work, without claiming causal explanations or unmeasured performance gains.
+The SQL aggregates cover every qualifying record. Evidence is capped at 50 requests; owner tables at 100 rows, and assistant owner context at 20. Stage metrics measure window-clipped elapsed calendar time, not effort or completed turnaround. Weekly completions count transitions, not unique requests. Owner metrics describe current open work across all creation dates, not available capacity. The server executes no model-authored SQL.
+
+Acceptance: changing persisted history changes verified SQL metrics; unauthorized roles cannot retrieve internal aggregates or receive them through model context. Every displayed metric has a declared period, scope, and definition. A snapshot used in an explanation does not bypass current record/version checks for a proposed change.
+
+## M1c — Company entry and company AI
+
+- [x] Provide a public landing page, company registration, staff login, workspace, and explicit sample route.
+- [x] Retain individual accounts, invitation-only membership, role controls, and owner-managed company appearance.
+- [x] Add company-owned OpenAI, Claude, Kimi, and DeepSeek API configuration with explicit test-and-save and revocation.
+- [x] Encrypt saved provider credentials using a deployment key and workspace/provider/model/revision binding; return metadata only to settings clients.
+- [x] Route the existing bounded AI workflows through the configured company API and recheck provider configuration before retaining results.
+- [ ] Verify each intended live provider/model using supplied credentials; fixture tests do not prove real provider availability or answer quality.
+- [ ] Add email verification/recovery and domain-based discovery only with explicit membership approval semantics.
+- [ ] Design supported account OAuth separately if needed. Do not treat a chat-subscription login as a generic backend API credential.
+- [ ] Choose an appropriate Exasol edition/deployment before a real multi-company rollout; Personal remains the single-operator challenge prototype.
 
 ## M2 — Describe, refine, and publish the tool
 
@@ -149,7 +178,7 @@ Dependencies: M1 and M4; tool-aware interface depends on M2.
 - [ ] Implement cancel, timeout, budget exhaustion, retry exhaustion, and stale-proposal behavior.
 - [x] Revalidate inside the write transaction and append audit/outbox records on commit.
 
-Current M5 scope: `openrouter-v1` uses the configured model and operator-authored task to generate structured commands, explanations, uncertainty, and source references. No heuristics choose those outputs. Runs pin model/prompt/template, select 1–20 records, and use short reservation/finalization transactions around provider calls. Attempts use two-minute leases and a maximum of two explicit calls per checkpoint. JSON/action validation, unavailable-source rejection, stale context, cancellation, revocation, replay, and exact approval are tested with real Exasol and a test-only provider fixture. The deployment uses `openrouter/free` with zero-price routing limits. Live action quality and restart recovery remain verification gates; malformed or ineffective responses are rejected rather than repaired. Generated tool publication, broader retrieval, richer query evidence, proposal editing, and quality/cost evaluation remain unfinished.
+Current M5 scope: the bounded operating agent and conversation interface generate validated structured proposals using a configured company API or, where configured, the server OpenRouter fallback. No heuristics choose model outputs. Short database reservations/finalization surround provider calls; models cannot apply their own proposals. Company provider changes are checked before generated results are retained. Runs, knowledge, record versions, explicit human review, and audit history remain the authority for action execution. Internal conversation context now includes the Exasol insight snapshot with its cutoff and measurement definitions. Live provider/model quality, restart recovery, proposal editing, broader retrieval, and cost/productivity evaluation remain separate gates. A failed or revoked company provider is not silently replaced by another billing account.
 
 Acceptance: agent-assisted triage completes on a selected batch. No request is modified before an authorized approval. Editing a proposal invalidates the previous approval. Changed records, rules, tool revisions, or permissions block stale execution. A duplicate approval or retried job produces one domain effect. Server restart, request interruption, and cancellation do not cause an unapproved write.
 
@@ -216,17 +245,16 @@ Stream or process files with bounded memory. Export untrusted spreadsheet cells 
 
 ## Demo script
 
-1. An owner describes a data-request desk and publishes the validated draft.
-2. Import a synthetic CSV with known missing fields and repeated requests; inspect Exasol-derived queue age, owner workload, SLA risk, and query evidence.
-3. A requester submits a request and sees only their own records.
-4. An operator opens the shared queue in a second browser and changes an owner.
-5. Ask the agent to triage selected requests using an approved procedure.
-6. Inspect evidence and exact proposed changes; approve a subset.
-7. Change a record in the second browser before approving its older proposal; show the conflict and refreshed proposal.
-8. Correct a recommendation, propose a routing rule, and approve it as the owner.
-9. Submit a new applicable request; show grounded reuse and the audit trail.
+1. Show the analytics-team problem on the landing page and register a synthetic company.
+2. Invite a requester and analyst using individual accounts; submit a request with missing business context.
+3. Import a synthetic backlog and approved metric definitions/routing guidance.
+4. Open Flow insights. Show stage samples/medians, partial-week inflow/completions, reopened work, owner aging, and query evidence from Exasol.
+5. Ask the assistant where requests wait. Inspect its interpretation against the exact SQL values and cutoff; disclose the configured provider or test fixture.
+6. Ask for a clarification or assignment proposal using approved guidance, inspect the exact change, and approve it.
+7. Change a record before approving an older proposal; demonstrate rejection of stale work.
+8. Draft useful guidance from an applied decision, approve it separately, and demonstrate later authorized reuse.
 
-The demo should include a visible rejected/stale proposal. It should use genuine persisted state and a synthetic dataset, not simulated success messages.
+Use genuine saved synthetic state. Do not imply that a mock provider response is live inference, that elapsed stage time equals analyst effort, or that a small synthetic exercise proves customer savings.
 
 ## Submission checklist
 
@@ -248,15 +276,15 @@ Do not add a graph database, autonomous agent team, offline editing, arbitrary c
 
 ## Open decisions and risks
 
-| Decision/risk                           | Default                                                  | Evidence that changes it                                                        |
-| --------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Event data and users                    | Synthetic analytics scenarios and consenting testers     | Real-team pilots require separate data permission and applicable edition terms. |
-| Agent provider/model                    | One provider selected with fixtures                      | Grounded task quality, latency, price, and permitted data handling.             |
-| Renderer adapter                        | Loom-owned schema, thin catalog renderer                 | M0 spike proves json-render fits without obscuring domain contracts.            |
-| Semantic retrieval                      | Lexical/structured retrieval first                       | Measured retrieval failures and a passing hybrid-search comparison.             |
-| Workflow too broad                      | Data-request desk first                                  | Repeated demand for another workflow using the same primitives.                 |
-| Existing ticket tool already sufficient | Validate coordination benefit before integration breadth | Pilot users cannot demonstrate a meaningful reason to adopt Loom.               |
-| Capacity remains the bottleneck         | Report triage and fulfillment separately                 | Actual throughput and queue-age evidence.                                       |
+| Decision/risk                           | Default                                                    | Evidence that changes it                                                        |
+| --------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Event data and users                    | Synthetic analytics scenarios and consenting testers       | Real-team pilots require separate data permission and applicable edition terms. |
+| Agent provider/model                    | Company API selected explicitly; fixtures for system tests | Live grounded quality, latency, price, and permitted data handling.             |
+| Renderer adapter                        | Loom-owned schema, thin catalog renderer                   | M0 spike proves json-render fits without obscuring domain contracts.            |
+| Semantic retrieval                      | Lexical/structured retrieval first                         | Measured retrieval failures and a passing hybrid-search comparison.             |
+| Workflow too broad                      | Data-request desk first                                    | Repeated demand for another workflow using the same primitives.                 |
+| Existing ticket tool already sufficient | Validate coordination benefit before integration breadth   | Pilot users cannot demonstrate a meaningful reason to adopt Loom.               |
+| Capacity remains the bottleneck         | Report triage and fulfillment separately                   | Actual throughput and queue-age evidence.                                       |
 
 ## Definition of done
 

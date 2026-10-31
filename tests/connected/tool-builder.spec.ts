@@ -22,7 +22,7 @@ test("an owner publishes a reviewed tool and a requester opens the same definiti
   );
   const title = `Support desk ${crypto.randomUUID().slice(0, 8)}`;
   try {
-    await page.goto("/?view=settings");
+    await page.goto("/app?view=settings");
     await page
       .getByRole("combobox", { name: "Demo persona" })
       .selectOption(personas[0].id);
@@ -60,7 +60,7 @@ test("an owner publishes a reviewed tool and a requester opens the same definiti
       .getByRole("combobox", { name: "Demo persona" })
       .selectOption(personas[2].id);
     await expect(page.locator(".tool-builder")).toHaveCount(0);
-    await page.goto("/?view=records");
+    await page.goto("/app?view=records");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     await page
       .getByRole("button", { name: "+ New request", exact: true })

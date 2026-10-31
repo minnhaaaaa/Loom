@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  providerFetch,
+  modelIdentity,
+  type ProviderRuntimeConfig,
+} from "./provider-transport";
 import { z } from "zod";
 import {
   modelSuggestionSchema,
@@ -132,8 +137,15 @@ export async function inferProposal(
   context: unknown,
   model: string,
   signal?: AbortSignal,
+  runtimeConfig?: ProviderRuntimeConfig,
 ): Promise<ModelResult> {
-  const config = modelConfiguration();
+  const config: ProviderRuntimeConfig = runtimeConfig || modelConfiguration();
+  if (config.revision !== undefined && modelIdentity(config) !== model)
+    throw new DomainError(
+      "MODEL_CONFIGURATION_CHANGED",
+      "The company AI connection changed. Start a new run.",
+      409,
+    );
   if (config.freeOnly && !isFreeModel(model))
     throw new DomainError(
       "MODEL_COST_POLICY",
@@ -150,46 +162,17 @@ export async function inferProposal(
   const started = Date.now();
   let response: Response;
   try {
-    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      redirect: "error",
-      signal: AbortSignal.any([
-        AbortSignal.timeout(config.timeoutMs),
-        ...(signal ? [signal] : []),
-      ]),
-      headers: {
-        Authorization: `Bearer ${config.key}`,
-        "Content-Type": "application/json",
-        "X-OpenRouter-Title": "Loom",
+    response = await providerFetch(
+      config,
+      {
+        model: config.revision === undefined ? model : config.model,
+        system: systemPrompt,
+        input,
+        schemaName: "loom_proposal",
+        schema: suggestionJsonSchema(),
       },
-      body: JSON.stringify({
-        model,
-        stream: false,
-        max_tokens: config.maxTokens,
-        ...(config.reasoningEnabled === undefined
-          ? {}
-          : { reasoning: { enabled: config.reasoningEnabled } }),
-        provider: {
-          require_parameters: true,
-          data_collection: "deny",
-          ...(config.freeOnly
-            ? { max_price: { prompt: 0, completion: 0, request: 0 } }
-            : {}),
-        },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: input },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "loom_proposal",
-            strict: true,
-            schema: suggestionJsonSchema(),
-          },
-        },
-      }),
-    });
+      signal,
+    );
   } catch {
     throw new DomainError(
       "MODEL_NETWORK",

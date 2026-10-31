@@ -1,6 +1,7 @@
 import "server-only";
 import type {
   Actor,
+  AnalyticsInsights,
   ConversationCitation,
   ConversationMessage,
   KnowledgeEntry,
@@ -25,6 +26,22 @@ import {
 } from "./desk";
 import { approvedKnowledge, knowledgeDigest } from "./knowledge";
 import { publishedTool } from "./tool-definitions";
+import { analyticsInsights } from "@loom/analytics";
+
+export type ConversationInsights = Pick<
+  AnalyticsInsights,
+  | "days"
+  | "from"
+  | "asOf"
+  | "phases"
+  | "flow"
+  | "owners"
+  | "evidence"
+  | "semantics"
+> & {
+  purpose: "explanatory_snapshot";
+  ownersHasMore: boolean;
+};
 
 export type ConversationContext = {
   today: string;
@@ -40,6 +57,9 @@ export type ConversationContext = {
   prompt: string;
   allowProposals: boolean;
   allowToolDesign: boolean;
+  // Optional for previously persisted turns. This is explanatory evidence,
+  // never a replacement for record versions/permissions in action approval.
+  insights?: ConversationInsights;
 };
 export type ConversationResult = {
   reply: string;
@@ -153,6 +173,21 @@ export async function conversationContext(
     allowProposals: internal,
     allowToolDesign: member.role === "owner",
   };
+  if (internal) {
+    const computed = await analyticsInsights(sql, actor, 30, new Date(), false);
+    context.insights = {
+      purpose: "explanatory_snapshot",
+      days: computed.days,
+      from: computed.from,
+      asOf: computed.asOf,
+      phases: computed.phases,
+      flow: computed.flow,
+      owners: computed.owners.slice(0, 20),
+      ownersHasMore: computed.hasMore.owners || computed.owners.length > 20,
+      evidence: computed.evidence,
+      semantics: computed.semantics,
+    };
+  }
   if (Buffer.byteLength(JSON.stringify(context), "utf8") > 120_000)
     throw new DomainError(
       "CONVERSATION_CONTEXT_LIMIT",

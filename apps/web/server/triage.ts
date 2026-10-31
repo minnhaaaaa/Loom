@@ -1,4 +1,6 @@
 import "server-only";
+import { workspaceProvider, assertProviderCurrent } from "./provider-config";
+import { modelIdentity } from "./provider-transport";
 import { randomUUID } from "node:crypto";
 import {
   type Actor,
@@ -123,8 +125,13 @@ export async function listRuns(actor: Actor) {
     );
     let configuration;
     try {
-      const config = modelConfiguration();
-      configuration = { configured: true, model: config.model, message: "" };
+      const config =
+        (await workspaceProvider(sql, actor)) || modelConfiguration();
+      configuration = {
+        configured: true,
+        model: modelIdentity(config),
+        message: "",
+      };
     } catch (error) {
       configuration = {
         configured: false,
@@ -154,7 +161,8 @@ export async function startRun(
     const member = await requireOperator(sql, actor);
     const existing = await receipt<{ id: string }>(sql, actor, commandId, hash);
     if (existing) return getRun(sql, actor, existing.id);
-    const config = modelConfiguration();
+    const config =
+      (await workspaceProvider(sql, actor)) || modelConfiguration();
     const tool = await publishedTool(sql, actor);
     for (const id of requestIds) await getRequest(sql, actor, member, id);
     const id = randomUUID(),
@@ -170,7 +178,7 @@ export async function startRun(
         sqlTimestamp(now),
         sqlTimestamp(expiresAt),
         `request-desk-v${tool.revision}`,
-        config.model,
+        modelIdentity(config),
         instructions,
         promptVersion,
       ],
@@ -184,7 +192,7 @@ function supportedRun(run: TriageRun, allowExternal = false) {
   if (
     allowExternal &&
     run.engine === "conversation-v1" &&
-    run.promptVersion === "conversation-v1" &&
+    ["conversation-v1", "conversation-v2"].includes(run.promptVersion || "") &&
     run.model &&
     /^request-desk-v[1-9]\d*$/.test(run.toolRevision)
   )
@@ -407,7 +415,14 @@ export async function changeRun(
       return { cached: await runDetails(sql, actor, id) };
     }
     supportedRun(run);
-    modelConfiguration();
+    const runtimeConfig = await workspaceProvider(sql, actor);
+    const config = runtimeConfig || modelConfiguration();
+    if (runtimeConfig && modelIdentity(config) !== run.model)
+      throw new DomainError(
+        "MODEL_CONFIGURATION_CHANGED",
+        "The company AI connection changed. Start a new run.",
+        409,
+      );
     if (
       attempts.some(
         (attempt) =>
@@ -457,7 +472,12 @@ export async function changeRun(
       ],
     );
     await agentEvent(sql, actor, id, "model_call_reserved", run.version + 1);
-    return { attemptId, run: { ...run, version: run.version + 1 }, context };
+    return {
+      attemptId,
+      run: { ...run, version: run.version + 1 },
+      context,
+      runtimeConfig,
+    };
   });
   if ("cached" in reservation) {
     if (action === "cancel")
@@ -473,8 +493,10 @@ export async function changeRun(
       reservation.context,
       reservation.run.model!,
       AbortSignal.any([controller.signal, ...(signal ? [signal] : [])]),
+      reservation.runtimeConfig || undefined,
     );
     return await writeDatabase(async (sql) => {
+      await assertProviderCurrent(sql, actor, reservation.runtimeConfig);
       const run = await getRun(sql, actor, id),
         member = await requireOperator(sql, actor);
       if (await receipt(sql, actor, commandId, hash))

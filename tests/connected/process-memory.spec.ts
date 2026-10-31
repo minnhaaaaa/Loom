@@ -28,7 +28,7 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
     password,
     workspaceName: `Onboarding ${suffix}`,
   });
-  await page.goto("/?view=settings");
+  await page.goto("/app?view=settings");
   const builder = page.locator(".tool-builder");
   await builder.getByText("Customize this desk", { exact: true }).click();
   await builder
@@ -94,7 +94,7 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
       email: `joiner.${suffix}@example.com`,
       password,
     });
-    await colleague.goto("/?view=records");
+    await colleague.goto("/app?view=records");
     await expect(colleague.getByRole("heading", { level: 1 })).toHaveText(
       "Employee onboarding",
     );

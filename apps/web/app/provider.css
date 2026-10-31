@@ -1,0 +1,140 @@
+.company-provider {
+  border: 1px solid var(--border, #cbd5c8);
+  border-radius: 14px;
+  padding: 24px;
+  margin: 20px 0;
+  background: var(--surface, #fff);
+  color: var(--ink, #163d27);
+}
+.company-provider-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+}
+.company-provider h3 {
+  margin: 6px 0;
+  font-size: 1.4rem;
+}
+.company-provider p {
+  max-width: 72ch;
+  line-height: 1.6;
+}
+.provider-state {
+  font-size: 0.75rem;
+  padding: 7px 10px;
+  border: 1px solid currentColor;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.provider-state.connected {
+  background: #e6f4d7;
+}
+.provider-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 20px 0;
+}
+.provider-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.provider-fields input,
+.provider-fields select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #bbc9b9;
+  background: #fff;
+  border-radius: 7px;
+  padding: 10px;
+  color: #142a1d;
+}
+.provider-fields small {
+  font-weight: 400;
+  line-height: 1.5;
+}
+.provider-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.5;
+  max-width: 76ch;
+  font-size: 0.88rem;
+}
+.provider-consent input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.provider-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.provider-actions button,
+.provider-error button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #163d27;
+  border-radius: 7px;
+  background: #163d27;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+.provider-actions .secondary {
+  background: transparent;
+  color: inherit;
+}
+.company-provider button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.provider-note,
+.provider-current {
+  padding: 12px 14px;
+  background: #f0f4ed;
+  border-radius: 8px;
+}
+.provider-error {
+  color: #912f24;
+  background: #fff0e9;
+  padding: 12px;
+  margin-top: 14px;
+  border-radius: 8px;
+}
+.provider-error button {
+  display: block;
+  margin-top: 10px;
+}
+.provider-notice {
+  color: #244e2e;
+  background: #edf8e7;
+  padding: 12px;
+  border-radius: 8px;
+}
+.company-provider input:focus-visible,
+.company-provider select:focus-visible,
+.company-provider button:focus-visible {
+  outline: 3px solid #8ab36d;
+  outline-offset: 3px;
+}
+@media (max-width: 640px) {
+  .company-provider {
+    padding: 18px;
+  }
+  .provider-fields {
+    grid-template-columns: 1fr;
+  }
+  .company-provider-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}

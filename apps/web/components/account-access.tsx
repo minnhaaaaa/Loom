@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "./workspace-fetch";
 
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { AccountContext } from "@loom/contracts";
@@ -17,7 +18,7 @@ export async function accessRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(path, {
+  const response = await workspaceFetch(path, {
     ...options,
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -34,12 +35,14 @@ export async function accessRequest<T>(
 
 export function AccountAccess({
   onAuthenticated,
+  initialMode = "login",
 }: {
   onAuthenticated: () => Promise<void>;
+  initialMode?: "login" | "register";
 }) {
   const id = useId();
   const [context, setContext] = useState<AccountContext | null>(null);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [name, setName] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [email, setEmail] = useState("");
@@ -82,7 +85,7 @@ export function AccountAccess({
       );
       setPassword("");
       setNotice(
-        mode === "register" ? "Your workspace is ready." : "Signed in.",
+        mode === "register" ? "Your company workspace is ready." : "Signed in.",
       );
       await onAuthenticated();
     } catch (reason) {
@@ -103,15 +106,16 @@ export function AccountAccess({
           L
         </span>
         <div>
-          <p className="eyebrow">Your team’s workspace</p>
+          <p className="eyebrow">Your analytics team, connected</p>
           <h2>
             {mode === "register"
-              ? "Give the work a home."
-              : "Pick up where your team left off."}
+              ? "Give your data requests a home."
+              : "Welcome back to your company."}
           </h2>
           <p>
-            Use your own account to share requests, review changes, and keep the
-            team’s work together.
+            {mode === "register"
+              ? "Create your company’s analytics workspace, then invite your analysts and colleagues."
+              : "Use your own work account. Your company memberships determine the requests and knowledge you can access."}
           </p>
         </div>
       </div>
@@ -148,7 +152,7 @@ export function AccountAccess({
                 setError("");
               }}
             >
-              Create a workspace
+              Create a company
             </button>
           )}
         </div>
@@ -172,14 +176,15 @@ export function AccountAccess({
                 />
               </label>
               <label>
-                Workspace name
+                Company name
                 <input
                   maxLength={160}
                   required
                   disabled={busy}
                   value={workspaceName}
                   onChange={(event) => setWorkspaceName(event.target.value)}
-                  placeholder="Analytics team"
+                  autoComplete="organization"
+                  placeholder="Your company"
                 />
               </label>
             </>
@@ -213,8 +218,8 @@ export function AccountAccess({
           </label>
           {mode === "register" && (
             <p className="hint">
-              Use at least 12 characters. You’ll be the first owner and can
-              invite colleagues after creating the workspace.
+              Use at least 12 characters. You’ll be the company admin and can
+              invite analysts and requesters after registration.
             </p>
           )}
           {error && (
@@ -236,13 +241,14 @@ export function AccountAccess({
             {busy
               ? "Opening workspace…"
               : mode === "register"
-                ? "Create workspace and account"
-                : "Sign in to workspace"}
+                ? "Create company and account"
+                : "Sign in to company"}
           </button>
           {context && !context.registrationEnabled && (
             <p className="hint">
-              Joining a new team? Open the invitation link your workspace owner
-              shared.
+              {mode === "register"
+                ? "New company registration is not enabled on this deployment. Existing staff can sign in or use an invitation from their company admin."
+                : "Joining a company? Open the invitation link your company admin shared."}
             </p>
           )}
           {!context && !error && (

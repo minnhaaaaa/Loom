@@ -5,6 +5,10 @@ import "./civitas.css";
 import "./branding.css";
 import "./setup.css";
 import "./prompt.css";
+import "./landing.css";
+import "./company-entry.css";
+import "./insights.css";
+import "./provider.css";
 
 const body = localFont({
   src: "./fonts/manrope-variable.ttf",
@@ -25,9 +29,9 @@ const mono = localFont({
   weight: "400",
 });
 export const metadata: Metadata = {
-  title: "Loom · Your team’s workspace",
+  title: "Loom · Less chasing. More analysis.",
   description:
-    "Describe a tool, make it yours, and work together with your team and an agent.",
+    "A shared request desk for small analytics teams. Clear requirements, accountable owners, and Exasol-backed insight into where work gets stuck.",
 };
 export default function RootLayout({
   children,

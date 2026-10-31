@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "./workspace-fetch";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { MemoryEdge, TeamMemorySnapshot } from "@loom/contracts";
@@ -34,7 +35,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
 
   const refresh = useCallback(
     async (parameters: string, signal?: AbortSignal) => {
-      const response = await fetch(
+      const response = await workspaceFetch(
         `/api/memory${parameters ? `?${parameters}` : ""}`,
         {
           cache: "no-store",

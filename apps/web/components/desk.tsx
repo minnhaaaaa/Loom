@@ -6,6 +6,9 @@ import { TriageWorkspace } from "./triage-workspace";
 import { ToolBuilder } from "./tool-builder";
 import { PromptWorkspace } from "./prompt-workspace";
 import { TeamMemory } from "./team-memory";
+import { AnalyticsInsights } from "./analytics-insights";
+import { ProviderSettings } from "./provider-settings";
+import { workspaceFetch } from "./workspace-fetch";
 import { WorkspaceSetup } from "./workspace-setup";
 import { ToolFields, ToolTable, ToolSummary } from "./tool-renderer";
 import { Arrow, CompanyMark } from "./ui/civitas";
@@ -59,7 +62,7 @@ class ApiError extends Error {
   }
 }
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await workspaceFetch(path, {
     ...options,
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -141,7 +144,7 @@ export function Desk({
   workspaceControls?: ReactNode;
   showDemoControls?: boolean;
   setupInitiallyOpen?: boolean;
-  initialView?: "assistant" | "records" | "settings";
+  initialView?: "assistant" | "records" | "settings" | "insights" | "knowledge";
 }) {
   const router = useRouter();
   const [view] = useState(
@@ -150,7 +153,7 @@ export function Desk({
       initial.membership?.role === "owner" &&
       !initial.settings?.setupCompletedAt
         ? "settings"
-        : "assistant"),
+        : "records"),
   );
   const [desk, setDesk] = useState(initial),
     [error, setError] = useState(initialError),
@@ -206,6 +209,8 @@ export function Desk({
   const memberId = member?.userId;
   const refreshIntervalMs = Math.max(1000, desk.refreshIntervalMs || 3000);
   const operates = member?.role === "owner" || member?.role === "operator";
+  const viewHref = (next: string) =>
+    `/app?${preview ? "demo=1&" : ""}view=${next}`;
   const canWrite = !preview && Boolean(member) && member?.role !== "viewer";
   const setDraft = useCallback((values: Intake) => {
     intakeRef.current = values;
@@ -661,6 +666,7 @@ export function Desk({
   return (
     <div
       className="app-shell"
+      data-workspace-id={desk.workspace?.id}
       data-company-theme
       style={brandTheme(branding) as CSSProperties}
     >
@@ -682,14 +688,14 @@ export function Desk({
         <span className="brand-caption">
           {branding.companyName
             ? "Your workspace, powered by Loom"
-            : "A little tool. A lot together."}
+            : "Less chasing. More analysis."}
         </span>
         <p className="workspace-label">
-          {desk.workspace?.name || "Team workspace"}
+          {desk.workspace?.name || "Analytics workspace"}
         </p>
         <nav aria-label="Main">
           <Link
-            href="/?view=assistant"
+            href={viewHref("assistant")}
             className={view === "assistant" ? "nav-active" : ""}
             aria-current={view === "assistant" ? "page" : undefined}
           >
@@ -699,19 +705,43 @@ export function Desk({
             <span className="nav-label">Ask your assistant</span>
           </Link>
           <Link
-            href="/?view=records"
+            href={viewHref("records")}
             className={view === "records" ? "nav-active" : ""}
             aria-current={view === "records" ? "page" : undefined}
           >
             <span className="nav-icon" aria-hidden="true">
               ▦
             </span>
-            <span className="nav-label">Saved work</span>
+            <span className="nav-label">Data requests</span>
             <span className="nav-count">{desk.requests.length}</span>
           </Link>
+          {(preview || operates) && (
+            <>
+              <Link
+                href={viewHref("insights")}
+                className={view === "insights" ? "nav-active" : ""}
+                aria-current={view === "insights" ? "page" : undefined}
+              >
+                <span className="nav-icon" aria-hidden="true">
+                  ↗
+                </span>
+                <span className="nav-label">Flow insights</span>
+              </Link>
+              <Link
+                href={viewHref("knowledge")}
+                className={view === "knowledge" ? "nav-active" : ""}
+                aria-current={view === "knowledge" ? "page" : undefined}
+              >
+                <span className="nav-icon" aria-hidden="true">
+                  ◎
+                </span>
+                <span className="nav-label">Team knowledge</span>
+              </Link>
+            </>
+          )}
           {(preview || member) && (
             <Link
-              href="/?view=settings"
+              href={viewHref("settings")}
               className={view === "settings" ? "nav-active" : ""}
               aria-current={view === "settings" ? "page" : undefined}
             >
@@ -723,7 +753,7 @@ export function Desk({
           )}
           {(preview || member?.role === "owner") && (
             <Link
-              href="/?view=settings#company-setup"
+              href={`${viewHref("settings")}#company-setup`}
               onClick={() => {
                 const setup = document.getElementById("company-setup");
                 if (setup instanceof HTMLDetailsElement) setup.open = true;
@@ -742,10 +772,16 @@ export function Desk({
           <select
             aria-label="Workspace view"
             value={view}
-            onChange={(event) => router.push(`/?view=${event.target.value}`)}
+            onChange={(event) => router.push(viewHref(event.target.value))}
           >
             <option value="assistant">Ask your assistant</option>
-            <option value="records">Saved work</option>
+            <option value="records">Data requests</option>
+            {(preview || operates) && (
+              <>
+                <option value="insights">Flow insights</option>
+                <option value="knowledge">Team knowledge</option>
+              </>
+            )}
             {(preview || member) && (
               <option value="settings">Workspace settings</option>
             )}
@@ -758,14 +794,14 @@ export function Desk({
             <b>L</b>
           </span>
           <strong>
-            Built around
+            Clear requests.
             <br />
-            your way of working.
+            Focused analysts.
           </strong>
           <p>
-            Your tools, your colleagues,
+            Give every question context,
             <br />
-            and a helping hand.
+            an owner, and a next step.
           </p>
         </div>
         <div className="environment">
@@ -786,7 +822,11 @@ export function Desk({
                 ? "Your assistant"
                 : view === "settings"
                   ? "Workspace settings"
-                  : spec.title}
+                  : view === "insights"
+                    ? "Flow insights"
+                    : view === "knowledge"
+                      ? "Team knowledge"
+                      : spec.title}
             </strong>
           </span>
           <span className="workspace-presence">
@@ -805,8 +845,8 @@ export function Desk({
             <div className="banner">
               <strong>Read-only sample preview</strong>
               <span>
-                These are synthetic examples. Connect Exasol to create and save
-                requests. Setup instructions are in the README.
+                Explore synthetic requests without saving changes. Create your
+                company to invite colleagues and manage your own queue.
               </span>
             </div>
           )}
@@ -861,7 +901,9 @@ export function Desk({
                   Published tool: {spec.title} · revision {tool.revision}
                 </p>
               </div>
-              <Link href="/?view=assistant">Return to your assistant ↗</Link>
+              <Link href={viewHref("assistant")}>
+                Return to your assistant ↗
+              </Link>
             </div>
           )}
           {view === "settings" && (preview || member?.role === "owner") && (
@@ -885,11 +927,89 @@ export function Desk({
               }}
             />
           )}
+          {view === "insights" &&
+            (preview || operates) &&
+            (preview ? (
+              <section className="empty">
+                <h1>See where requests wait.</h1>
+                <p>
+                  Flow insights calculates waiting time, backlog trends and
+                  analyst workload from your company’s saved request history in
+                  Exasol.
+                </p>
+                <p>There is no live history in this sample workspace.</p>
+                <Link href="/register">Create your company ↗</Link>
+              </section>
+            ) : (
+              <>
+                <div className="page-heading">
+                  <div>
+                    <p className="eyebrow">The work behind the answer</p>
+                    <h1>Flow insights</h1>
+                    <p>
+                      See where requests wait and how work moves through your
+                      team.
+                    </p>
+                  </div>
+                </div>
+                <AnalyticsInsights
+                  key={`insights/${desk.workspace?.id}/${memberId}/${member?.role}`}
+                  refreshKey={`${desk.workspace?.id}/${memberId}/${member?.role}/${desk.requests.map((r) => `${r.id}:${r.version}`).join(",")}`}
+                />
+              </>
+            ))}
+          {view === "knowledge" &&
+            (preview || operates) &&
+            (preview ? (
+              <section className="empty">
+                <h1>A shared understanding.</h1>
+                <p>
+                  Keep approved metric definitions, routing procedures and
+                  reviewed decisions alongside your team’s requests.
+                </p>
+                <Link href="/register">Create your company ↗</Link>
+              </section>
+            ) : (
+              <>
+                <div className="page-heading">
+                  <div>
+                    <p className="eyebrow">Context your team can rely on</p>
+                    <h1>Team knowledge</h1>
+                    <p>
+                      Approved definitions, procedures, and decisions with their
+                      sources.
+                    </p>
+                  </div>
+                </div>
+                <TeamMemory
+                  key={`memory/${desk.workspace?.id}/${memberId}`}
+                  refreshKey={`${desk.workspace?.id}/${memberId}/${member?.role}`}
+                />
+                <TriageWorkspace
+                  key={`knowledge/${desk.workspace?.id}/${memberId}`}
+                  owner={member?.role === "owner"}
+                  requests={desk.requests}
+                  members={desk.members}
+                  spec={spec}
+                  preferredAgent={companySettings.preferredAgent}
+                  onApplied={refresh}
+                />
+              </>
+            ))}
+          {view === "settings" &&
+            !preview &&
+            member?.role === "owner" &&
+            desk.workspace && (
+              <ProviderSettings
+                key={`provider/${desk.workspace.id}/${memberId}`}
+                workspaceId={desk.workspace.id}
+              />
+            )}
           {view === "records" && (
             <div className="page-heading">
               <div>
                 <p className="eyebrow">
-                  {own ? "Your work, in view" : "Your team’s shared tool"}
+                  {own ? "Your work, in view" : "Your analytics request queue"}
                 </p>
                 <h1>{spec.title}</h1>
                 <p>{spec.description}</p>

@@ -1,105 +1,102 @@
 # Loom
 
-Loom lets a team describe a small internal tool, assemble it from supported components, share it with colleagues, and work alongside an agent in one live workspace.
+Loom helps **small analytics teams** turn vague business requests into clear, assigned work and see where those requests spend time.
 
-The everyday screen is **one prompt box**. People ask questions or describe what they need in their own words. The configured agent reads the workspace context they can access and replies in that conversation. When appropriate, it returns a proposed record change or an unpublished tool draft for explicit review. There is no hardcoded business-query routing or required record-selection step.
+A business requester should not have to chase an analyst for every update. An analyst should not have to repeatedly reconstruct the reporting period, dataset, metric definition, or owner. Loom brings the request, approved team guidance, proposed next steps, and workflow measurements into one company workspace.
 
-Company owners can now use **Company setup** to preview and save their name, logo, brand colors, typography, and corner style. Branding follows the workspace for all colleagues. The same onboarding flow creates scoped MCP connections for Codex, Claude Code, or another compatible agent, with proposals entering Loom's existing human review. See the [company setup guide](RUNBOOK.md#company-branding-and-bring-your-own-agent--2026-10-28).
-
-Supported starting points include **data requests, IT support, employee onboarding, and project reviews**. They share a bounded request-and-review engine: collect information, assign owners, record progress, and work alongside an agent. Its suggestions draw on approved team knowledge and remain proposals until someone reviews and applies them. Onboarding buddies, dates, and checklists are editable text; integrations and automatic task execution are not included.
+**Problem statement:** Small analytics teams struggle to turn business requests into actionable work because requirements, ownership, and business definitions are scattered across conversations. Requesters wait while analysts repeatedly chase context.
 
 **Hackathon track:** Track 04 — The Work Behind the Work.
 
-**Project status:** The describe → shared tool → agent journey includes a conversation entry point, four optional templates, direct editing, a shared renderer, immutable drafts, reviewed publication, password accounts, expiring invitations, and role-aware records. The team brain adds approved-source search, evidence-backed connections, and an activity timeline. The agent retrieves relevant approved guidance; an applied decision can become a provenance-linked knowledge draft, with separate owner approval before reuse. Definitions, conversations, records, proposals, and knowledge persist in Exasol. Live designer generation was verified previously; current automated workflow checks distinguish real database execution from test-only model responses. SSO, email verification/reset, multiple independent tools per workspace, external ingestion, semantic retrieval, and broader evaluation remain planned. See [RUNBOOK.md](RUNBOOK.md) for supported behavior and verification limits.
+This is a working prototype. Customer demand, reduced coordination time, and willingness to pay remain unmeasured. Loom does not execute arbitrary business analyses, create analyst capacity, or establish the cause of every delay.
 
-## Describe a process, then work inside it
+## Company journey
 
-1. **Describe:** Type a question or describe the tool you need in the main prompt. Owners can review a generated draft of supported fields, table, filters, summary, and status labels. A manual builder and templates remain in workspace settings.
-2. **Share:** Save the draft, review its exact changes, and publish. Invite colleagues with a requester, operator, or viewer role. Each workspace has one tool; create a separate workspace for an independent process.
-3. **Work with the agent:** Ask for help in the same conversation. Relevant approved procedures and authorized saved work supply context. Inspect source references and before/after changes, then approve or reject them.
-4. **Keep useful knowledge:** Write guidance from an applied proposal and explain when it should be reused. An owner approves it separately. A later run can retrieve that guidance, with its original decision preserved as evidence.
+| Route                | Purpose                                                                    |
+| -------------------- | -------------------------------------------------------------------------- |
+| `/`                  | Public landing page                                                        |
+| `/register`          | Create an owner account and company workspace when registration is enabled |
+| `/login`             | Individual staff sign-in                                                   |
+| `/app`               | Authenticated workspace and assistant                                      |
+| `/app?view=records`  | Request intake and saved work                                              |
+| `/app?view=insights` | Exasol flow insights for owners and analysts                               |
+| `/app?view=settings` | Company setup, access, AI provider, and advanced desk configuration        |
+| `/app?demo=1`        | Unsaved sample exploration                                                 |
+| `/join`              | Accept an owner-issued invitation                                          |
 
-The Company Brain architecture reference informs the separation of stored facts, retrieved context, and AI suggestions. Loom's relationship view comes from saved ownership and explicit source references. It does not infer engineering infrastructure, ingest Slack/GitHub, provide vector search, or reconstruct a historical service topology.
+1. An administrator registers the company, sets its name and appearance, and invites colleagues.
+2. Each colleague uses an individual account. Membership determines access: owners administer, operators/analysts manage the queue, requesters submit and track their own work, and viewers have read-only access.
+3. The team imports a synthetic backlog or submits requests, then adds approved metric definitions and routing procedures.
+4. The assistant can explain visible work and propose supported changes. A teammate reviews exact changes before they are applied.
+5. Flow insights show waiting time, weekly movement, and current owner workload. A useful decision can become reusable guidance after separate owner approval.
 
-The workspace UI adapts components and styling from [Civitas](https://github.com/minnhaaaaa/civitas): its wordmark/seal, metric strip, terminal headers, forest/lime palette, and locally served typography. Component provenance and retained licenses are in [third-party/civitas](third-party/civitas/README.md).
+A company currently maps to one workspace and one shared request-family tool. Company-name selection alone grants no access. Domain discovery, verified-domain joining, and an organization hierarchy are not implemented.
+
+## Completed and pending features
+
+“Implemented” describes code and exercised system behavior; live provider quality and production readiness are separate gates. See [RUNBOOK.md](RUNBOOK.md) for dated verification results.
+
+| Area               | Implemented                                                                                                         | Pending or limited                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Request desk       | Forms, assignment, statuses, comments, due dates, CSV import/export, activity, and version conflicts                | Slack/Teams/email ingestion and notifications                                                                       |
+| Company access     | Owner registration, individual password accounts, invitation links, roles, revocation, branding                     | Email verification/delivery, password recovery, SSO, and company-domain joining                                     |
+| Exasol insights    | Stage median/p90, weekly arrivals and closure/reopening transitions, backlog, owner aging, bounded request evidence | Outcome evaluation, richer filters, capacity estimates, and predictive SLA models                                   |
+| Assistant          | Saved conversation, scoped context, validated proposals, explicit human approval                                    | Reliable live provider coverage and broad quality/cost evaluation                                                   |
+| Company AI         | Owner-managed OpenAI, Claude, Kimi, and DeepSeek API adapters; test-and-save, encrypted credentials, disconnect     | Subscription-account OAuth; verification with each real company credential/model                                    |
+| External agents    | MCP context, queued tasks, replies, proposals, tool drafts, expiring/revocable Loom tokens                          | Hosted agent runner and interactive vendor-client verification                                                      |
+| Team guidance      | Approved definitions/procedures, lexical retrieval, citations, reviewed decision reuse                              | External ingestion, semantic retrieval, automatic policy creation                                                   |
+| Desk configuration | Templates, manual editing, validated AI drafts, reviewed publication, compatible revisions                          | Arbitrary application/code generation and multiple independent tools per company                                    |
+| Deployment         | Next.js Node application, Exasol migrations, local setup and deployment instructions                                | Production edition/hosting decision, operational hardening, backup/restore rehearsal, and multi-instance deployment |
+
+Legacy IT, onboarding, and project-review templates remain available in advanced configuration, but the product and demonstration now focus on analytics requests.
+
+## Exasol does the analytical work
+
+Exasol is the canonical store for requests, events, accounts, conversations, proposals, guidance, and company settings. Flow insights also run real, workspace-filtered SQL rather than asking an LLM to estimate metrics:
+
+- **Stage time:** `LEAD` constructs intervals from request history; repeated visits are summed per request/status. Exasol computes medians and 90th percentiles over these totals.
+- **Weekly flow:** `LAG` identifies completions, cancellations, and reopening. A cumulative SQL ledger starts with carryover backlog and follows every transition.
+- **Owner workload:** current open requests, overdue dates, age buckets, and oldest age are grouped by current owner.
+- **Evidence:** query IDs, SQL hashes, cutoff, timing, sample counts, and up to 50 contributing request rows make results inspectable. Aggregates include all qualifying records even when evidence is truncated.
+
+The reporting window is 30 or 90 rolling UTC days, start included and cutoff excluded. First/last calendar weeks can be partial. Stage time is elapsed calendar time within the window, including unfinished work; it is not analyst effort or completed-request turnaround. Done/cancelled intervals are excluded until work reopens. Transition counts may include a request more than once. Owner workload covers all current open work and does not measure available capacity.
+
+The assistant receives a compact 30-day Exasol snapshot for owners/operators, including the cutoff and measurement definitions. Requesters/viewers receive no internal analytics snapshot. These measurements explain the workspace; action authorization still depends on exact permitted records and versions. There is no model-authored SQL execution.
+
+## Bring a company AI provider
+
+Owners can configure an **API account** for OpenAI, Claude, Kimi, or DeepSeek in company settings. The server sends authorized context using the selected model; staff continue using Loom. Test-and-save makes a small explicit provider request before saving a usable connection. API usage is billed by that provider.
+
+Set `LOOM_PROVIDER_ENCRYPTION_KEY` on the server before enabling this feature. Credentials are encrypted with AES-256-GCM, bound to the workspace/provider/model/revision, and never returned by the settings API. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup and key handling. Available models and structured-output compatibility depend on the provider; adapter tests do not establish that every model works.
+
+A ChatGPT/Claude/Kimi/DeepSeek chat subscription is not a connected API account in this implementation. Subscription-account OAuth is not implemented. The separate Codex/Claude Code MCP option gives an externally running client a Loom token; company setup does not launch, host, or log that client into its vendor account. External connections currently serve owners/operators.
 
 ## Run the current build
 
 ```sh
 pnpm install --frozen-lockfile
+# On a fresh checkout only, copy .env.example to .env; preserve existing secrets.
+# Configure Exasol, session settings, and optional company AI encryption in .env.
+pnpm db:migrate
+pnpm db:seed
 pnpm dev
 ```
 
-Open http://localhost:3000. The default view is the assistant; **Saved work** opens the table, and **Workspace settings** holds the optional builder and administration. Sample exploration is unsaved; conversations require an authenticated workspace, Exasol, and a configured agent. To enable real saves, configure Exasol and follow the migration, seed, and database checks in [RUNBOOK.md](RUNBOOK.md). There is no substitute persistence backend.
+Open http://localhost:3000 for the landing page or http://localhost:3000/app?demo=1 for an unsaved sample. Company registration requires `LOOM_ALLOW_WORKSPACE_SIGNUP=true`; real saves and conversations require Exasol. Manual request work does not require a model. Follow [RUNBOOK.md](RUNBOOK.md) for installing/starting Exasol Personal, verifying the connection, and choosing the correct authentication mode. There is no substitute persistence backend.
 
-## Build and challenge requirements
+## Competition and deployment scope
 
-Selected stack: **Next.js App Router, TypeScript, and Exasol Personal**. Next.js supplies the basic frontend and Node server endpoints. Exasol is the canonical store and analytical engine: imported requests, status history, backlog/SLA metrics, and evidence for triage suggestions. This replaces the earlier PostgreSQL/Supabase design.
+The [ExaThon India 2026 rules](https://www.exasol.com/events/exathon-india-2026/) require Exasol Personal, public or synthetic data, a public repository under an accepted open-source license, a clear problem statement, pitch deck, demo video of at most three minutes, and setup/deployment instructions. The official deadline is **31 October 2026, 23:59 IST**. Effective Exasol use accounts for 25% of judging. This repository uses Apache-2.0.
 
-The matching [ExaThon India 2026 rules](https://www.exasol.com/events/exathon-india-2026/) allow any framework and teams of one to three. Use only public or synthetic data, not employer/proprietary data. Submit a public repository, problem statement, slide deck, demo of at most three minutes, setup/usage instructions, and a deployment/run guide. This repository already uses Apache-2.0, an accepted license. The published deadline is **25 October 2026, 23:59 IST**; confirm any organizer updates before submission. Effective Exasol use accounts for 25% of judging, so it must power the working workflow and measurable SQL insights.
+[Exasol Personal](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm) is documented for individual/single-user use. The challenge prototype uses synthetic companies and role personas under one operator. The implemented company and membership flows do not establish permission to run a multi-company production service on Personal. A production deployment requires an appropriate edition/permission and hosting decision.
 
-Personal is documented for individual use with a single-user restriction. The event demo uses synthetic role personas under one operator; an actual shared service needs clarification of applicable permissions and edition terms. See the [Personal documentation](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm).
+## Documentation and evaluation
 
-## Who it serves
+- [RUNBOOK.md](RUNBOOK.md): setup, operating behavior, dated checks, and verification limits.
+- [PLAN.md](PLAN.md): narrowed priorities, acceptance gates, evaluation, and submission work.
+- [DEPLOYMENT.md](DEPLOYMENT.md): company access, AI credential setup, shared-host configuration, and deployment limits.
+- [ARCHITECTURE.md](ARCHITECTURE.md) and [TECH_STACK.md](TECH_STACK.md): system design and technology decisions; consult the current checkpoints for implemented scope.
 
-| Person                         | Problem                                                                                  | Intended benefit                                                                                |
-| ------------------------------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Analytics or data-team lead    | Requests arrive through messages and spreadsheets, without clear requirements or owners. | Create a suitable intake and review tool, organize the queue, and inspect proposed assignments. |
-| Analyst or operations teammate | Repeated clarification, context searches, and status updates interrupt delivery.         | Work from structured requests with relevant definitions, procedures, and decision history.      |
-| Internal business requester    | It is unclear what to submit, who owns the request, or what happens next.                | Use a guided form, answer questions, and track their own requests.                              |
+Compare matched synthetic request batches using the existing workflow, Loom's manual desk, and Loom with an agent. Measure clarification rounds, time to readiness/assignment, review effort, errors, and repeat explanations; report actual fulfillment time separately. Numerical targets are evaluation goals, not achieved savings.
 
-The initial adoption hypothesis is a team with recurring internal requests and repeated coordination work. Customer demand and time savings still need validation with pilot users.
-
-## Intended MVP journey
-
-> Build a data-request desk with requester, business question, reporting period, dataset, owner, priority, due date, and status. Show incomplete and overdue requests.
-
-1. The lead describes the desk and reviews a generated draft.
-2. Loom renders a supported table, intake form, record details, filters, and summary cards.
-3. The team imports an existing CSV backlog and adds a routing procedure and glossary.
-4. The agent checks selected requests, identifies missing details, retrieves relevant guidance, and proposes assignments or clarification drafts.
-5. An authorized teammate reviews exact changes. The server checks permissions and record versions before committing them.
-6. Everyone sees authorized updates in the shared workspace. The activity history records changes and decisions.
-7. A useful correction can become a proposed team rule. An owner reviews it before future requests use it.
-
-Loom aims to reduce coordination delays. It does not automatically create analyst capacity, execute arbitrary analyses, or resolve every cause of a long request backlog.
-
-## MVP boundary
-
-| Included                                                         | Deferred                                                  |
-| ---------------------------------------------------------------- | --------------------------------------------------------- |
-| One request-and-review tool family, led by the data-request desk | General-purpose application generation                    |
-| Versioned tool specifications and a fixed component catalog      | Arbitrary generated JavaScript, SQL, or backend code      |
-| CSV import/export and persisted requests                         | A connector marketplace or broad SaaS migration           |
-| Shared saved records, comments, authorized refresh, and activity | Character-level collaborative editing and offline writes  |
-| A bounded agent that reads context and creates proposals         | Unattended external actions or autonomous agent teams     |
-| Approved procedures, definitions, and reviewed decision reuse    | Automatic promotion of chat messages into policy          |
-| Exact-change review, version checks, and audit events            | Claims of guaranteed AI correctness or universal rollback |
-
-The IT-request template uses the same specification, renderer, and action system as the data desk. In this slice each workspace has one published request-family tool; selecting a template starts a draft of that tool and preserves its records. Multiple independent tools are a later extension.
-
-## How the company-brain idea fits
-
-Loom starts with a small **team knowledge layer**: definitions, procedures, routing rules, and reviewed decisions. Every reusable item has a scope, owner, source, and version. Draft suggestions and historical exceptions are distinct from approved guidance.
-
-The working tool supplies the interface and records; the knowledge layer supplies context; an explicit proposal and action system connects them. Shared knowledge is useful only when retrieval respects permissions and outdated guidance can be retired.
-
-Related market references include [YC's Company Brain request](https://www.linkedin.com/posts/y-combinator_every-company-has-critical-know-how-scattered-activity-7455394239946862592-OW2d), [Hyperspell](https://www.ycombinator.com/companies/hyperspell), [Memory Store](https://www.ycombinator.com/companies/memory-store), and [Savant](https://www.ycombinator.com/companies/savant). YC's [A Cloud for Small Software request](https://www.ycombinator.com/rfs) also relates to creating and sharing small team tools. These references inform positioning; they do not establish an unoccupied market or validate Loom's demand.
-
-## Documentation
-
-| Document                           | Purpose                                                                                        |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [DEPLOYMENT.md](DEPLOYMENT.md)     | Free online testing, shared-host configuration, and deployment limits.                         |
-| [RUNBOOK.md](RUNBOOK.md)           | Actual setup commands, supported behavior, verification, and current blockers.                 |
-| [TECH_STACK.md](TECH_STACK.md)     | Selected technologies, tradeoffs, proposed repository layout, and dependency evaluation rules. |
-| [PLAN.md](PLAN.md)                 | Prioritized milestones, implementation tasks, acceptance criteria, evaluation, and demo.       |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System boundaries, data model, protocols, failure handling, and research/repository evidence.  |
-
-Read the plan before implementation. Architecture decisions and the source register are maintained in `ARCHITECTURE.md`; stack choices are maintained in `TECH_STACK.md`.
-
-## Success criteria
-
-Compare the current workflow, Loom with manual controls, and Loom with its agent on comparable request batches. Measure setup effort, clarification and routing time, recommendation quality, repeat explanations, and lost or unowned work. Report request fulfillment time separately from triage time.
-
-Numerical targets in the plan are proposed evaluation gates, not measured results.
+The workspace adapts styling/components from [Civitas](https://github.com/minnhaaaaa/civitas). Attribution and retained licenses are in [third-party/civitas](third-party/civitas/README.md).

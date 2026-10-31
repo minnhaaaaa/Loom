@@ -65,16 +65,13 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
   const colleague = await colleagueContext.newPage();
 
   try {
-    await owner.goto("/");
+    await owner.goto("/register");
     const account = owner.locator(".account-access");
-    await account
-      .getByRole("tab", { name: "Create a workspace", exact: true })
-      .click();
     await account
       .getByRole("textbox", { name: "Your name", exact: true })
       .fill(ownerName);
     await account
-      .getByRole("textbox", { name: "Workspace name", exact: true })
+      .getByRole("textbox", { name: "Company name", exact: true })
       .fill(workspaceName);
     await account
       .getByRole("textbox", { name: "Email address", exact: true })
@@ -82,7 +79,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     await account.getByLabel("Password", { exact: true }).fill(password);
     await account
       .getByRole("button", {
-        name: "Create workspace and account",
+        name: "Create company and account",
         exact: true,
       })
       .click();
@@ -137,12 +134,12 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
       })
       .click();
     await expect(
-      colleague.getByRole("textbox", {
-        name: "Ask your workspace",
+      colleague.getByRole("heading", {
+        name: "Data requests",
         exact: true,
       }),
     ).toBeVisible();
-    await colleague.goto("/?view=settings");
+    await colleague.goto("/app?view=settings");
     await expect(colleague.locator(".workspace-access")).toBeVisible();
     const colleagueAccount = await read<AccountContext>(
       colleague,
@@ -153,6 +150,25 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     expect(colleagueAccount.workspaces).toEqual([
       { id: primaryId, name: workspaceName, role: "operator" },
     ]);
+    const signedOut = await colleague.request.delete("/api/session", {
+      headers: { Origin: origin },
+    });
+    expect(signedOut.ok()).toBe(true);
+    await colleague.goto("/login");
+    await colleague
+      .getByLabel("Email address", { exact: true })
+      .fill(`colleague.${suffix}@example.com`);
+    await colleague.getByLabel("Password", { exact: true }).fill(password);
+    await colleague
+      .getByRole("button", { name: "Sign in to company", exact: true })
+      .click();
+    await expect(
+      colleague.getByRole("heading", { name: "Data requests", exact: true }),
+    ).toBeVisible();
+    expect(
+      (await read<AccountContext>(colleague, "/api/account"))
+        .currentWorkspaceId,
+    ).toBe(primaryId);
 
     const builder = owner.locator(".tool-builder");
     await builder.getByText("Customize this desk", { exact: true }).click();
@@ -180,8 +196,8 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
       toolTitle,
       { timeout: 12_000 },
     );
-    await owner.goto("/?view=records");
-    await colleague.goto("/?view=records");
+    await owner.goto("/app?view=records");
+    await colleague.goto("/app?view=records");
     await expect(owner.getByRole("heading", { level: 1 })).toHaveText(
       toolTitle,
     );
@@ -305,8 +321,32 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
         businessQuestion: "Synthetic request owned by the workspace creator.",
       },
     });
+    await owner.goto("/app?view=insights");
+    await expect(owner.getByRole("heading", { level: 1 })).toHaveText(
+      "Flow insights",
+    );
+    await expect(
+      owner.getByRole("heading", { name: "Time in each stage", exact: true }),
+    ).toBeVisible();
+    await expect(
+      owner.getByText("Calculated in Exasol", { exact: true }),
+    ).toBeVisible();
+    await owner
+      .getByLabel("Reporting period", { exact: true })
+      .selectOption("90");
+    await expect(
+      owner.getByRole("table", { name: /Weekly request flow/ }),
+    ).toBeVisible();
+    await colleague.goto("/app?view=insights");
+    await expect(
+      colleague.getByRole("heading", {
+        name: "Time in each stage",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await colleague.goto("/app?view=records");
     const otherName = `Separate workspace ${suffix}`;
-    await owner.goto("/?view=settings");
+    await owner.goto("/app?view=settings");
     const workspaceControls = owner.locator(".workspace-access");
     await workspaceControls
       .locator(".workspace-access-create > summary")
@@ -366,7 +406,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     await expect(
       colleague.getByText(`Isolated request ${suffix}`, { exact: true }),
     ).toHaveCount(0);
-    await colleague.goto("/?view=records");
+    await colleague.goto("/app?view=records");
 
     const outsider = await outsiderContext.newPage();
     await outsider.goto(`/w/${otherWorkspace.id}`);
@@ -393,6 +433,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
       owner.getByRole("combobox", { name: "Current workspace", exact: true }),
     ).toHaveValue(primaryId);
 
+    await owner.goto("/app?view=settings");
     share = await openSharing(owner);
     await share
       .getByRole("combobox", { name: `Role for ${colleagueName}`, exact: true })
@@ -413,6 +454,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
           )?.role,
       )
       .toBe("requester");
+    expect((await colleague.request.get("/api/insights")).status()).toBe(403);
     await expect(
       colleague.getByRole("button", { name: requestTitle, exact: true }),
     ).toBeVisible({ timeout: 12_000 });

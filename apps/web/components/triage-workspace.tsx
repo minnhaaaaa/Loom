@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "./workspace-fetch";
 import {
   useCallback,
   useEffect,
@@ -20,7 +21,7 @@ import {
 } from "@loom/contracts";
 import { ConsoleChrome } from "./ui/civitas";
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await workspaceFetch(path, {
     ...options,
     headers: { "Content-Type": "application/json" },
     cache: "no-store",

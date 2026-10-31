@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("workspace settings opens an onboarding draft and preserves its fields across templates", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page
     .getByRole("link", { name: "Workspace settings", exact: true })
     .click();
@@ -48,7 +48,7 @@ test("sample builder previews an IT template and an optional field without chang
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/?view=settings");
+  await page.goto("/app?view=settings");
   const builder = page.locator(".tool-builder");
   await builder.getByText("Explore the tool builder", { exact: true }).click();
   await builder
@@ -109,7 +109,7 @@ test("sample builder previews an IT template and an optional field without chang
 
 test("expanded sample builder fits a narrow viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/?view=settings");
+  await page.goto("/app?view=settings");
   const builder = page.locator(".tool-builder");
   await builder.getByText("Explore the tool builder", { exact: true }).click();
   await builder

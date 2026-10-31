@@ -120,7 +120,7 @@ test("one prompt delivers real external replies, reviewed record changes, and an
         businessQuestion: "Prepare a colleague's access.",
       },
     });
-    await page.goto("/?view=assistant");
+    await page.goto("/app?view=assistant");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       "What would you like to do?",
     );

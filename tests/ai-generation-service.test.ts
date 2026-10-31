@@ -121,6 +121,7 @@ beforeEach(() => {
   boundary.query
     .mockReset()
     .mockImplementation(async (sql: string, values: unknown[]) => {
+      if (sql.includes("FROM PROVIDER_CONNECTIONS")) return [];
       if (sql.includes("FROM TOOL_GENERATIONS")) {
         const generation = boundary.generation;
         if (!generation) return [];

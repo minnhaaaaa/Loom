@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("company setup previews brand colors, typography and identity without saving sample state", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("link", { name: "Company setup", exact: true }).click();
   const setup = page.locator("#company-setup");
   await setup.getByLabel("Company name", { exact: true }).fill("Nimbus");
@@ -57,7 +57,7 @@ test("company onboarding and agent configuration fit a phone", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/?view=settings");
+  await page.goto("/app?view=settings");
   // The sidebar collapses on small screens; setup also has a visible entry in the page.
   await page.locator("#company-setup > summary").click();
   const setup = page.locator("#company-setup");

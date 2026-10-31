@@ -129,6 +129,20 @@ export function requestFilter(member: Membership, query: DeskQuery) {
   }
   return filter;
 }
+export function sampleSnapshot(): DeskSnapshot {
+  return {
+    mode: "preview",
+    refreshIntervalMs: 3000,
+    tool: { revision: 1, spec: dataRequestTemplate, publishedAt: null },
+    membership: null,
+    requests: sampleRequests,
+    members: personas.map((p) => ({
+      userId: p.id,
+      name: p.name,
+      role: p.role,
+    })),
+  };
+}
 export async function snapshot(
   actor: Actor | null,
   input: Partial<DeskQuery> = {},
@@ -143,18 +157,7 @@ export async function snapshot(
       throw new DatabaseUnavailable(
         "Exasol configuration is incomplete. Set host, user, and password.",
       );
-    return {
-      mode: "preview",
-      refreshIntervalMs: 3000,
-      tool: { revision: 1, spec: dataRequestTemplate, publishedAt: null },
-      membership: null,
-      requests: sampleRequests,
-      members: personas.map((p) => ({
-        userId: p.id,
-        name: p.name,
-        role: p.role,
-      })),
-    };
+    return sampleSnapshot();
   }
   if (!actor)
     return { mode: "connected", membership: null, requests: [], members: [] };

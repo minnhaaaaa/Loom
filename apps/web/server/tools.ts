@@ -1,4 +1,6 @@
 import "server-only";
+import { workspaceProvider, assertProviderCurrent } from "./provider-config";
+import { modelIdentity } from "./provider-transport";
 import { randomUUID } from "node:crypto";
 import {
   toolSpecSchema,
@@ -202,12 +204,16 @@ export async function insertDraft(
   );
   return draft;
 }
-function configuration(): ToolWorkspace["configuration"] {
+async function configuration(
+  sql: SqlSession,
+  actor: Actor,
+): Promise<ToolWorkspace["configuration"]> {
   try {
-    const value = toolModelConfiguration();
+    const value =
+      (await workspaceProvider(sql, actor)) || toolModelConfiguration();
     return {
       configured: true,
-      model: value.model,
+      model: modelIdentity(value),
       freeOnly: value.freeOnly,
       message:
         "Describe a tool or refine the current draft. Generation creates a draft for review.",
@@ -250,7 +256,7 @@ export async function toolWorkspace(actor: Actor): Promise<ToolWorkspace> {
       published,
       drafts: drafts.map(mapDraft),
       history: revisions.length ? revisions.map(mapPublishedTool) : [published],
-      configuration: configuration(),
+      configuration: await configuration(sql, actor),
     };
   });
 }
@@ -400,7 +406,8 @@ export async function generateToolDraft(
         baseErrors.join(" "),
         422,
       );
-    const config = toolModelConfiguration();
+    const runtimeConfig = await workspaceProvider(sql, actor);
+    const config = runtimeConfig || toolModelConfiguration();
     const [existing] = await sql.query(
       "SELECT * FROM TOOL_GENERATIONS WHERE WORKSPACE_ID = ? AND COMMAND_ID = ?",
       [actor.workspaceId, commandId],
@@ -453,7 +460,7 @@ export async function generateToolDraft(
           })
         : {};
       if (
-        pinned.requestedModel !== config.model ||
+        pinned.requestedModel !== modelIdentity(config) ||
         pinned.promptVersion !== toolGenerationPromptVersion
       )
         throw new DomainError(
@@ -477,14 +484,14 @@ export async function generateToolDraft(
           leaseId,
           sqlTimestamp(leaseUntil),
           JSON.stringify({
-            requestedModel: config.model,
+            requestedModel: modelIdentity(config),
             promptVersion: toolGenerationPromptVersion,
           }),
           sqlTimestamp(now),
         ],
       );
     }
-    return { leaseId, model: config.model };
+    return { leaseId, model: modelIdentity(config), runtimeConfig };
   });
   if (reservation.draft) return reservation.draft;
   try {
@@ -492,8 +499,10 @@ export async function generateToolDraft(
       instructions,
       baseSpec,
       reservation.model,
+      reservation.runtimeConfig || undefined,
     );
     return await writeDatabase(async (sql) => {
+      await assertProviderCurrent(sql, actor, reservation.runtimeConfig);
       await owner(sql, actor);
       const current = await publishedTool(sql, actor);
       assertRevision(current.revision, expectedRevision);

@@ -1,4 +1,6 @@
 import "server-only";
+import { workspaceProvider, assertProviderCurrent } from "./provider-config";
+import { modelIdentity } from "./provider-transport";
 import { randomUUID } from "node:crypto";
 import {
   conversationSendSchema,
@@ -68,12 +70,13 @@ export async function conversationConfiguration(
     };
   }
   try {
-    const config = modelConfiguration();
+    const config =
+      (await workspaceProvider(sql, actor)) || modelConfiguration();
     return {
       configured: true,
       mode: "builtin",
       provider: "loom",
-      model: config.model,
+      model: modelIdentity(config),
       message:
         "Ask a question or describe what you want to do. The agent uses the workspace information you can access.",
     };
@@ -131,7 +134,7 @@ async function saveProposals(
   const runId = randomUUID();
   const requestIds = decision.proposals.map((proposal) => proposal.requestId);
   await sql.execute(
-    "INSERT INTO AGENT_RUNS (WORKSPACE_ID,ID,INITIATOR_ID,REQUEST_IDS_JSON,STATUS,VERSION,CHECKPOINT,CREATED_AT,EXPIRES_AT,ENGINE,TOOL_REVISION,MODEL,INSTRUCTIONS,PROMPT_VERSION) VALUES (?,?,?,?,'completed',1,?,?,?,'conversation-v1',?,?,?,'conversation-v1')",
+    "INSERT INTO AGENT_RUNS (WORKSPACE_ID,ID,INITIATOR_ID,REQUEST_IDS_JSON,STATUS,VERSION,CHECKPOINT,CREATED_AT,EXPIRES_AT,ENGINE,TOOL_REVISION,MODEL,INSTRUCTIONS,PROMPT_VERSION) VALUES (?,?,?,?,'completed',1,?,?,?,'conversation-v1',?,?,?,?)",
     [
       actor.workspaceId,
       runId,
@@ -143,6 +146,7 @@ async function saveProposals(
       `request-desk-v${context.tool.revision}`,
       inference.requestedModel,
       context.prompt,
+      inference.promptVersion,
     ],
   );
   const ids: string[] = [];
@@ -341,6 +345,7 @@ export async function sendConversation(
       id,
       external,
       model: configuration.model,
+      runtimeConfig: external ? null : await workspaceProvider(sql, actor),
       context,
       member,
     };
@@ -352,6 +357,7 @@ export async function sendConversation(
       reservation.context,
       reservation.model!,
       signal,
+      reservation.runtimeConfig || undefined,
     );
     const available = new Set(
       reservation.context.knowledge.map((entry) => entry.id),
@@ -387,6 +393,7 @@ export async function sendConversation(
         )
       : undefined;
     await writeDatabase(async (sql) => {
+      await assertProviderCurrent(sql, actor, reservation.runtimeConfig);
       await assertConversationContext(sql, actor, reservation.context);
       const turn = await getConversationTurn(sql, actor, reservation.id);
       if (
