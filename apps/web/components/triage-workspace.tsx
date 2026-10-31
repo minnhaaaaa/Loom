@@ -20,7 +20,7 @@ import {
   type ToolSpec,
   type PreferredAgent,
 } from "@loom/contracts";
-import { ConsoleChrome } from "./ui/civitas";
+
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await workspaceFetch(path, {
     ...options,
@@ -373,203 +373,167 @@ export function TriageWorkspace({
   return (
     <section
       id="agent-workspace"
-      className="triage-workspace triage-console"
+      className="triage-workspace triage-console knowledge-management"
       aria-label="Triage and team knowledge"
     >
-      <ConsoleChrome
-        label="Loom / triage and knowledge"
-        status={
-          inferring
-            ? "Model running"
-            : busy
-              ? "Working…"
-              : externalAgent
-                ? "External agent workspace"
-                : !configuration.configured
-                  ? "Model unavailable"
-                  : detail
-                    ? detail.run.status.replaceAll("_", " ")
-                    : "Ready"
-        }
-      />
       <div className="triage-console-body">
-        <h2>Work alongside your agent</h2>
-        <p>
-          Work through the queue with an agent. Your team’s knowledge guides its
-          suggestions; you review every change before it is saved.
-        </p>
         {error && (
           <p className="alert" role="alert">
             {error}
           </p>
         )}
-        <p>
-          {externalAgent
-            ? `${externalAgentLabel} connects through MCP. Ask it to inspect selected records and submit a proposal; review its saved changes here.`
-            : configuration.configured
-              ? `OpenRouter · ${configuration.model}`
-              : configuration.message}
-        </p>
-        <button
-          className="secondary"
-          disabled={busy}
-          onClick={() =>
-            void work(async () => {
-              await refresh();
-              if (detail)
-                setDetail(await api<RunDetails>(`/api/runs/${detail.run.id}`));
-            })
-          }
-        >
-          {externalAgent
-            ? "Refresh agent proposals"
-            : "Refresh model and saved state"}
-        </button>
         <p className="notice" role="status" aria-live="polite">
           {busy ? "Working…" : message}
         </p>
-        <details id="agent-knowledge">
-          <summary>Team knowledge</summary>
-          <p>
-            Operators can draft. Only owners can approve, supersede, or retire
-            guidance. The agent retrieves relevant approved sources as reference
-            material. A reviewed decision becomes reusable only after separate
-            owner approval.
-          </p>
-          <form onSubmit={(event) => void draft(event)}>
-            <div className="triage-form">
+        <details id="agent-knowledge" open>
+          <summary>Sources & drafts</summary>
+          <details className="knowledge-draft">
+            <summary>Add knowledge</summary>
+            <form onSubmit={(event) => void draft(event)}>
+              <div className="triage-form">
+                <label>
+                  Knowledge title
+                  <input
+                    required
+                    maxLength={160}
+                    disabled={busy}
+                    value={values.title}
+                    onChange={(event) =>
+                      setValues({ ...values, title: event.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Knowledge kind
+                  <LoomSelect
+                    disabled={busy}
+                    value={values.kind}
+                    onChange={(event) =>
+                      setValues({
+                        ...values,
+                        kind: event.target.value as KnowledgeInput["kind"],
+                        dataset: "",
+                        ownerId: null,
+                      })
+                    }
+                  >
+                    <option value="routing">Routing guidance</option>
+                    <option value="procedure">Procedure</option>
+                    <option value="glossary">Glossary</option>
+                  </LoomSelect>
+                </label>
+              </div>
               <label>
-                Knowledge title
-                <input
+                Knowledge content
+                <textarea
                   required
-                  maxLength={160}
+                  rows={3}
+                  maxLength={4000}
                   disabled={busy}
-                  value={values.title}
+                  value={values.content}
                   onChange={(event) =>
-                    setValues({ ...values, title: event.target.value })
+                    setValues({ ...values, content: event.target.value })
                   }
                 />
               </label>
-              <label>
-                Knowledge kind
-                <LoomSelect
-                  disabled={busy}
-                  value={values.kind}
-                  onChange={(event) =>
-                    setValues({
-                      ...values,
-                      kind: event.target.value as KnowledgeInput["kind"],
-                      dataset: "",
-                      ownerId: null,
-                    })
-                  }
-                >
-                  <option value="routing">Routing guidance</option>
-                  <option value="procedure">Procedure</option>
-                  <option value="glossary">Glossary</option>
-                </LoomSelect>
-              </label>
-              {values.kind === "routing" && (
-                <>
+              <details className="knowledge-draft-options">
+                <summary>Dates & context</summary>
+                <div className="triage-form">
+                  {values.kind === "routing" && (
+                    <>
+                      <label>
+                        Dataset context (optional)
+                        <input
+                          maxLength={200}
+                          disabled={busy}
+                          value={values.dataset}
+                          onChange={(event) =>
+                            setValues({
+                              ...values,
+                              dataset: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Owner context (optional)
+                        <LoomSelect
+                          disabled={busy}
+                          value={values.ownerId || ""}
+                          onChange={(event) =>
+                            setValues({
+                              ...values,
+                              ownerId: event.target.value || null,
+                            })
+                          }
+                        >
+                          <option value="">Choose owner</option>
+                          {members
+                            .filter((m) =>
+                              ["owner", "operator"].includes(m.role),
+                            )
+                            .map((m) => (
+                              <option key={m.userId} value={m.userId}>
+                                {m.name}
+                              </option>
+                            ))}
+                        </LoomSelect>
+                      </label>
+                    </>
+                  )}
                   <label>
-                    Dataset context (optional)
+                    Effective from (UTC)
                     <input
-                      maxLength={200}
+                      type="date"
+                      required
                       disabled={busy}
-                      value={values.dataset}
+                      value={values.effectiveFrom}
                       onChange={(event) =>
-                        setValues({ ...values, dataset: event.target.value })
+                        setValues({
+                          ...values,
+                          effectiveFrom: event.target.value,
+                        })
                       }
                     />
                   </label>
                   <label>
-                    Owner context (optional)
-                    <LoomSelect
+                    Effective until (UTC)
+                    <input
+                      type="date"
                       disabled={busy}
-                      value={values.ownerId || ""}
+                      value={values.effectiveUntil || ""}
                       onChange={(event) =>
                         setValues({
                           ...values,
-                          ownerId: event.target.value || null,
+                          effectiveUntil: event.target.value || null,
                         })
                       }
-                    >
-                      <option value="">Choose owner</option>
-                      {members
-                        .filter((m) => ["owner", "operator"].includes(m.role))
-                        .map((m) => (
-                          <option key={m.userId} value={m.userId}>
-                            {m.name}
-                          </option>
-                        ))}
-                    </LoomSelect>
+                    />
                   </label>
-                </>
+                </div>
+              </details>
+              {values.supersedesId && (
+                <p>
+                  Replacement draft for {values.supersedesId}. The approved
+                  source stays active until this replacement is approved.
+                </p>
               )}
-              <label>
-                Effective from (UTC)
-                <input
-                  type="date"
-                  required
-                  disabled={busy}
-                  value={values.effectiveFrom}
-                  onChange={(event) =>
-                    setValues({ ...values, effectiveFrom: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Effective until (UTC)
-                <input
-                  type="date"
-                  disabled={busy}
-                  value={values.effectiveUntil || ""}
-                  onChange={(event) =>
-                    setValues({
-                      ...values,
-                      effectiveUntil: event.target.value || null,
-                    })
-                  }
-                />
-              </label>
-            </div>
-            <label>
-              Knowledge content
-              <textarea
-                required
-                rows={3}
-                maxLength={4000}
+              <button disabled={busy} type="submit">
+                Save knowledge draft
+              </button>{" "}
+              <button
+                type="button"
+                className="secondary"
                 disabled={busy}
-                value={values.content}
-                onChange={(event) =>
-                  setValues({ ...values, content: event.target.value })
-                }
-              />
-            </label>
-            {values.supersedesId && (
-              <p>
-                Replacement draft for {values.supersedesId}. The approved source
-                stays active until this replacement is approved.
-              </p>
-            )}
-            <button disabled={busy} type="submit">
-              Save knowledge draft
-            </button>{" "}
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy}
-              onClick={() => setValues(emptyKnowledge())}
-            >
-              Clear draft form
-            </button>
-          </form>
+                onClick={() => setValues(emptyKnowledge())}
+              >
+                Clear draft form
+              </button>
+            </form>
+          </details>
           <p>
             Showing the latest {knowledge.length} entries
-            {hasMore
-              ? " (more entries exist; full knowledge pagination is pending)"
-              : ""}
-            .
+            {hasMore ? " (more saved entries exist)" : ""}.
           </p>
           {knowledge.map((entry) => (
             <article key={entry.id} className="knowledge-entry">
@@ -634,6 +598,10 @@ export function TriageWorkspace({
                   className="secondary"
                   disabled={busy}
                   onClick={() => {
+                    const draftPanel =
+                      document.querySelector(".knowledge-draft");
+                    if (draftPanel instanceof HTMLDetailsElement)
+                      draftPanel.open = true;
                     setValues({
                       title: entry.title,
                       kind: entry.kind,
@@ -661,6 +629,31 @@ export function TriageWorkspace({
               ? "Agent proposals and human review"
               : "Run triage and review proposals"}
           </summary>
+          <p>
+            {externalAgent
+              ? `${externalAgentLabel} connects through MCP. Ask it to inspect selected records and submit a proposal; review its saved changes here.`
+              : configuration.configured
+                ? `OpenRouter · ${configuration.model}`
+                : configuration.message}
+          </p>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() =>
+              void work(async () => {
+                await refresh();
+                if (detail)
+                  setDetail(
+                    await api<RunDetails>(`/api/runs/${detail.run.id}`),
+                  );
+              })
+            }
+          >
+            {externalAgent
+              ? "Refresh agent proposals"
+              : "Refresh model and saved state"}
+          </button>
+
           {externalAgent && (
             <p className="banner compact">
               Your agent runs in its own client. Use its Loom tools to read the

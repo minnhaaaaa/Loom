@@ -36,8 +36,8 @@ const agentOptions: {
 }[] = [
   {
     id: "codex",
-    label: "Codex",
-    description: "Connect with your ChatGPT account.",
+    label: "ChatGPT",
+    description: "Use your plan. No API key.",
   },
   {
     id: "claude-code",
@@ -649,12 +649,8 @@ export function WorkspaceSetup({
                 <section aria-labelledby="setup-step-2">
                   <p className="eyebrow">03 / Your agent</p>
                   <h3 id="setup-step-2" tabIndex={-1}>
-                    Bring your own working partner.
+                    Choose your AI.
                   </h3>
-                  <p className="hint">
-                    Your agent can read workspace context and propose changes.
-                    Your team reviews them here before they are applied.
-                  </p>
                   <div
                     className="setup-agent-options"
                     role="group"

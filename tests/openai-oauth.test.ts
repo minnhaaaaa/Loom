@@ -168,6 +168,23 @@ it("generates independent S256 PKCE/state/nonce and only dynamically registers a
   expect(returning.searchParams.get("client_id")).toBe(clientId);
   expect(returning.searchParams.has("agent_name_hint")).toBe(false);
 });
+it("asks for plan consent only on an explicit enable action and keeps the saved registration", () => {
+  const transaction = createOpenAiTransaction(config, hostId, {
+    clientId,
+    subject: "synthetic-subject",
+  });
+  const ordinary = new URL(openAiAuthorizationUrl(metadata, transaction));
+  const enable = new URL(
+    openAiAuthorizationUrl(metadata, transaction, { requestPlanAccess: true }),
+  );
+  expect(ordinary.searchParams.has("prompt")).toBe(false);
+  expect(enable.searchParams.get("prompt")).toBe("consent");
+  expect(enable.searchParams.get("client_id")).toBe(clientId);
+  expect(enable.searchParams.get("scope")?.split(" ")).toEqual(
+    expect.arrayContaining([...OPENAI_PLAN_SCOPES]),
+  );
+  expect(enable.searchParams.has("force_reconsent")).toBe(false);
+});
 it("validates state, expiry, origin, OAuth errors and the issued client binding before exchange", () => {
   const transaction = createOpenAiTransaction(config, hostId);
   const url = new URL(

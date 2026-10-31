@@ -60,9 +60,7 @@ test("company setup previews brand colors, typography and identity without savin
     "#19161e",
   );
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
-  await setup
-    .getByRole("button", { name: /Codex Connect with your ChatGPT account/ })
-    .click();
+  await setup.getByRole("button", { name: /ChatGPT Use your plan/ }).click();
   await expect(
     setup.getByRole("button", { name: "Continue with ChatGPT", exact: true }),
   ).toBeVisible();

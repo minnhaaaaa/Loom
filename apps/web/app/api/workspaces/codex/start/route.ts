@@ -15,6 +15,7 @@ export const POST = endpoint(async (request) => {
     .object({
       clientId: z.string().max(220).optional(),
       newAccount: z.boolean().optional(),
+      requestPlanAccess: z.boolean().optional(),
     })
     .strict()
     .parse(await jsonBody(request));

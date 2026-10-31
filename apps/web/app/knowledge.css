@@ -1,0 +1,293 @@
+.app-shell .team-memory {
+  margin: 18px 0;
+}
+.app-shell .team-memory .memory-content {
+  padding: 24px;
+}
+.app-shell .memory-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin: 0 0 12px;
+  align-items: center;
+}
+.memory-search-field input {
+  margin: 0;
+}
+.app-shell .memory-search .memory-search-field {
+  grid-column: auto;
+}
+.memory-filters {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+}
+.memory-filters summary {
+  width: fit-content;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.memory-filters > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.app-shell .memory-views {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0 18px;
+  margin-bottom: 22px;
+}
+.app-shell .memory-views button.secondary {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.app-shell .memory-views button.secondary[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--soft);
+  border-color: var(--line);
+}
+.memory-sources > [role="status"] {
+  font-size: 12px;
+  color: var(--muted);
+}
+.app-shell .memory-source {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+  padding: 0;
+}
+.app-shell .memory-source summary.memory-source-top {
+  padding: 20px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  color: var(--ink);
+  list-style: none;
+}
+.memory-source-top::-webkit-details-marker {
+  display: none;
+}
+.app-shell .memory-source-top h3 {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.app-shell .memory-source-top > span {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.memory-source-content {
+  padding: 0 0 20px;
+}
+.memory-source-content .source-text {
+  margin-top: 0;
+}
+.app-shell .memory-empty {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 45px 0;
+  text-align: center;
+}
+.knowledge-graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+}
+.knowledge-graph-toolbar > .loom-select {
+  width: min(100%, 380px);
+}
+.knowledge-graph-toolbar > span,
+.knowledge-graph-pagination > span {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.knowledge-graph-canvas {
+  position: relative;
+  height: 440px;
+  margin-top: 12px;
+}
+.knowledge-graph-canvas > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.knowledge-graph-canvas path {
+  fill: none;
+  stroke: #71647f;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.knowledge-graph-focus,
+.app-shell button.knowledge-graph-node {
+  position: absolute;
+  width: 29%;
+  transform: translateY(-50%);
+  padding: 16px;
+  display: grid;
+  gap: 7px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  min-width: 0;
+}
+.knowledge-graph-focus {
+  top: 50%;
+  left: 36.5%;
+  width: 27%;
+  border-color: #b8a0d1;
+  background: #201b25;
+}
+.knowledge-graph-focus h3,
+.knowledge-graph-node strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  margin: 0;
+}
+.knowledge-graph-focus > span,
+.knowledge-graph-node .knowledge-graph-relation {
+  font-size: 10px;
+  color: #d5b9ed;
+  line-height: 1.5;
+}
+.knowledge-graph-focus small,
+.knowledge-graph-node small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.app-shell button.knowledge-graph-node:hover {
+  background: var(--soft);
+  border-color: #b8a0d1;
+}
+.knowledge-graph-empty {
+  position: absolute;
+  bottom: 65px;
+  width: 100%;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.knowledge-graph-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  align-items: center;
+  margin: 0 0 20px;
+}
+.knowledge-graph-evidence {
+  font-size: 12px;
+}
+.knowledge-graph-evidence summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+.knowledge-graph-evidence p {
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.knowledge-graph-evidence ul {
+  padding-left: 18px;
+}
+.knowledge-graph-evidence li {
+  margin: 15px 0;
+  overflow-wrap: anywhere;
+}
+.knowledge-graph-evidence small {
+  display: block;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.app-shell .knowledge-management .triage-console-body {
+  padding: 0;
+}
+.app-shell .knowledge-management {
+  border: 0;
+  margin: 0;
+}
+.knowledge-draft {
+  margin-top: 16px;
+}
+.knowledge-draft > form {
+  padding-top: 18px;
+}
+.knowledge-draft-options {
+  margin: 18px 0;
+}
+.knowledge-draft-options > .triage-form {
+  margin-top: 14px;
+}
+@media (max-width: 680px) {
+  .app-shell .team-memory .memory-content {
+    padding: 18px 14px;
+  }
+  .memory-filters > div {
+    grid-template-columns: 1fr;
+  }
+  .knowledge-graph-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .knowledge-graph-canvas {
+    height: auto;
+    display: grid;
+    gap: 16px;
+    margin: 24px 0;
+    padding-left: 18px;
+    border-left: 1px solid #71647f;
+  }
+  .knowledge-graph-canvas > svg {
+    display: none;
+  }
+  .knowledge-graph-focus,
+  .app-shell button.knowledge-graph-node {
+    position: relative;
+    width: 100%;
+    top: auto !important;
+    left: auto !important;
+    transform: none;
+    padding: 14px;
+  }
+  .knowledge-graph-focus {
+    margin-bottom: 6px;
+  }
+  .knowledge-graph-node::before {
+    content: "";
+    position: absolute;
+    width: 19px;
+    height: 1px;
+    top: 50%;
+    right: 100%;
+    background: #71647f;
+  }
+  .knowledge-graph-empty {
+    position: static;
+    text-align: left;
+    padding: 12px;
+  }
+  .knowledge-graph-focus h3,
+  .knowledge-graph-node strong {
+    -webkit-line-clamp: 2;
+  }
+  .app-shell .memory-source summary.memory-source-top {
+    gap: 10px;
+  }
+}

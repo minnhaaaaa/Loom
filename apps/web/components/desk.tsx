@@ -886,11 +886,7 @@ export function Desk({
               <>
                 <div className="page-heading">
                   <div>
-                    <h1>Flow insights</h1>
-                    <p>
-                      See where requests wait and how work moves through your
-                      team.
-                    </p>
+                    <h1>Insights</h1>
                   </div>
                 </div>
                 <AnalyticsInsights
@@ -914,11 +910,7 @@ export function Desk({
               <>
                 <div className="page-heading">
                   <div>
-                    <h1>Team knowledge</h1>
-                    <p>
-                      Approved definitions, procedures, and decisions with their
-                      sources.
-                    </p>
+                    <h1>Knowledge</h1>
                   </div>
                 </div>
                 <TeamMemory
@@ -926,7 +918,7 @@ export function Desk({
                   refreshKey={`${desk.workspace?.id}/${memberId}/${member?.role}`}
                 />
                 <details className="dashboard-settings-section">
-                  <summary>Manage knowledge and review activity</summary>
+                  <summary>Manage knowledge</summary>
                   <div className="dashboard-settings-body">
                     <TriageWorkspace
                       key={`knowledge/${desk.workspace?.id}/${memberId}`}

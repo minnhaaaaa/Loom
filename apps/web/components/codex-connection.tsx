@@ -158,7 +158,7 @@ export function CodexConnection({
     }
     welcomeRef.current?.close();
   }
-  async function connect(newAccount = false) {
+  async function connect(newAccount = false, requestPlanAccess = false) {
     setBusy(true);
     setError("");
     try {
@@ -167,13 +167,14 @@ export function CodexConnection({
         {
           method: "POST",
           headers: { "X-Loom-Workspace": workspaceId || "" },
-          body: JSON.stringify(
-            newAccount
+          body: JSON.stringify({
+            ...(newAccount
               ? { newAccount: true }
               : selectedClient
                 ? { clientId: selectedClient }
-                : {},
-          ),
+                : {}),
+            ...(requestPlanAccess ? { requestPlanAccess: true } : {}),
+          }),
         },
       );
       const url = new URL(result.authorizationUrl);
@@ -223,11 +224,8 @@ export function CodexConnection({
     connection?.message ?? (error ? "" : "Loading connection…");
   return (
     <div className="setup-agent-connect codex-connection" id="codex-connection">
-      <h4>Use your ChatGPT account</h4>
-      <p className="hint">
-        Sign in with OpenAI to authorize your ChatGPT plan for this local Loom
-        workspace. Your password stays with OpenAI.
-      </p>
+      <h4>ChatGPT plan</h4>
+      <p className="hint">Use your ChatGPT plan. No API key required.</p>
       {Boolean(connection?.accounts?.length) && (
         <label className="codex-account-picker">
           ChatGPT account
@@ -259,9 +257,20 @@ export function CodexConnection({
           data-oai-siwc-button
           data-oai-siwc-button-client={selectedClient || undefined}
           disabled={preview || busy || !connection?.configured}
-          onClick={() => void connect()}
+          onClick={() =>
+            void connect(
+              false,
+              connection?.status === "identity_verified" &&
+                selectedClient === connection.clientId,
+            )
+          }
         >
-          {busy ? "Please wait…" : "Continue with ChatGPT"}
+          {busy
+            ? "Please wait…"
+            : connection?.status === "identity_verified" &&
+                selectedClient === connection.clientId
+              ? "Enable ChatGPT plan"
+              : "Continue with ChatGPT"}
         </button>
       )}
       {Boolean(connection?.accounts?.length) && !wrongHost && (
@@ -346,9 +355,8 @@ export function CodexConnection({
             Save ChatGPT model
           </button>
           <p className="hint">
-            Eligible requests use your ChatGPT plan. This authorization belongs
-            to your account; it does not give colleagues access to your plan.
-            Loom does not silently switch to API billing.
+            Eligible requests use your personal ChatGPT plan or available
+            credits.
           </p>
           <a
             href="https://chatgpt.com/settings/usage"
@@ -357,10 +365,7 @@ export function CodexConnection({
           >
             Manage ChatGPT usage
           </a>
-          <p className="hint">
-            After choosing your model, select Save company setup to activate
-            Codex as the preferred agent.
-          </p>
+          <p className="hint">Save company setup to use this connection.</p>
         </div>
       )}
       {connection?.identity && (

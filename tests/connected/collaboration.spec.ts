@@ -334,22 +334,31 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     });
     await owner.goto("/app?view=insights");
     await expect(owner.getByRole("heading", { level: 1 })).toHaveText(
-      "Flow insights",
+      "Insights",
     );
+    await owner
+      .getByRole("button", { name: "Stage time", exact: true })
+      .click();
     await expect(
       owner.getByRole("heading", { name: "Time in each stage", exact: true }),
     ).toBeVisible();
+    await owner.getByText("About this data", { exact: true }).click();
     await expect(
-      owner.getByText("Calculated in Exasol", { exact: true }),
+      owner.getByText("Calculated in Exasol.", { exact: true }),
     ).toBeVisible();
     await selectOption(
       owner.getByRole("combobox", { name: /Reporting period/ }),
       "90",
     );
+    await owner.getByRole("button", { name: "Flow", exact: true }).click();
+    await owner.getByText("View numbers", { exact: true }).click();
     await expect(
       owner.getByRole("table", { name: /Weekly request flow/ }),
     ).toBeVisible();
     await colleague.goto("/app?view=insights");
+    await colleague
+      .getByRole("button", { name: "Stage time", exact: true })
+      .click();
     await expect(
       colleague.getByRole("heading", {
         name: "Time in each stage",

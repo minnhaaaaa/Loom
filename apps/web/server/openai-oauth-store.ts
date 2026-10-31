@@ -293,9 +293,9 @@ export async function readOpenAiConnection(
       })),
       message:
         state === "plan_enabled"
-          ? "ChatGPT plan authorized for your own requests on this computer. Model availability is checked when you use it."
+          ? "ChatGPT plan connected."
           : state === "identity_verified"
-            ? "ChatGPT identity verified, but plan usage was not authorized. Continue with ChatGPT to grant plan access."
+            ? "Signed in. Enable plan access to use ChatGPT in Loom."
             : state === "reconnect_required"
               ? "Reconnect your ChatGPT account to renew access."
               : "",
@@ -314,7 +314,11 @@ function transactionAad(row: Row) {
 export async function startOpenAiConnection(
   actor: Actor,
   sessionToken: string | undefined,
-  selection: { clientId?: string; newAccount?: boolean } = {},
+  selection: {
+    clientId?: string;
+    newAccount?: boolean;
+    requestPlanAccess?: boolean;
+  } = {},
 ) {
   const config = requireOpenAiOAuthConfig();
   if (!sessionToken || !isSessionToken(sessionToken))
@@ -396,7 +400,9 @@ export async function startOpenAiConnection(
     );
   });
   return {
-    authorizationUrl: openAiAuthorizationUrl(metadata, transaction),
+    authorizationUrl: openAiAuthorizationUrl(metadata, transaction, {
+      requestPlanAccess: selection.requestPlanAccess,
+    }),
     browserToken,
     secure: false,
   };

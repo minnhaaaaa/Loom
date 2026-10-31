@@ -743,13 +743,7 @@ export function PromptWorkspace({
       aria-label="Workspace assistant"
     >
       <header className="prompt-heading">
-        <p className="eyebrow">Your workspace, in your words</p>
         <h1>What would you like to do?</h1>
-        <p>
-          Clarify a data request, find an approved definition, or review a
-          proposed next step. Your agent uses only the workspace context you can
-          access.
-        </p>
       </header>
       {loading && (
         <p className="prompt-loading" role="status">

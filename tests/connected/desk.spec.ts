@@ -299,7 +299,7 @@ test("live OpenRouter proposal and exact-change human review in the production U
     name: "Triage and team knowledge",
   });
   await expect(workspace).toBeVisible();
-  await workspace.getByText("Team knowledge", { exact: true }).click();
+  await workspace.getByText("Add knowledge", { exact: true }).click();
   await workspace
     .getByRole("textbox", { name: "Knowledge title", exact: true })
     .fill(source);
@@ -307,6 +307,7 @@ test("live OpenRouter proposal and exact-change human review in the production U
     workspace.getByRole("combobox", { name: "Knowledge kind", exact: true }),
     "routing",
   );
+  await workspace.getByText("Dates & context", { exact: true }).click();
   await workspace
     .getByRole("textbox", { name: "Dataset context (optional)", exact: true })
     .fill(dataset);

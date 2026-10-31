@@ -131,28 +131,29 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
       .getByRole("navigation", { name: "Main", exact: true })
       .getByRole("link", { name: "Knowledge", exact: true })
       .click();
-    await page.locator("#team-memory > summary").click();
     const memory = page.locator("#team-memory");
     await memory
       .getByRole("textbox", { name: "Search team knowledge", exact: true })
       .fill(suffix);
     await expect(
-      memory.getByRole("button", { name: "Search knowledge", exact: true }),
+      memory.getByRole("button", { name: "Search", exact: true }),
     ).toBeEnabled();
-    await memory
-      .getByRole("button", { name: "Search knowledge", exact: true })
-      .click();
+    await memory.getByRole("button", { name: "Search", exact: true }).click();
     await expect(
       memory.getByRole("heading", { name: source.title, exact: true }),
     ).toBeVisible();
-    await memory
-      .getByRole("button", { name: "Connections", exact: true })
+    await memory.getByRole("button", { name: "Graph", exact: true }).click();
+    await memory.getByLabel("Explore a saved item").click();
+    await page
+      .getByRole("option", {
+        name: `Request · New joiner ${suffix}`,
+        exact: true,
+      })
       .click();
-    await expect(memory.getByLabel("Explore a saved item")).toContainText(
-      `New joiner ${suffix}`,
-    );
     await expect(
-      memory.getByText("Requested by", { exact: false }),
+      memory
+        .locator(".knowledge-graph-relation")
+        .filter({ hasText: "Requested by" }),
     ).toBeVisible();
     await memory.getByRole("button", { name: "Timeline", exact: true }).click();
     await expect(
@@ -171,9 +172,7 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
       path: "test-results-connected/onboarding-team-memory.png",
       fullPage: true,
     });
-    await page
-      .getByText("Manage knowledge and review activity", { exact: true })
-      .click();
+    await page.getByText("Manage knowledge", { exact: true }).click();
     await page.locator(".agent-run-details > summary").click();
     await expect(page.locator(".agent-run-details")).toHaveAttribute(
       "open",

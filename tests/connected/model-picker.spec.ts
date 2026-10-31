@@ -159,9 +159,7 @@ test("ChatGPT models use account choices in the same mobile dropdown", async ({
     .fill("Picker workspace");
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
-  await setup
-    .getByRole("button", { name: /Codex Connect with your ChatGPT account/ })
-    .click();
+  await setup.getByRole("button", { name: /ChatGPT Use your plan/ }).click();
   await page.getByRole("button", { name: "Got it", exact: true }).click();
   const picker = setup.getByRole("combobox", {
     name: "ChatGPT model ID",
@@ -241,4 +239,72 @@ test("request-dialog dropdowns stay above the dialog and support keyboard select
   await dialog.screenshot({
     path: "test-results-connected/request-dropdown.png",
   });
+});
+
+test("identity-only ChatGPT sign-in offers explicit plan consent without an API key", async ({
+  page,
+}) => {
+  let consentRequested = false;
+  await page.route("**/api/workspaces/codex", (route) =>
+    route.fulfill({
+      json: {
+        configured: true,
+        status: "identity_verified",
+        inferenceAvailable: false,
+        canonicalOrigin: origin,
+        clientId: "oaiapp_saved",
+        accounts: [
+          {
+            clientId: "oaiapp_saved",
+            email: "plan@example.com",
+            name: "Plan user",
+            active: true,
+          },
+        ],
+        model: null,
+        identity: {
+          email: "plan@example.com",
+          name: "Plan user",
+          verifiedAt: new Date().toISOString(),
+        },
+        message: "Signed in. Enable plan access to use ChatGPT in Loom.",
+      },
+    }),
+  );
+  await page.route("**/api/workspaces/codex/start", (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      clientId: "oaiapp_saved",
+      requestPlanAccess: true,
+    });
+    consentRequested = true;
+    return route.fulfill({
+      json: {
+        authorizationUrl:
+          "https://auth.openai.com/api/accounts/authorize?client_id=oaiapp_saved&prompt=consent",
+      },
+    });
+  });
+  await page.route("https://auth.openai.com/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<title>Simulated OAuth</title><h1>OpenAI consent</h1>",
+    }),
+  );
+  await createWorkspace(page);
+  const setup = page.locator("#company-setup");
+  if ((await setup.getAttribute("open")) === null)
+    await setup.locator(":scope > summary").click();
+  await setup.getByRole("button", { name: "Continue", exact: true }).click();
+  await setup.getByRole("button", { name: "Continue", exact: true }).click();
+  await setup.getByRole("button", { name: /ChatGPT Use your plan/ }).click();
+  await expect(
+    setup.getByText("Use your ChatGPT plan. No API key required."),
+  ).toBeVisible();
+  await setup
+    .getByRole("button", { name: "Enable ChatGPT plan", exact: true })
+    .click();
+  await expect(page).toHaveURL(
+    /https:\/\/auth.openai.com\/api\/accounts\/authorize/,
+  );
+  expect(consentRequested).toBe(true);
 });

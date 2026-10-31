@@ -293,6 +293,7 @@ export async function discoverOpenAi(
 export function openAiAuthorizationUrl(
   metadata: OpenAiMetadata,
   transaction: OpenAiTransaction,
+  options: { requestPlanAccess?: boolean } = {},
 ) {
   const url = new URL(metadata.authorizationEndpoint);
   url.search = new URLSearchParams({
@@ -306,6 +307,7 @@ export function openAiAuthorizationUrl(
     nonce: transaction.nonce,
     code_challenge: transaction.challenge,
     code_challenge_method: "S256",
+    ...(options.requestPlanAccess ? { prompt: "consent" } : {}),
     ...(transaction.clientId === "dynamic_agent_client"
       ? { agent_name_hint: "Loom" }
       : {}),
