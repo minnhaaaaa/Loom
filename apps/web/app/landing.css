@@ -1,0 +1,1129 @@
+/* Loom's public surface: a dark workshop for luminous threads of work. */
+.loom-landing {
+  --loom-night: #080e0d;
+  --loom-panel: #101a17;
+  --loom-text: #edf0e4;
+  --loom-muted: #9ba69b;
+  --loom-acid: #d0ed9b;
+  --loom-amber: #d8bb89;
+  --loom-line: #28332b;
+  background: var(--loom-night);
+  color: var(--loom-text);
+  font-family: var(--font-body), sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow: clip;
+  isolation: isolate;
+  color-scheme: dark;
+}
+.loom-landing *,
+.loom-landing *::before,
+.loom-landing *::after {
+  box-sizing: border-box;
+}
+.loom-landing :where(h1, h2, h3, p, figure) {
+  margin: 0;
+}
+.loom-landing a {
+  color: inherit;
+  text-decoration: none;
+}
+.loom-landing :focus-visible {
+  outline: 2px solid var(--loom-acid);
+  outline-offset: 6px;
+}
+.loom-landing .loom-skip {
+  position: fixed;
+  z-index: 100;
+  top: -90px;
+  left: 20px;
+  padding: 12px 18px;
+  color: var(--loom-night);
+  background: var(--loom-acid);
+}
+.loom-landing .loom-skip:focus {
+  top: 12px;
+}
+.loom-nav {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 29px 6%;
+}
+.loom-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+.loom-wordmark > svg {
+  width: 29px;
+  height: 29px;
+  color: var(--loom-acid);
+}
+.loom-wordmark-dot {
+  color: var(--loom-acid);
+}
+.loom-nav-links {
+  display: flex;
+  gap: 31px;
+  margin-left: auto;
+  align-items: center;
+  font-size: 12px;
+  color: #b7bfb2;
+}
+.loom-nav-links a {
+  display: inline-flex;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.loom-nav-links a,
+.loom-footer a,
+.loom-member-link a {
+  transition: color 160ms ease;
+}
+.loom-nav-links a:hover,
+.loom-footer a:hover,
+.loom-member-link a:hover {
+  color: var(--loom-acid);
+}
+.loom-landing .loom-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  min-height: 54px;
+  padding: 14px 23px;
+  background: var(--loom-acid);
+  border: 1px solid var(--loom-acid);
+  border-radius: 6px;
+  color: #172018;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  white-space: nowrap;
+}
+.loom-landing .loom-button:hover {
+  background: #e0f6bb;
+  box-shadow: 0 0 26px #bce76615;
+  transform: translateY(-2px);
+}
+.loom-landing .loom-button svg,
+.loom-text-link svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+.loom-landing .loom-button-small {
+  min-height: 40px;
+  font-size: 11px;
+  padding: 10px 15px;
+  gap: 17px;
+}
+.loom-hero {
+  position: relative;
+  min-height: 755px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 129px 6% 120px;
+}
+.loom-hero::before {
+  content: "";
+  position: absolute;
+  inset: 15% -15% -15% 30%;
+  background: radial-gradient(ellipse at center, #b0d88807, transparent 60%);
+  pointer-events: none;
+}
+.loom-hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 600px;
+  pointer-events: none;
+}
+.loom-hero-copy a {
+  pointer-events: auto;
+}
+.loom-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--loom-acid);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  text-transform: uppercase;
+  letter-spacing: 1.8px;
+}
+.loom-signal {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--loom-acid);
+  box-shadow: 0 0 12px #c6eb8b70;
+}
+.loom-hero h1 {
+  margin-top: 27px;
+  font-family: var(--font-body), sans-serif;
+  font-size: clamp(61px, 6.35vw, 91px);
+  font-weight: 570;
+  line-height: 1.04;
+  letter-spacing: -5.9px;
+}
+.loom-hero h1 > span {
+  color: var(--loom-acid);
+}
+.loom-hero-description {
+  max-width: 365px;
+  margin-top: 27px;
+  color: #a6b0a4;
+  font-size: 15px;
+  line-height: 1.85;
+}
+.loom-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  margin-top: 35px;
+}
+.loom-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #cad1c3 !important;
+}
+.loom-text-link:hover {
+  color: var(--loom-acid) !important;
+}
+.loom-hero-note {
+  margin-top: 17px;
+  color: #778375;
+  font-size: 10px;
+}
+.loom-hero-art {
+  position: absolute;
+  z-index: 1;
+  width: 69%;
+  height: 650px;
+  right: -11%;
+  top: -3px;
+  pointer-events: auto;
+}
+.loom-sculpture {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+.loom-sculpture-stage {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 900ms ease;
+  mask-image: radial-gradient(
+    ellipse 57% 49% at 51% 50%,
+    #000 48%,
+    transparent 100%
+  );
+}
+.loom-sculpture-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.loom-sculpture-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+  transition: opacity 700ms ease;
+  filter: drop-shadow(0 0 4px #bdde7e25);
+}
+.loom-sculpture.is-ready .loom-sculpture-stage {
+  opacity: 1;
+}
+.loom-sculpture.is-ready .loom-sculpture-fallback {
+  opacity: 0;
+  pointer-events: none;
+}
+.loom-sculpture-caption {
+  position: absolute;
+  left: 36%;
+  bottom: 61px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #a6b49d;
+  font:
+    9px var(--font-mono),
+    monospace;
+  letter-spacing: 0.5px;
+}
+.loom-landing .loom-motion-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  bottom: 53px;
+  right: 21%;
+  width: 29px;
+  height: 29px;
+  min-height: 29px;
+  padding: 5px;
+  border: 1px solid #34422f;
+  border-radius: 50%;
+  background: transparent;
+  color: #a1b192;
+}
+.loom-landing .loom-motion-control:hover {
+  background: #192316;
+  border-color: #859b6b;
+}
+.loom-motion-control svg {
+  width: 16px;
+  height: 16px;
+}
+.loom-hero-bottom {
+  position: absolute;
+  inset: auto 6% 34px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--loom-line);
+  padding-top: 24px;
+  font:
+    9px var(--font-mono),
+    monospace;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #788573;
+}
+.loom-hero-bottom a {
+  color: #b2beaa;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.loom-hero-bottom a span {
+  font-size: 17px;
+}
+.loom-purpose {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 50px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 74px 6% 90px;
+}
+.loom-purpose > p {
+  font-size: 22px;
+  line-height: 1.6;
+  letter-spacing: -0.7px;
+  font-weight: 500;
+}
+.loom-purpose > p > span {
+  color: #889580;
+}
+.loom-purpose-details {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  color: #aebaa5;
+  font-size: 10px;
+}
+.loom-purpose-details > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.loom-purpose-details > span::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  background: #718b55;
+  border-radius: 50%;
+}
+.loom-workflow {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 53px 6% 105px;
+  border-top: 1px solid #17211a;
+}
+.loom-section-intro {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 20px 70px;
+  align-items: end;
+}
+.loom-section-intro .loom-eyebrow {
+  grid-column: 1 / -1;
+}
+.loom-landing h2 {
+  font-size: clamp(35px, 3.6vw, 49px);
+  font-family: var(--font-body), sans-serif;
+  font-weight: 500;
+  line-height: 1.17;
+  letter-spacing: -2px;
+}
+.loom-section-intro > p:last-child {
+  max-width: 320px;
+  padding-bottom: 5px;
+  color: var(--loom-muted);
+  font-size: 13px;
+  line-height: 1.85;
+}
+.loom-workflow-body {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 80px;
+  margin-top: 55px;
+  align-items: center;
+}
+.loom-process-list article {
+  display: flex;
+  gap: 23px;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--loom-line);
+}
+.loom-process-list article:first-child {
+  padding-top: 0;
+}
+.loom-process-list article:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.loom-step {
+  margin-top: 4px;
+  color: #7e956b;
+  font:
+    10px var(--font-mono),
+    monospace;
+}
+.loom-process-list h3 {
+  font-size: 17px;
+  font-weight: 550;
+  letter-spacing: -0.3px;
+}
+.loom-process-list p {
+  color: var(--loom-muted);
+  font-size: 12px;
+  line-height: 1.85;
+  margin-top: 9px;
+  max-width: 365px;
+}
+.loom-request-example {
+  background: linear-gradient(145deg, #15211b, #101813);
+  border: 1px solid #33412f;
+  border-radius: 10px;
+  padding: 25px;
+  box-shadow: 0 20px 80px #0003;
+}
+.loom-example-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #adbba2;
+  font:
+    9px var(--font-mono),
+    monospace;
+}
+.loom-sample-label {
+  color: #91a282;
+  font-size: 8px;
+}
+.loom-request-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 35px;
+}
+.loom-request-id {
+  color: #829776;
+  font:
+    9px var(--font-mono),
+    monospace;
+}
+.loom-status-amber {
+  color: var(--loom-amber);
+  background: #d8bb8910;
+  border: 1px solid #d8bb8933;
+  border-radius: 4px;
+  font-size: 8px;
+  padding: 3px 7px;
+}
+.loom-request-example > h3 {
+  margin-top: 14px;
+  max-width: 280px;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.5px;
+}
+.loom-request-quote {
+  color: #86997a;
+  font-size: 11px;
+  margin-top: 8px;
+}
+.loom-guidance {
+  display: flex;
+  gap: 12px;
+  margin-top: 26px;
+  padding: 15px;
+  border: 1px solid #a8ca7333;
+  border-radius: 5px;
+  background: #a8ca7307;
+}
+.loom-guidance-symbol {
+  font-size: 23px;
+  color: var(--loom-acid);
+  line-height: 1;
+}
+.loom-guidance strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+.loom-guidance p {
+  margin-top: 5px;
+  font-size: 11px;
+  color: #a3b397;
+  line-height: 1.75;
+}
+.loom-source {
+  display: block;
+  margin-top: 11px;
+  color: #9baf89;
+  font:
+    8px var(--font-mono),
+    monospace;
+}
+.loom-proposal-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 18px 0;
+  margin-top: 3px;
+  color: #859a79;
+  font-size: 9px;
+}
+.loom-proposal-line strong {
+  color: #c1d2b1;
+  font-weight: 500;
+}
+.loom-human-review {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  border-top: 1px solid #33412f;
+  padding-top: 17px;
+  font-size: 9px;
+  color: #a6b99a;
+}
+.loom-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 23px;
+  height: 23px;
+  border: 1px solid #5a7250;
+  border-radius: 50%;
+  color: #d2e5bd;
+  background: #293a22;
+  font-size: 8px;
+}
+.loom-human-review > svg {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  color: var(--loom-acid);
+}
+.loom-insights-section {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 80px;
+  align-items: center;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 95px 6% 110px;
+  border-top: 1px solid #17211a;
+}
+.loom-insight-visual {
+  padding: 29px;
+  border: 1px solid #2b3928;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 100% 100%, #a6c28407, transparent 60%), #0c1510;
+}
+.loom-chart-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 43px;
+}
+.loom-chart-caption strong {
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+}
+.loom-chart-caption span {
+  font-size: 9px;
+  color: #7f9373;
+}
+.loom-time-chart {
+  margin-top: 30px;
+}
+.loom-time-chart > div {
+  display: grid;
+  grid-template-columns: 105px 1fr 28px;
+  gap: 12px;
+  align-items: center;
+  margin: 20px 0;
+  font-size: 9px;
+  color: #a2b297;
+}
+.loom-time-chart strong {
+  color: #d3dfc5;
+  font:
+    10px var(--font-mono),
+    monospace;
+  text-align: right;
+}
+.loom-bar-track {
+  height: 23px;
+  border-left: 1px solid #566b44;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(25% - 1px),
+    #24321f 25%
+  );
+}
+.loom-bar {
+  display: block;
+  height: 100%;
+  border-radius: 0 2px 2px 0;
+}
+.loom-bar-context {
+  width: 90%;
+  background: #c8a979;
+}
+.loom-bar-ready {
+  width: 45%;
+  background: #92ad75;
+}
+.loom-bar-progress {
+  width: 30%;
+  background: #c9e7a1;
+}
+.loom-chart-footnote {
+  margin-top: 34px;
+  padding-top: 21px;
+  border-top: 1px solid #263420;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a4b493;
+  font-size: 9px;
+}
+.loom-insights-copy .loom-eyebrow {
+  letter-spacing: 1.25px;
+  font-size: 9px;
+}
+.loom-insights-copy h2 {
+  margin-top: 19px;
+}
+.loom-insights-copy h2 > span {
+  color: #a3b794;
+}
+.loom-insights-copy > p:not(.loom-eyebrow):not(.loom-insights-note) {
+  margin-top: 21px;
+  max-width: 340px;
+  color: var(--loom-muted);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.loom-insights-copy ul {
+  padding: 0;
+  margin: 24px 0;
+  list-style: none;
+  font-size: 11px;
+  color: #bfccb3;
+}
+.loom-insights-copy li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 10px 0;
+}
+.loom-insights-copy li::before {
+  content: "↗";
+  color: #91aa76;
+}
+.loom-insights-note {
+  max-width: 320px;
+  color: #829475;
+  font-size: 9px;
+  line-height: 1.75;
+}
+.loom-company-section {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 80px;
+  max-width: 1268px;
+  margin: 0 auto 80px;
+  padding: 60px 50px;
+  border: 1px solid #35432b;
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse at 0 0, #819d4e0f, transparent 70%), #10180f;
+}
+.loom-company-section h2 {
+  margin-top: 19px;
+  font-size: clamp(30px, 3.2vw, 43px);
+}
+.loom-company-copy > p:first-child {
+  color: #a6b49a;
+  font-size: 12px;
+  line-height: 1.8;
+  max-width: 330px;
+}
+.loom-role-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 19px 0 25px;
+  color: #c0ceb3;
+  font-size: 11px;
+}
+.loom-member-link {
+  margin-top: 14px;
+  color: #7f9272;
+  font-size: 10px;
+}
+.loom-member-link a {
+  color: #b6c7a5;
+  margin-left: 5px;
+}
+.loom-footer {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 32px 6% 41px;
+  max-width: 1440px;
+  margin: 0 auto;
+  border-top: 1px solid #25311f;
+}
+.loom-footer .loom-wordmark {
+  font-size: 27px;
+}
+.loom-footer .loom-wordmark svg {
+  width: 23px;
+  height: 23px;
+}
+.loom-footer > p {
+  color: #829375;
+  font-size: 10px;
+}
+.loom-footer > div {
+  margin-left: auto;
+  display: flex;
+  gap: 25px;
+  color: #a1b292;
+  font-size: 10px;
+}
+@media (min-width: 1441px) {
+  .loom-hero-art {
+    right: -6%;
+    width: 66%;
+  }
+}
+@media (max-width: 1160px) {
+  .loom-nav,
+  .loom-hero,
+  .loom-purpose,
+  .loom-workflow,
+  .loom-insights-section,
+  .loom-footer {
+    padding-left: 5%;
+    padding-right: 5%;
+  }
+  .loom-hero {
+    min-height: 700px;
+    padding-top: 125px;
+  }
+  .loom-hero h1 {
+    font-size: 69px;
+    letter-spacing: -4.7px;
+  }
+  .loom-hero-art {
+    right: -15%;
+    width: 75%;
+    top: -12px;
+  }
+  .loom-hero-actions {
+    gap: 19px;
+    flex-wrap: wrap;
+    max-width: 340px;
+  }
+  .loom-hero-bottom {
+    left: 5%;
+    right: 5%;
+  }
+  .loom-purpose {
+    gap: 25px;
+  }
+  .loom-purpose-details {
+    gap: 16px;
+    flex-wrap: wrap;
+    max-width: 340px;
+  }
+  .loom-workflow-body,
+  .loom-insights-section {
+    gap: 45px;
+  }
+  .loom-company-section {
+    margin-left: 5%;
+    margin-right: 5%;
+    gap: 45px;
+    padding: 45px 35px;
+  }
+}
+@media (max-width: 850px) {
+  .loom-nav {
+    padding-top: 24px;
+    gap: 20px;
+  }
+  .loom-nav-links {
+    gap: 23px;
+  }
+  .loom-nav-links > a:not(:last-child) {
+    display: none;
+  }
+  .loom-hero {
+    min-height: 960px;
+    padding-top: 65px;
+  }
+  .loom-hero-copy {
+    max-width: 610px;
+  }
+  .loom-hero h1 {
+    font-size: clamp(61px, 10vw, 80px);
+  }
+  .loom-hero-description {
+    max-width: 390px;
+    font-size: 14px;
+  }
+  .loom-hero-actions {
+    max-width: none;
+    gap: 25px;
+  }
+  .loom-hero-art {
+    top: 340px;
+    right: -9%;
+    width: 110%;
+    height: 550px;
+  }
+  .loom-sculpture-caption {
+    bottom: 38px;
+    left: 27%;
+  }
+  .loom-landing .loom-motion-control {
+    bottom: 31px;
+    right: 20%;
+  }
+  .loom-purpose {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 25px;
+    padding-top: 45px;
+    padding-bottom: 60px;
+  }
+  .loom-purpose-details {
+    max-width: none;
+  }
+  .loom-section-intro {
+    gap: 18px 40px;
+  }
+  .loom-workflow-body {
+    grid-template-columns: 1fr;
+    gap: 45px;
+  }
+  .loom-process-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+  }
+  .loom-process-list article {
+    flex-direction: column;
+    padding: 0 0 20px;
+    gap: 12px;
+    border-bottom: 0;
+  }
+  .loom-process-list h3 {
+    font-size: 15px;
+  }
+  .loom-process-list p {
+    font-size: 11px;
+  }
+  .loom-request-example {
+    max-width: 520px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .loom-insights-section {
+    grid-template-columns: 1fr;
+    padding-top: 65px;
+    padding-bottom: 65px;
+  }
+  .loom-insights-copy {
+    grid-row: 1;
+  }
+  .loom-insights-copy > p:not(.loom-eyebrow):not(.loom-insights-note) {
+    max-width: 520px;
+  }
+  .loom-insight-visual {
+    max-width: 520px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .loom-company-section {
+    gap: 30px;
+    grid-template-columns: 1fr;
+  }
+  .loom-company-copy > p:first-child {
+    max-width: 500px;
+  }
+}
+@media (max-width: 520px) {
+  .loom-nav {
+    padding: 24px 6%;
+    gap: 16px;
+  }
+  .loom-wordmark {
+    font-size: 29px;
+    gap: 8px;
+  }
+  .loom-wordmark > svg {
+    width: 25px;
+    height: 25px;
+  }
+  .loom-nav > .loom-button-small {
+    font-size: 10px;
+    gap: 10px;
+    padding: 9px 11px;
+    min-height: 36px;
+  }
+  .loom-nav > .loom-button-small > svg {
+    display: none;
+  }
+  .loom-nav-links {
+    font-size: 10px;
+  }
+  .loom-hero {
+    padding: 49px 6% 100px;
+    min-height: 855px;
+  }
+  .loom-hero h1 {
+    font-size: clamp(49px, 12.5vw, 64px);
+    letter-spacing: -3.6px;
+    margin-top: 24px;
+  }
+  .loom-eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.3px;
+  }
+  .loom-hero-description {
+    max-width: 310px;
+    font-size: 12px;
+    margin-top: 22px;
+  }
+  .loom-hero-actions {
+    gap: 21px;
+    margin-top: 26px;
+  }
+  .loom-hero-actions > .loom-button {
+    min-height: 48px;
+    font-size: 11px;
+    padding: 12px 17px;
+    gap: 19px;
+  }
+  .loom-text-link {
+    font-size: 10px;
+  }
+  .loom-hero-note {
+    max-width: 300px;
+    font-size: 9px;
+  }
+  .loom-hero-art {
+    top: 385px;
+    right: -21%;
+    width: 141%;
+    height: 380px;
+  }
+  .loom-sculpture-caption {
+    bottom: 16px;
+    left: 25%;
+    font-size: 8px;
+  }
+  .loom-landing .loom-motion-control {
+    bottom: 8px;
+    right: 24%;
+  }
+  .loom-hero-bottom {
+    left: 6%;
+    right: 6%;
+    bottom: 23px;
+    padding-top: 18px;
+    font-size: 7px;
+    letter-spacing: 0.35px;
+    gap: 20px;
+  }
+  .loom-hero-bottom > span {
+    max-width: 145px;
+    line-height: 1.7;
+  }
+  .loom-hero-bottom a {
+    gap: 13px;
+  }
+  .loom-purpose,
+  .loom-workflow,
+  .loom-insights-section {
+    padding-left: 6%;
+    padding-right: 6%;
+  }
+  .loom-purpose > p {
+    font-size: 17px;
+    letter-spacing: -0.4px;
+  }
+  .loom-purpose-details {
+    gap: 10px 16px;
+    font-size: 8px;
+  }
+  .loom-purpose-details > span {
+    gap: 6px;
+  }
+  .loom-section-intro {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .loom-landing h2 {
+    font-size: 35px;
+    letter-spacing: -1.6px;
+  }
+  .loom-section-intro > p:last-child {
+    max-width: 300px;
+    font-size: 12px;
+  }
+  .loom-workflow {
+    padding-top: 45px;
+    padding-bottom: 65px;
+  }
+  .loom-workflow-body {
+    margin-top: 38px;
+    gap: 34px;
+  }
+  .loom-process-list {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .loom-process-list article {
+    flex-direction: row;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--loom-line);
+    gap: 17px;
+  }
+  .loom-process-list p {
+    font-size: 11px;
+  }
+  .loom-request-example {
+    padding: 20px;
+  }
+  .loom-example-topline {
+    font-size: 8px;
+  }
+  .loom-sample-label {
+    font-size: 7px;
+  }
+  .loom-request-heading {
+    margin-top: 25px;
+  }
+  .loom-request-example > h3 {
+    font-size: 19px;
+  }
+  .loom-request-quote {
+    font-size: 10px;
+  }
+  .loom-guidance {
+    padding: 13px;
+  }
+  .loom-insight-visual {
+    padding: 23px 20px;
+  }
+  .loom-chart-caption {
+    margin-top: 29px;
+  }
+  .loom-chart-caption strong {
+    font-size: 16px;
+  }
+  .loom-time-chart > div {
+    grid-template-columns: 90px 1fr 25px;
+    font-size: 8px;
+    gap: 9px;
+  }
+  .loom-company-section {
+    margin: 0 6% 55px;
+    padding: 30px 24px;
+  }
+  .loom-company-section h2 {
+    font-size: 30px;
+  }
+  .loom-footer {
+    gap: 22px;
+    flex-wrap: wrap;
+    padding: 27px 6% 30px;
+  }
+  .loom-footer > p {
+    font-size: 9px;
+  }
+  .loom-footer > div {
+    margin-left: 0;
+    width: 100%;
+    font-size: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loom-landing *,
+  .loom-landing *::before,
+  .loom-landing *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .loom-landing .loom-motion-control {
+    display: none;
+  }
+  .loom-landing .loom-button:hover {
+    transform: none;
+  }
+}
