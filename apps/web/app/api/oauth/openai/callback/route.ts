@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { DomainError } from "@loom/domain";
-import { assertOpenAiLocalRequest } from "@/server/openai-oauth";
+import { openAiLocalRequestUrl } from "@/server/openai-oauth";
 import { completeOpenAiConnection } from "@/server/openai-oauth-store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,9 +28,8 @@ export async function GET(request: Request) {
     message =
       "ChatGPT sign-in could not be verified. Return to Loom and start a new attempt.";
   try {
-    assertOpenAiLocalRequest(request);
     const permitted = await completeOpenAiConnection(
-      new URL(request.url),
+      openAiLocalRequestUrl(request),
       browserToken,
     );
     success = true;

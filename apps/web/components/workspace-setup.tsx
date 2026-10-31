@@ -481,9 +481,6 @@ export function WorkspaceSetup({
                   <h3 id="setup-step-0" tabIndex={-1}>
                     Put your name on it.
                   </h3>
-                  <p className="hint">
-                    This identity appears across your team’s workspace.
-                  </p>
                   <label>
                     Company name
                     <input
@@ -505,10 +502,6 @@ export function WorkspaceSetup({
                       onChange={(event) => void uploadLogo(event)}
                     />
                   </label>
-                  <p className="hint">
-                    PNG, JPEG, or WebP · up to 2 MB. Your logo is resized and
-                    saved with this workspace.
-                  </p>
                   {draft.logoDataUrl && (
                     <button
                       className="quiet"
@@ -522,13 +515,6 @@ export function WorkspaceSetup({
                       Remove company logo
                     </button>
                   )}
-                  <div className="setup-callout">
-                    <strong>One identity for your team.</strong>
-                    <p>
-                      Saved branding follows the workspace when colleagues sign
-                      in. Your other workspaces keep their own look.
-                    </p>
-                  </div>
                 </section>
               )}
               {step === 1 && (
@@ -1013,13 +999,13 @@ export function WorkspaceSetup({
             </div>
           </div>
           <div className="setup-footer">
-            <span>
-              {preview
-                ? "Unsaved sample exploration"
-                : dirty
-                  ? "Your preview has unsaved changes"
+            {(preview || !dirty) && (
+              <span>
+                {preview
+                  ? "Unsaved sample exploration"
                   : `Saved settings · version ${base.version}`}
-            </span>
+              </span>
+            )}
             <div>
               {step > 0 && (
                 <button

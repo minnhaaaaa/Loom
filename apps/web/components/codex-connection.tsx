@@ -181,6 +181,8 @@ export function CodexConnection({
     connection?.canonicalOrigin &&
     typeof window !== "undefined" &&
     window.location.origin !== connection.canonicalOrigin;
+  const statusMessage =
+    connection?.message ?? (error ? "" : "Loading connection…");
   return (
     <div className="setup-agent-connect codex-connection" id="codex-connection">
       <h4>Use your ChatGPT account</h4>
@@ -238,11 +240,11 @@ export function CodexConnection({
         <p className="hint">
           Live account connections are disabled in the test preview.
         </p>
-      ) : (
+      ) : statusMessage ? (
         <p className="hint" role="status">
-          {connection?.message || (error ? "" : "Loading connection…")}
+          {statusMessage}
         </p>
-      )}
+      ) : null}
       {connection?.identity && (
         <p className="hint">
           {connection.identity.email ||

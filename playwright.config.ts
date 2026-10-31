@@ -21,6 +21,9 @@ export default defineConfig({
       LOOM_AUTH_MODE: "local-demo",
       LOOM_ALLOW_DEMO_PRODUCTION: "true",
       LOOM_SESSION_SECRET: "public-test-only-session-key-do-not-deploy",
+      // Exercise the local OAuth request boundary without credentials or Exasol.
+      LOOM_OPENAI_LOCAL_ENABLED: "true",
+      LOOM_PROVIDER_ENCRYPTION_KEY: "0123456789abcdef".repeat(4),
       EXASOL_HOST: "",
       EXASOL_USER: "",
       EXASOL_PASSWORD: "",

@@ -11,6 +11,7 @@ import {
   hasOpenAiPlanScope,
   openAiAuthorizationUrl,
   openAiOAuthConfig,
+  openAiLocalRequestUrl,
   parseOpenAiTokens,
   refreshOpenAiTokens,
   validateOpenAiCallback,
@@ -85,8 +86,59 @@ it("requires explicit local enablement, canonical 127.0.0.1 and encrypted storag
       new Request("http://localhost:3000/api/workspaces/codex/start"),
     ),
   ).toThrow();
-  expect(assertOpenAiLocalRequest(new Request(config.origin))).toEqual(config);
+  expect(
+    assertOpenAiLocalRequest(
+      new Request(config.origin, {
+        headers: { host: new URL(config.origin).host },
+      }),
+    ),
+  ).toEqual(config);
 });
+it("uses the actual canonical Host when Next normalizes its request URL, including callbacks", () => {
+  vi.stubEnv("LOOM_OPENAI_LOCAL_ENABLED", "true");
+  vi.stubEnv("APP_ORIGIN", config.origin);
+  vi.stubEnv("LOOM_PROVIDER_ENCRYPTION_KEY", "a".repeat(64));
+  const transaction = createOpenAiTransaction(config, hostId);
+  const request = new Request(
+    `http://localhost:3000/api/oauth/openai/callback?code=fixture&state=${transaction.state}&client_id=${clientId}`,
+    { headers: { host: "127.0.0.1:3000" } },
+  );
+  expect(assertOpenAiLocalRequest(request)).toEqual(config);
+  const restored = openAiLocalRequestUrl(request);
+  expect(restored.origin).toBe(config.origin);
+  expect(restored.search).toBe(new URL(request.url).search);
+  expect(validateOpenAiCallback(restored, transaction, config)).toEqual({
+    code: "fixture",
+    clientId,
+  });
+  restored.pathname = "/another-callback";
+  expect(() => validateOpenAiCallback(restored, transaction, config)).toThrow();
+});
+it.each([
+  "localhost:3000",
+  "127.0.0.1:4000",
+  "example.com",
+  "127.0.0.1:3000, example.com",
+  "",
+])(
+  "rejects noncanonical Host %j even with canonical-looking URL and forwarded headers",
+  (host) => {
+    vi.stubEnv("LOOM_OPENAI_LOCAL_ENABLED", "true");
+    vi.stubEnv("APP_ORIGIN", config.origin);
+    vi.stubEnv("LOOM_PROVIDER_ENCRYPTION_KEY", "a".repeat(64));
+    expect(() =>
+      openAiLocalRequestUrl(
+        new Request(config.redirectUri, {
+          headers: {
+            host,
+            "x-forwarded-host": "127.0.0.1:3000",
+            "x-forwarded-proto": "http",
+          },
+        }),
+      ),
+    ).toThrow(expect.objectContaining({ code: "OPENAI_CANONICAL_ORIGIN" }));
+  },
+);
 it("generates independent S256 PKCE/state/nonce and only dynamically registers a new client", () => {
   const first = createOpenAiTransaction(config, hostId),
     second = createOpenAiTransaction(config, hostId);

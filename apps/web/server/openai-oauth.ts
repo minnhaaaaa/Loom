@@ -90,13 +90,30 @@ export function requireOpenAiOAuthConfig() {
 }
 export function assertOpenAiLocalRequest(request: Request) {
   const config = requireOpenAiOAuthConfig();
-  if (new URL(request.url).origin !== config.origin)
+  const canonical = new URL(config.origin);
+  const incoming = new URL(request.url);
+  // NextRequest rewrites loopback URL hostnames to localhost. The actual Host
+  // header retains the browser's address; forwarded headers are not authority.
+  if (
+    request.headers.get("host") !== canonical.host ||
+    incoming.protocol !== canonical.protocol ||
+    incoming.port !== canonical.port ||
+    ![canonical.hostname, "localhost"].includes(incoming.hostname)
+  )
     throw new DomainError(
       "OPENAI_CANONICAL_ORIGIN",
       "Open Loom at its 127.0.0.1 address and sign in there before connecting ChatGPT.",
       409,
     );
   return config;
+}
+export function openAiLocalRequestUrl(request: Request): URL {
+  const config = assertOpenAiLocalRequest(request);
+  const url = new URL(request.url);
+  // Restore only the verified host. Preserve the callback path and query so
+  // the existing exact-path, state, issued-client and one-use checks still run.
+  url.host = new URL(config.origin).host;
+  return url;
 }
 export function hasOpenAiPlanScope(scopes: readonly string[]) {
   return OPENAI_PLAN_SCOPES.every((scope) => scopes.includes(scope));

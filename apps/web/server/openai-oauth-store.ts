@@ -298,7 +298,7 @@ export async function readOpenAiConnection(
             ? "ChatGPT identity verified, but plan usage was not authorized. Continue with ChatGPT to grant plan access."
             : state === "reconnect_required"
               ? "Reconnect your ChatGPT account to renew access."
-              : "Connect your ChatGPT account locally. Only your own Loom requests can use your plan.",
+              : "",
     };
   });
 }
