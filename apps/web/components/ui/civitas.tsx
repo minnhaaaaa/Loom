@@ -22,19 +22,6 @@ export function CompanyMark({
       className={`company-wordmark${compact ? " company-wordmark-compact" : ""}`}
       translate="no"
     >
-      {branding.logoDataUrl ? (
-        // Uploaded logos are validated, bounded raster data URLs; no remote fetch.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          className="company-logo"
-          src={branding.logoDataUrl}
-          alt={`${name} logo`}
-        />
-      ) : (
-        <span className="company-seal" aria-hidden="true">
-          {Array.from(name)[0].toUpperCase()}
-        </span>
-      )}
       <span>{name}</span>
     </span>
   );
@@ -51,9 +38,6 @@ export function Arrow() {
 export function LoomMark() {
   return (
     <span className="civitas-wordmark" translate="no">
-      <span className="civitas-seal" aria-hidden="true">
-        L
-      </span>
       <span>Loom</span>
     </span>
   );
@@ -88,11 +72,6 @@ export function ConsoleChrome({
 }) {
   return (
     <div className="civitas-console-chrome">
-      <span className="civitas-console-lights" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </span>
       <span>{label}</span>
       {status != null && <span>{status}</span>}
     </div>

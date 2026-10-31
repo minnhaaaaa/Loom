@@ -201,7 +201,7 @@ function ProposalCard({
               disabled={busy}
               onClick={() => onEvidence(source.id)}
             >
-              {source.title} <span>v{source.version} ↗</span>
+              {source.title} <span>v{source.version}</span>
             </button>
           ))}
         </div>
@@ -642,9 +642,6 @@ export function PromptWorkspace({
         }
       >
         <div className="prompt-message-heading">
-          <span className="prompt-message-mark" aria-hidden="true">
-            {message.role === "user" ? "↗" : "✳"}
-          </span>
           <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
           <time dateTime={message.createdAt}>
             {relativeTime(message.createdAt)}
@@ -659,7 +656,6 @@ export function PromptWorkspace({
         )}
         {message.state === "pending" && (
           <p className="prompt-waiting" role="status">
-            <span aria-hidden="true" />
             Request saved. Waiting for a response.
           </p>
         )}
@@ -675,7 +671,7 @@ export function PromptWorkspace({
                 onClick={() => void showEvidence(source.id)}
               >
                 {source.title}
-                <span>v{source.version} ↗</span>
+                <span>v{source.version}</span>
               </button>
             ))}
           </div>
@@ -835,16 +831,12 @@ export function PromptWorkspace({
           }}
         />
         <div className="prompt-composer-footer">
-          <span>
-            <span className="prompt-context-dot" aria-hidden="true" />
-            {preview ? "Sample workspace" : agentName}
-          </span>
+          <span>{preview ? "Sample workspace" : agentName}</span>
           <button
             type="submit"
             disabled={!available || Boolean(busy) || !prompt.trim()}
           >
             {busy === "sending" ? "Sending…" : "Send"}
-            <span aria-hidden="true">↑</span>
           </button>
         </div>
       </form>
@@ -861,7 +853,7 @@ export function PromptWorkspace({
           snapshot &&
           !snapshot.configuration.configured && (
             <Link href="/app?view=settings#company-setup">
-              Set up your agent ↗
+              Set up your agent
             </Link>
           )}
       </div>

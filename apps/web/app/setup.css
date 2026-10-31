@@ -58,18 +58,7 @@
 .setup-entry::-webkit-details-marker {
   display: none;
 }
-.setup-entry-mark {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  background: var(--brand-primary);
-  color: var(--brand-on-primary);
-  border-radius: var(--brand-control-radius);
-  font-size: 22px;
-}
-.setup-entry > span:nth-child(2) {
+.setup-entry-copy {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -77,7 +66,7 @@
 .setup-entry strong {
   font-size: 13px;
 }
-.setup-entry > span:nth-child(2) > span {
+.setup-entry-copy > span {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.7;
@@ -254,16 +243,12 @@
 }
 .setup-agent-options button {
   display: grid;
-  grid-template-columns: 25px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 7px;
   border-radius: var(--brand-panel-radius);
   padding: 17px 14px;
   text-align: left;
-}
-.setup-agent-options button > span {
-  font-size: 23px;
-  grid-row: span 2;
 }
 .setup-agent-options strong {
   font-size: 12px;
@@ -483,9 +468,6 @@
   border-radius: var(--brand-control-radius);
   background: var(--surface);
 }
-.setup-preview-check {
-  color: var(--brand-link);
-}
 .setup-preview-record strong {
   display: block;
   font-size: 8px;
@@ -546,7 +528,7 @@
     gap: 11px;
   }
   .setup-entry-status {
-    margin-left: 47px;
+    margin-left: 0;
     flex-basis: 100%;
   }
   .setup-body {

@@ -11,7 +11,9 @@ import { ProviderSettings } from "./provider-settings";
 import { workspaceFetch } from "./workspace-fetch";
 import { WorkspaceSetup } from "./workspace-setup";
 import { ToolFields, ToolTable, ToolSummary } from "./tool-renderer";
-import { Arrow, CompanyMark } from "./ui/civitas";
+import { Button } from "@cloudflare/kumo/components/button";
+import { Input } from "@cloudflare/kumo/components/input";
+import { Badge } from "@cloudflare/kumo/components/badge";
 import { brandTheme } from "@loom/domain";
 import {
   useCallback,
@@ -95,10 +97,9 @@ function StatusBadge({
   labels?: typeof statusLabels;
 }) {
   return (
-    <span className={`status status-${status}`}>
-      <span aria-hidden="true" />
+    <Badge variant="secondary" className={`status status-${status}`}>
       {labels[status]}
-    </span>
+    </Badge>
   );
 }
 const emptyIntake: Intake = {
@@ -683,37 +684,22 @@ export function Desk({
           href="/"
           aria-label={`${branding.companyName || "Loom"} home`}
         >
-          <CompanyMark branding={branding} />
+          {branding.companyName || desk.workspace?.name || "Loom"}
         </Link>
-        <span className="brand-caption">
-          {branding.companyName
-            ? "Your workspace, powered by Loom"
-            : "Less chasing. More analysis."}
-        </span>
-        <p className="workspace-label">
-          {desk.workspace?.name || "Analytics workspace"}
-        </p>
         <nav aria-label="Main">
-          <Link
-            href={viewHref("assistant")}
-            className={view === "assistant" ? "nav-active" : ""}
-            aria-current={view === "assistant" ? "page" : undefined}
-          >
-            <span className="nav-icon" aria-hidden="true">
-              ◇
-            </span>
-            <span className="nav-label">Ask your assistant</span>
-          </Link>
           <Link
             href={viewHref("records")}
             className={view === "records" ? "nav-active" : ""}
             aria-current={view === "records" ? "page" : undefined}
           >
-            <span className="nav-icon" aria-hidden="true">
-              ▦
-            </span>
-            <span className="nav-label">Data requests</span>
-            <span className="nav-count">{desk.requests.length}</span>
+            Requests
+          </Link>
+          <Link
+            href={viewHref("assistant")}
+            className={view === "assistant" ? "nav-active" : ""}
+            aria-current={view === "assistant" ? "page" : undefined}
+          >
+            Assistant
           </Link>
           {(preview || operates) && (
             <>
@@ -722,20 +708,14 @@ export function Desk({
                 className={view === "insights" ? "nav-active" : ""}
                 aria-current={view === "insights" ? "page" : undefined}
               >
-                <span className="nav-icon" aria-hidden="true">
-                  ↗
-                </span>
-                <span className="nav-label">Flow insights</span>
+                Insights
               </Link>
               <Link
                 href={viewHref("knowledge")}
                 className={view === "knowledge" ? "nav-active" : ""}
                 aria-current={view === "knowledge" ? "page" : undefined}
               >
-                <span className="nav-icon" aria-hidden="true">
-                  ◎
-                </span>
-                <span className="nav-label">Team knowledge</span>
+                Knowledge
               </Link>
             </>
           )}
@@ -745,25 +725,7 @@ export function Desk({
               className={view === "settings" ? "nav-active" : ""}
               aria-current={view === "settings" ? "page" : undefined}
             >
-              <span className="nav-icon" aria-hidden="true">
-                ◎
-              </span>
-              <span className="nav-label">Workspace settings</span>
-            </Link>
-          )}
-          {(preview || member?.role === "owner") && (
-            <Link
-              href={`${viewHref("settings")}#company-setup`}
-              onClick={() => {
-                const setup = document.getElementById("company-setup");
-                if (setup instanceof HTMLDetailsElement) setup.open = true;
-              }}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                ◈
-              </span>
-              <span className="nav-label">Company setup</span>
-              <Arrow />
+              Settings
             </Link>
           )}
         </nav>
@@ -774,87 +736,41 @@ export function Desk({
             value={view}
             onChange={(event) => router.push(viewHref(event.target.value))}
           >
-            <option value="assistant">Ask your assistant</option>
-            <option value="records">Data requests</option>
+            <option value="records">Requests</option>
+            <option value="assistant">Assistant</option>
             {(preview || operates) && (
               <>
-                <option value="insights">Flow insights</option>
-                <option value="knowledge">Team knowledge</option>
+                <option value="insights">Insights</option>
+                <option value="knowledge">Knowledge</option>
               </>
             )}
-            {(preview || member) && (
-              <option value="settings">Workspace settings</option>
-            )}
+            {(preview || member) && <option value="settings">Settings</option>}
           </select>
         </label>
-        <div className="sidebar-note">
-          <span className="sidebar-orbit" aria-hidden="true">
-            <i />
-            <i />
-            <b>L</b>
-          </span>
-          <strong>
-            Clear requests.
-            <br />
-            Focused analysts.
-          </strong>
-          <p>
-            Give every question context,
-            <br />
-            an owner, and a next step.
+        {member && (
+          <p className="dashboard-member">
+            {member.name}
+            <span>{member.role}</span>
           </p>
-        </div>
-        <div className="environment">
-          <span className={preview ? "dot neutral" : "dot"} />
-          {preview ? "Sample preview" : "Shared workspace"}
-        </div>
+        )}
       </aside>
       <main
         id="workspace-main"
         tabIndex={-1}
         inert={creating || Boolean(selected)}
       >
-        <header className="topbar">
-          <span>
-            Workspace <span aria-hidden="true">/</span>{" "}
-            <strong>
-              {view === "assistant"
-                ? "Your assistant"
-                : view === "settings"
-                  ? "Workspace settings"
-                  : view === "insights"
-                    ? "Flow insights"
-                    : view === "knowledge"
-                      ? "Team knowledge"
-                      : spec.title}
-            </strong>
-          </span>
-          <span className="workspace-presence">
-            <span className="dot" aria-hidden="true" />
-            {preview
-              ? "Explore Loom"
-              : member
-                ? `${member.name} · ${member.role}`
-                : "Make room for teamwork"}
-          </span>
-        </header>
         <div
           className={`content${view === "assistant" ? " content-assistant" : ""}`}
         >
           {preview && view !== "assistant" && (
             <div className="banner">
               <strong>Read-only sample preview</strong>
-              <span>
-                Explore synthetic requests without saving changes. Create your
-                company to invite colleagues and manage your own queue.
-              </span>
+              <Link href="/register">Create your company</Link>
             </div>
           )}
-          {!preview &&
-            workspaceControls &&
-            (view === "settings" || !member) && (
-              <div id="workspace-access">{workspaceControls}</div>
-            )}
+          {!preview && workspaceControls && !member && (
+            <div id="workspace-access">{workspaceControls}</div>
+          )}
           {!preview &&
             showDemoControls &&
             (view !== "assistant" || !member) && (
@@ -894,17 +810,42 @@ export function Desk({
           {view === "settings" && (
             <div className="page-heading">
               <div>
-                <p className="eyebrow">Manage your workspace</p>
-                <h1>Workspace settings</h1>
-                <p>Company identity, teammates, and approved context.</p>
-                <p className="current-tool-label">
-                  Published tool: {spec.title} · revision {tool.revision}
-                </p>
+                <h1>Settings</h1>
+                <p className="current-tool-label">Request desk: {spec.title}</p>
               </div>
-              <Link href={viewHref("assistant")}>
-                Return to your assistant ↗
-              </Link>
+              {!preview && member && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    void navigator.clipboard
+                      .writeText(
+                        `${window.location.origin}/w/${desk.workspace?.id || ""}`,
+                      )
+                      .then(
+                        () =>
+                          setNotice(
+                            "Workspace link copied. Colleagues need workspace access to open it.",
+                          ),
+                        () =>
+                          setError(
+                            "Could not copy the workspace link. Copy the address from your browser.",
+                          ),
+                      );
+                  }}
+                >
+                  Copy workspace link
+                </Button>
+              )}
             </div>
+          )}
+          {view === "settings" && !preview && member && workspaceControls && (
+            <details
+              className="dashboard-settings-section"
+              id="workspace-access"
+            >
+              <summary>People and access</summary>
+              <div className="dashboard-settings-body">{workspaceControls}</div>
+            </details>
           )}
           {view === "settings" && (preview || member?.role === "owner") && (
             <WorkspaceSetup
@@ -938,13 +879,12 @@ export function Desk({
                   Exasol.
                 </p>
                 <p>There is no live history in this sample workspace.</p>
-                <Link href="/register">Create your company ↗</Link>
+                <Link href="/register">Create your company</Link>
               </section>
             ) : (
               <>
                 <div className="page-heading">
                   <div>
-                    <p className="eyebrow">The work behind the answer</p>
                     <h1>Flow insights</h1>
                     <p>
                       See where requests wait and how work moves through your
@@ -962,18 +902,17 @@ export function Desk({
             (preview || operates) &&
             (preview ? (
               <section className="empty">
-                <h1>A shared understanding.</h1>
+                <h1>Team knowledge</h1>
                 <p>
                   Keep approved metric definitions, routing procedures and
                   reviewed decisions alongside your team’s requests.
                 </p>
-                <Link href="/register">Create your company ↗</Link>
+                <Link href="/register">Create your company</Link>
               </section>
             ) : (
               <>
                 <div className="page-heading">
                   <div>
-                    <p className="eyebrow">Context your team can rely on</p>
                     <h1>Team knowledge</h1>
                     <p>
                       Approved definitions, procedures, and decisions with their
@@ -985,36 +924,43 @@ export function Desk({
                   key={`memory/${desk.workspace?.id}/${memberId}`}
                   refreshKey={`${desk.workspace?.id}/${memberId}/${member?.role}`}
                 />
-                <TriageWorkspace
-                  key={`knowledge/${desk.workspace?.id}/${memberId}`}
-                  owner={member?.role === "owner"}
-                  requests={desk.requests}
-                  members={desk.members}
-                  spec={spec}
-                  preferredAgent={companySettings.preferredAgent}
-                  onApplied={refresh}
-                />
+                <details className="dashboard-settings-section">
+                  <summary>Manage knowledge and review activity</summary>
+                  <div className="dashboard-settings-body">
+                    <TriageWorkspace
+                      key={`knowledge/${desk.workspace?.id}/${memberId}`}
+                      owner={member?.role === "owner"}
+                      requests={desk.requests}
+                      members={desk.members}
+                      spec={spec}
+                      preferredAgent={companySettings.preferredAgent}
+                      onApplied={refresh}
+                    />
+                  </div>
+                </details>
               </>
             ))}
           {view === "settings" &&
             !preview &&
             member?.role === "owner" &&
             desk.workspace && (
-              <ProviderSettings
-                key={`provider/${desk.workspace.id}/${memberId}`}
-                workspaceId={desk.workspace.id}
-              />
+              <details className="dashboard-settings-section">
+                <summary>Company AI connection</summary>
+                <div className="dashboard-settings-body">
+                  <ProviderSettings
+                    key={`provider/${desk.workspace.id}/${memberId}`}
+                    workspaceId={desk.workspace.id}
+                  />
+                </div>
+              </details>
             )}
           {view === "records" && (
             <div className="page-heading">
               <div>
-                <p className="eyebrow">
-                  {own ? "Your work, in view" : "Your analytics request queue"}
-                </p>
                 <h1>{spec.title}</h1>
-                <p>{spec.description}</p>
               </div>
-              <button
+              <Button
+                variant="primary"
                 onClick={openCreate}
                 disabled={
                   busy ||
@@ -1023,8 +969,8 @@ export function Desk({
                 }
                 className="new-request-button"
               >
-                + New request <Arrow />
-              </button>
+                New request
+              </Button>
             </div>
           )}
           {view === "settings" && (preview || member?.role === "owner") && (
@@ -1090,21 +1036,6 @@ export function Desk({
                 requests={desk.requests}
                 analytics={analytics}
               />
-              <div className="summary-source">
-                {analytics
-                  ? `Exasol · ${analytics.queryId} · checked ${new Date(analytics.queriedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`
-                  : preview
-                    ? "Sample counts · not live SQL results"
-                    : "Counts cover this page · use the queue summary for workspace totals"}
-                {analytics &&
-                spec.fields.some(
-                  (field) =>
-                    field.id.startsWith("custom_") &&
-                    field.requiredAt !== "optional",
-                )
-                  ? " · Missing requirements covers this page, including custom fields."
-                  : ""}
-              </div>
               <section
                 id="request-queue"
                 className="queue"
@@ -1114,9 +1045,10 @@ export function Desk({
                   {filters?.id === "filters" && filters.search && (
                     <label className="search">
                       <span className="sr-only">Search requests</span>
-                      <input
+                      <Input
                         type="search"
-                        placeholder="Search requests, people, or context…"
+                        aria-label="Search requests"
+                        placeholder="Search requests"
                         value={search}
                         maxLength={200}
                         onChange={(e) => {
@@ -1147,13 +1079,14 @@ export function Desk({
                       </select>
                     </label>
                   )}
-                  <button
+                  <Button
+                    variant="secondary"
                     className="secondary"
                     onClick={() => void refresh()}
                     disabled={preview || busy}
                   >
                     Refresh
-                  </button>
+                  </Button>
                 </div>
                 <ToolTable
                   spec={spec}
@@ -1194,7 +1127,8 @@ export function Desk({
                     : `page ${(desk.page?.index ?? 0) + 1}`}
                   {!preview && (
                     <div>
-                      <button
+                      <Button
+                        variant="secondary"
                         className="secondary"
                         disabled={
                           busy || desk.page?.index !== page || page === 0
@@ -1205,8 +1139,9 @@ export function Desk({
                         }}
                       >
                         Previous page
-                      </button>{" "}
-                      <button
+                      </Button>{" "}
+                      <Button
+                        variant="secondary"
                         className="secondary"
                         disabled={
                           busy ||
@@ -1220,16 +1155,10 @@ export function Desk({
                         }}
                       >
                         Next page
-                      </button>
+                      </Button>
                     </div>
                   )}
-                  <span>
-                    {preview
-                      ? "Read-only preview"
-                      : own
-                        ? "Only your requests are visible"
-                        : `Saved changes refresh every ${Math.round(refreshIntervalMs / 1000)} seconds`}
-                  </span>
+                  {own && <span>Only your requests</span>}
                 </div>
               </section>
               {!preview && member && (
@@ -1242,64 +1171,11 @@ export function Desk({
                   onImported={refresh}
                 />
               )}
-              <p className="scope-note">
-                Shared tool · revision {tool.revision}. Saved records and
-                reviewed agent proposals stay in this workspace.
-                {!preview && member && (
-                  <button
-                    className="quiet"
-                    onClick={() => {
-                      void navigator.clipboard
-                        .writeText(
-                          `${window.location.origin}/w/${desk.workspace?.id || ""}`,
-                        )
-                        .then(
-                          () =>
-                            setNotice(
-                              "Workspace link copied. Colleagues need workspace access to open it.",
-                            ),
-                          () =>
-                            setError(
-                              "Could not copy the workspace link. Copy the address from your browser.",
-                            ),
-                        );
-                    }}
-                  >
-                    Copy workspace link
-                  </button>
-                )}
-              </p>
             </>
-          )}
-          {view === "settings" && !preview && operates && member && (
-            <details className="advanced-administration">
-              <summary>Advanced administration</summary>
-              <p className="hint">
-                Manage approved sources and inspect saved agent activity.
-                Everyday questions belong in your assistant conversation.
-              </p>
-              {!preview && operates && member && (
-                <TeamMemory
-                  key={`memory/${desk.workspace?.id}/${member.userId}`}
-                  refreshKey={`${desk.workspace?.id}/${tool.revision}/${desk.requests.map((request) => `${request.id}:${request.version}`).join(",")}`}
-                />
-              )}
-              {!preview && operates && member && (
-                <TriageWorkspace
-                  key={`agent/${desk.workspace?.id}/${member.userId}`}
-                  owner={member.role === "owner"}
-                  requests={desk.requests}
-                  members={desk.members}
-                  spec={spec}
-                  preferredAgent={companySettings.preferredAgent}
-                  onApplied={refresh}
-                />
-              )}
-            </details>
           )}
           {!preview && !member && (
             <section className="empty login">
-              <h2>Open the local demo desk</h2>
+              <h2>Sign in to your workspace</h2>
               <p>
                 {showDemoControls
                   ? "Choose a persona above or sign in. "
@@ -1351,7 +1227,7 @@ export function Desk({
                 </p>
                 <h2 id="panel-heading">
                   {creating
-                    ? "A clear question starts here"
+                    ? "New request"
                     : detail?.request.title || "Loading request…"}
                 </h2>
               </div>

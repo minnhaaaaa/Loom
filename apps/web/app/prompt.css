@@ -83,25 +83,14 @@
     9px/1.7 var(--font-mono),
     monospace;
 }
-.prompt-context-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--brand-link, var(--accent));
-}
 .prompt-composer-footer > button {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 27px;
+  justify-content: center;
   padding: 11px 16px;
   min-width: 105px;
   min-height: 40px;
   font-size: 11px;
-}
-.prompt-composer-footer > button > span {
-  font-size: 18px;
-  line-height: 1;
 }
 .prompt-composer-note {
   display: flex;
@@ -161,22 +150,6 @@
     9px var(--font-mono),
     monospace;
 }
-.prompt-message-mark {
-  display: grid;
-  place-items: center;
-  width: 25px;
-  height: 25px;
-  border-radius: var(--brand-control-radius, 8px);
-  color: var(--brand-on-primary, white);
-  background: var(--brand-primary, var(--forest));
-  font-size: 17px;
-}
-.prompt-message-user .prompt-message-mark {
-  background: var(--soft);
-  color: var(--brand-link, var(--accent));
-  border: 1px solid var(--line);
-  font-size: 14px;
-}
 .prompt-message-user .prompt-message-content {
   padding: 12px 18px;
   border: 1px solid var(--line);
@@ -195,7 +168,7 @@
   margin-bottom: 0;
 }
 .prompt-message-assistant .prompt-message-content {
-  padding: 5px 0 0 35px;
+  padding: 5px 0 0;
 }
 .prompt-message-failed .prompt-message-content {
   color: var(--danger, #a32f3b);
@@ -204,22 +177,15 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding-left: 35px;
+  padding-left: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.8;
 }
-.prompt-waiting > span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--brand-link, var(--accent));
-  animation: prompt-pulse 1.8s ease-in-out infinite;
-}
 .prompt-proposal,
 .prompt-tool-draft,
 .prompt-source-detail {
-  margin: 22px 0 0 35px;
+  margin: 22px 0 0;
   padding: 23px;
   border: 1px solid var(--line);
   border-radius: var(--brand-panel-radius, 12px);
@@ -332,7 +298,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 18px 0 12px 35px;
+  margin: 18px 0 12px;
 }
 .prompt-proposal .prompt-source-list {
   margin-left: 0;
@@ -452,15 +418,6 @@
 .prompt-feedback:empty {
   margin: 0;
 }
-@keyframes prompt-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
 @media (max-width: 720px) {
   .prompt-workspace {
     margin: 30px auto 45px;
@@ -529,9 +486,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .prompt-waiting > span {
-    animation: none;
-  }
   .prompt-composer {
     transition: none;
   }

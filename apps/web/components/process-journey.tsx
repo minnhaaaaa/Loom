@@ -68,8 +68,7 @@ export function ProcessJourney({
               disabled={!preview && !owner}
               onClick={() => reveal("tool-builder")}
             >
-              {preview ? "Explore the builder" : "Open tool builder"}{" "}
-              <span aria-hidden="true">↗</span>
+              {preview ? "Explore the builder" : "Open tool builder"}
             </button>
             {!preview && !owner && (
               <small>Your workspace owner builds and publishes the tool.</small>
@@ -93,8 +92,7 @@ export function ProcessJourney({
                 reveal("workspace-access", ".workspace-access-share")
               }
             >
-              {owner ? "Invite your team" : "Open workspace access"}{" "}
-              <span aria-hidden="true">↗</span>
+              {owner ? "Invite your team" : "Open workspace access"}
             </button>
             {!preview && membership && (
               <small>
@@ -119,7 +117,7 @@ export function ProcessJourney({
               disabled={preview || !operates}
               onClick={() => reveal("agent-workspace", ".agent-run-details")}
             >
-              Open agent workspace <span aria-hidden="true">↗</span>
+              Open agent workspace
             </button>
             {preview && (
               <small>

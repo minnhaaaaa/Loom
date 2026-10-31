@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import "@cloudflare/kumo/styles/standalone";
 import "./globals.css";
 import "./civitas.css";
 import "./branding.css";
@@ -9,6 +10,7 @@ import "./landing.css";
 import "./company-entry.css";
 import "./insights.css";
 import "./provider.css";
+import "./dashboard.css";
 
 const body = localFont({
   src: "./fonts/manrope-variable.ttf",
@@ -35,7 +37,7 @@ const editorial = localFont({
   weight: "100 900",
 });
 export const metadata: Metadata = {
-  title: "Loom · Less chasing. More analysis.",
+  title: "Loom · Data requests, one workspace",
   description:
     "A shared request desk for small analytics teams. Clear requirements, accountable owners, and Exasol-backed insight into where work gets stuck.",
 };

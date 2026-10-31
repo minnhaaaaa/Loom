@@ -55,9 +55,7 @@ test("the single prompt fits a narrow screen without exposing administrative con
   await page
     .getByRole("combobox", { name: "Workspace view", exact: true })
     .selectOption("settings");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Workspace settings",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
   await page
     .getByRole("combobox", { name: "Workspace view", exact: true })
     .selectOption("assistant");
@@ -71,21 +69,24 @@ test("navigation keeps the prompt, saved work, and settings in separate views", 
 }) => {
   await page.goto("/app?view=assistant");
   await page
-    .getByRole("link", { name: "Workspace settings", exact: true })
+    .getByRole("navigation", { name: "Main", exact: true })
+    .getByRole("link", { name: "Settings", exact: true })
     .click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Workspace settings",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
   await expect(
     page.getByRole("textbox", { name: "Ask your workspace", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("link", { name: /^Data requests/ }).click();
+  await page
+    .getByRole("navigation", { name: "Main", exact: true })
+    .getByRole("link", { name: "Requests", exact: true })
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Data requests",
   );
   await expect(page.getByRole("table")).toBeVisible();
   await page
-    .getByRole("link", { name: "Ask your assistant", exact: true })
+    .getByRole("navigation", { name: "Main", exact: true })
+    .getByRole("link", { name: "Assistant", exact: true })
     .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "What would you like to do?",

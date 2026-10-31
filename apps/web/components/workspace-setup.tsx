@@ -32,38 +32,32 @@ const agentOptions: {
   id: PreferredAgent;
   label: string;
   description: string;
-  mark: string;
 }[] = [
   {
     id: "codex",
     label: "Codex",
     description: "Bring the agent you use in Codex.",
-    mark: "↗",
   },
   {
     id: "claude-code",
     label: "Claude Code",
     description: "Connect your Claude Code workspace.",
-    mark: "✳",
   },
   {
     id: "other",
     label: "Another agent",
     description: "Use a compatible MCP client.",
-    mark: "◇",
   },
   {
     id: "loom",
     label: "Company AI",
     description:
       "Use your company API connection or the configured server model.",
-    mark: "L",
   },
   {
     id: "later",
     label: "Set up later",
     description: "Start with your team’s request desk.",
-    mark: "→",
   },
 ];
 function external(agent: PreferredAgent): agent is AgentClient {
@@ -403,10 +397,7 @@ export function WorkspaceSetup({
       }}
     >
       <summary className="setup-entry">
-        <span className="setup-entry-mark" aria-hidden="true">
-          ◈
-        </span>
-        <span>
+        <span className="setup-entry-copy">
           <strong>
             {settings.setupCompletedAt
               ? "Company brand and agents"
@@ -419,8 +410,7 @@ export function WorkspaceSetup({
           </span>
         </span>
         <span className="setup-entry-status">
-          {settings.setupCompletedAt ? "Manage setup" : "Start company setup"}{" "}
-          <span aria-hidden="true">↗</span>
+          {settings.setupCompletedAt ? "Manage setup" : "Start company setup"}
         </span>
       </summary>
       {open && (
@@ -434,9 +424,7 @@ export function WorkspaceSetup({
                 works with.
               </p>
             </div>
-            <span className="setup-live">
-              <span className="dot" aria-hidden="true" /> Live brand preview
-            </span>
+            <span className="setup-live">Live brand preview</span>
           </div>
           {preview && (
             <p className="banner compact">
@@ -686,7 +674,6 @@ export function WorkspaceSetup({
                           setError("");
                         }}
                       >
-                        <span aria-hidden="true">{option.mark}</span>
                         <strong>{option.label}</strong>
                         <small>{option.description}</small>
                       </button>
@@ -817,7 +804,7 @@ export function WorkspaceSetup({
                             target="_blank"
                             rel="noreferrer"
                           >
-                            Codex connection guide ↗
+                            Codex connection guide
                           </a>
                         ) : agent === "claude-code" ? (
                           <a
@@ -825,7 +812,7 @@ export function WorkspaceSetup({
                             target="_blank"
                             rel="noreferrer"
                           >
-                            Claude Code connection guide ↗
+                            Claude Code connection guide
                           </a>
                         ) : null}
                       </p>
@@ -994,7 +981,7 @@ export function WorkspaceSetup({
                         onPreview(null);
                       }}
                     >
-                      Open your workspace <span aria-hidden="true">↗</span>
+                      Open your workspace
                     </a>
                   )}
                 </section>
@@ -1015,9 +1002,7 @@ export function WorkspaceSetup({
                   <p className="eyebrow">A little tool. Your way.</p>
                   <h3>{draft.companyName || "Your company"}</h3>
                   <p>Your tools, your people, and an agent beside you.</p>
-                  <span className="setup-preview-cta">
-                    Create a tool <span aria-hidden="true">↗</span>
-                  </span>
+                  <span className="setup-preview-cta">Create a tool</span>
                   <div className="setup-preview-metrics">
                     <div>
                       <small>In progress</small>
@@ -1029,9 +1014,6 @@ export function WorkspaceSetup({
                     </div>
                   </div>
                   <div className="setup-preview-record">
-                    <span className="setup-preview-check" aria-hidden="true">
-                      ✓
-                    </span>
                     <div>
                       <strong>A clearer way to work</strong>
                       <small>Shared with your team</small>
@@ -1072,7 +1054,7 @@ export function WorkspaceSetup({
                   disabled={busy || !valid.success}
                   onClick={() => go(step + 1)}
                 >
-                  Continue <span aria-hidden="true">→</span>
+                  Continue
                 </button>
               )}
               {!preview && step < 3 && (

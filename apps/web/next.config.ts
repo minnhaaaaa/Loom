@@ -6,6 +6,7 @@ loadEnvConfig(path.resolve(process.cwd(), "../.."));
 process.env.WS_NO_BUFFER_UTIL = "1";
 const config: NextConfig = {
   poweredByHeader: false,
+  devIndicators: false,
   serverExternalPackages: ["@exasol/exasol-driver-ts", "ws"],
   transpilePackages: [
     "@loom/contracts",

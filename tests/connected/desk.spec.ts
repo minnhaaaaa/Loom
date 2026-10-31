@@ -11,7 +11,7 @@ test("real Exasol workflow through the production UI and protected API", async (
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[2].id);
   await expect(
-    page.getByRole("button", { name: "+ New request", exact: true }),
+    page.getByRole("button", { name: "New request", exact: true }),
   ).toBeEnabled();
   await expect(
     page.getByRole("button", {
@@ -19,9 +19,7 @@ test("real Exasol workflow through the production UI and protected API", async (
       exact: true,
     }),
   ).not.toBeVisible();
-  await page
-    .getByRole("button", { name: "+ New request", exact: true })
-    .click();
+  await page.getByRole("button", { name: "New request", exact: true }).click();
   const panel = page.getByRole("dialog");
   await panel.getByLabel("Request title").fill(title);
   await panel
@@ -172,7 +170,7 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[0].id);
   await expect(
-    page.getByRole("button", { name: "+ New request", exact: true }),
+    page.getByRole("button", { name: "New request", exact: true }),
   ).toBeEnabled();
   await page.getByText("CSV import / export", { exact: true }).click();
   await page.getByLabel("Choose CSV").setInputFiles({

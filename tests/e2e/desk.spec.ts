@@ -44,9 +44,7 @@ test("intake renders the supported field specification without pretending to sav
   page,
 }) => {
   await page.goto("/app?view=records");
-  await page
-    .getByRole("button", { name: "+ New request", exact: true })
-    .click();
+  await page.getByRole("button", { name: "New request", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByLabel("Request title").fill("Example request");
   await page.getByLabel("Business question").fill("What changed this week?");

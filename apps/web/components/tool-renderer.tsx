@@ -5,9 +5,11 @@ import type {
   PublicRequest,
   ToolSpec,
 } from "@loom/contracts";
-import type { ChangeEvent, CSSProperties } from "react";
+import type { ChangeEvent } from "react";
 import { toolFieldValue, toolRequirements } from "@loom/domain";
-import { MetricCard } from "./ui/civitas";
+import { Badge } from "@cloudflare/kumo/components/badge";
+import { Input, InputArea } from "@cloudflare/kumo/components/input";
+import { Table } from "@cloudflare/kumo/components/table";
 
 export function ToolFields({
   spec,
@@ -62,9 +64,9 @@ export function ToolFields({
             </small>
           )}
           {field.type === "textarea" ? (
-            <textarea {...input} rows={4} />
+            <InputArea {...input} rows={4} />
           ) : (
-            <input {...input} />
+            <Input {...input} />
           )}
         </label>
       );
@@ -127,10 +129,12 @@ export function ToolTable({
       );
     if (id === "status")
       return (
-        <span className={`status status-${request.status}`}>
-          <span aria-hidden="true" />
+        <Badge
+          variant="secondary"
+          className={`status status-${request.status}`}
+        >
           {spec.statusLabels[request.status]}
-        </span>
+        </Badge>
       );
     if (id === "ownerName")
       return request.ownerName || <span className="muted">Unassigned</span>;
@@ -146,30 +150,30 @@ export function ToolTable({
   }
   return (
     <div className="table-scroll">
-      <table>
+      <Table className="dashboard-request-table">
         <caption className="sr-only">
           {own ? "Your requests" : `${spec.title} queue`}
         </caption>
-        <thead>
-          <tr>
+        <Table.Header>
+          <Table.Row>
             {columns.map((id) => (
-              <th key={id} scope="col">
+              <Table.Head key={id}>
                 {spec.fields.find((field) => field.id === id)?.label ||
                   labels[id]}
-              </th>
+              </Table.Head>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
           {requests.map((request) => (
-            <tr key={request.id}>
+            <Table.Row key={request.id}>
               {columns.map((id) => (
-                <td key={id}>{cell(request, id)}</td>
+                <Table.Cell key={id}>{cell(request, id)}</Table.Cell>
               ))}
-            </tr>
+            </Table.Row>
           ))}
-        </tbody>
-      </table>
+        </Table.Body>
+      </Table>
     </div>
   );
 }
@@ -218,23 +222,19 @@ export function ToolSummary({
         : "Missing requirements",
   };
   return (
-    <section
-      className="stats"
-      aria-label="Queue summary"
-      style={{ "--summary-count": view.metrics.length } as CSSProperties}
-    >
-      {view.metrics.map((metric) => (
-        <MetricCard
-          key={metric}
-          label={labels[metric]}
-          value={values[metric]}
-          detail={
-            metric === "incomplete" && analytics && customRequirements
-              ? "This page · includes custom requirements"
-              : undefined
-          }
-        />
-      ))}
+    <section className="dashboard-summary" aria-label="Queue summary">
+      <dl>
+        {view.metrics.map((metric) => (
+          <div key={metric}>
+            <dt>{labels[metric]}</dt>
+            <dd>{values[metric]}</dd>
+            {metric === "incomplete" && analytics && customRequirements && (
+              <small>This page</small>
+            )}
+          </div>
+        ))}
+      </dl>
+      {!analytics && <span className="summary-scope">Current list</span>}
     </section>
   );
 }

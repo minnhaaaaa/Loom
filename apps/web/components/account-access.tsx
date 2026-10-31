@@ -105,9 +105,6 @@ export function AccountAccess({
     <section className="account-access" aria-label="Account access">
       {!minimalPublic && (
         <div className="account-access-intro">
-          <span className="brand-mark" aria-hidden="true">
-            L
-          </span>
           <div>
             <p className="eyebrow">Your analytics team, connected</p>
             <h2>

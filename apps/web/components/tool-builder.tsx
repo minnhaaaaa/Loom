@@ -941,9 +941,6 @@ export function ToolBuilder({
                 aria-label="Draft tool preview"
               >
                 <div className="tool-builder-preview-title">
-                  <span className="brand-mark" aria-hidden="true">
-                    L
-                  </span>
                   <div>
                     <h3>{spec.title || "Untitled tool"}</h3>
                     <p>{spec.description}</p>
@@ -957,7 +954,7 @@ export function ToolBuilder({
                 {(filters?.search || filters?.status) && (
                   <div className="tool-builder-preview-filters">
                     {filters.search && <span>Search requests…</span>}
-                    {filters.status && <span>All statuses ▾</span>}
+                    {filters.status && <span>All statuses</span>}
                   </div>
                 )}
                 <ToolTable

@@ -141,7 +141,6 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
             work.
           </span>
         </span>
-        <span aria-hidden="true">↗</span>
       </summary>
       {open && (
         <div className="memory-body">
@@ -163,7 +162,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                     knowledge.open = true;
                 }}
               >
-                Add team knowledge <span aria-hidden="true">↗</span>
+                Add team knowledge
               </a>
             </div>
             <p className="hint">
@@ -305,7 +304,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                               setView("Connections");
                             }}
                           >
-                            Explore connections ↗
+                            Explore connections
                           </button>
                         </details>
                       </article>

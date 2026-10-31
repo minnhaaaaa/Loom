@@ -115,9 +115,6 @@ export function InvitationAccept({
   return (
     <main className="invitation-accept">
       <Link className="brand" href="/" aria-label="Loom home">
-        <span className="brand-mark" aria-hidden="true">
-          L
-        </span>
         Loom
       </Link>
       <section

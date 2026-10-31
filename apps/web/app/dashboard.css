@@ -1,0 +1,557 @@
+/* Kumo workspace. Public presentation pages keep their own visual system. */
+.app-shell {
+  isolation: isolate;
+  grid-template-columns: 190px minmax(0, 1fr);
+  min-height: 100svh;
+  color: #202124;
+  background: #fff;
+  font-family: var(--font-editorial), Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color-scheme: light;
+  --color-kumo-brand: var(--brand-link, #19161e);
+}
+.app-shell :is(button, input, textarea, select) {
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: normal;
+}
+.app-shell :is(h1, h2, h3, h4) {
+  color: #202124;
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.app-shell button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid #d9d9de;
+  border-radius: 6px;
+  color: #303136;
+  background: #fff;
+  font-weight: 500;
+  box-shadow: none;
+}
+.app-shell button:hover:not(:disabled) {
+  color: #202124;
+  background: #f6f6f7;
+  border-color: #bdbdc4;
+  filter: none;
+}
+.app-shell .new-request-button,
+.app-shell button[type="submit"]:not(.secondary) {
+  background: var(--brand-primary, #19161e);
+  border-color: var(--brand-primary, #19161e);
+  color: var(--brand-on-primary, #fff);
+}
+.app-shell .new-request-button:hover:not(:disabled),
+.app-shell button[type="submit"]:not(.secondary):hover:not(:disabled) {
+  background: var(--brand-primary-hover, #302c36);
+  border-color: var(--brand-primary-hover, #302c36);
+  color: var(--brand-on-primary, #fff);
+}
+.app-shell button.quiet,
+.app-shell .request-link {
+  padding: 0;
+  min-height: 28px;
+  background: transparent;
+  border-color: transparent;
+  color: #303136;
+}
+.app-shell button.quiet:hover:not(:disabled),
+.app-shell .request-link:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.app-shell :is(input, textarea, select) {
+  min-height: 36px;
+  border: 1px solid #d9d9de;
+  border-radius: 6px;
+  background: #fff;
+  color: #202124;
+  padding: 8px 10px;
+}
+.app-shell input[type="checkbox"],
+.app-shell input[type="radio"] {
+  min-height: 0;
+}
+.app-shell :is(input, textarea, select):disabled {
+  background: #f7f7f8;
+  color: #777780;
+}
+.app-shell :focus-visible {
+  outline: 2px solid #797383;
+  outline-offset: 3px;
+}
+.app-shell .sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 28px 16px;
+  color: #414149;
+  background: #fafafa;
+  border-right: 1px solid #e8e8eb;
+}
+[data-company-theme].app-shell .sidebar .brand {
+  display: block;
+  padding: 0 10px;
+  color: #202124;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: normal;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.app-shell .sidebar nav {
+  display: grid;
+  gap: 3px;
+  margin-top: 36px;
+}
+.app-shell .sidebar nav a {
+  display: block;
+  padding: 9px 10px;
+  color: #5e5e67;
+  border: 0;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.app-shell .sidebar nav a:hover {
+  color: #202124;
+  background: #eeeeef;
+}
+.app-shell .sidebar nav .nav-active,
+.app-shell .sidebar nav .nav-active:hover {
+  color: #202124;
+  background: #eaeaed;
+  font-weight: 500;
+}
+.dashboard-member {
+  margin: auto 10px 0;
+  padding-top: 36px;
+  color: #48484f;
+  font-size: 12px;
+}
+.dashboard-member span {
+  display: block;
+  color: #81818a;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.app-shell main {
+  min-width: 0;
+  background: #fff;
+}
+.app-shell .content {
+  max-width: 1440px;
+  padding: 44px 40px;
+  margin: 0 auto;
+}
+.app-shell .page-heading {
+  align-items: center;
+  gap: 24px;
+  margin: 0 0 28px;
+}
+.app-shell .page-heading h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 650;
+  font-family: var(--font-editorial), Arial, sans-serif;
+}
+.app-shell .page-heading p {
+  color: #777780;
+  font-size: 13px;
+  margin: 7px 0 0;
+}
+.app-shell .page-heading .current-tool-label {
+  font-family: inherit;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.app-shell .banner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  margin-bottom: 28px;
+  border: 1px solid #e6e6e9;
+  border-radius: 5px;
+  background: #fafafa;
+  color: #777780;
+  font-size: 12px;
+}
+.app-shell .banner strong {
+  color: #5e5e67;
+  font-weight: 400;
+}
+.app-shell .banner a {
+  color: #414149;
+  text-underline-offset: 3px;
+}
+.app-shell .notice:empty {
+  display: none;
+}
+.dashboard-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 0 0 24px;
+  color: #71717a;
+  font-size: 12px;
+}
+.dashboard-summary dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin: 0;
+}
+.dashboard-summary dl > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dashboard-summary dt,
+.dashboard-summary dd {
+  margin: 0;
+}
+.dashboard-summary dd {
+  color: #303136;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-summary small,
+.dashboard-summary .summary-scope {
+  color: #8b8b94;
+  font-size: 11px;
+}
+.app-shell .queue {
+  border: 1px solid #e4e4e8;
+  border-radius: 6px;
+  box-shadow: none;
+  background: #fff;
+  overflow: hidden;
+}
+.app-shell .queue-toolbar {
+  gap: 12px;
+  padding: 14px;
+  background: #fff;
+  border-bottom: 1px solid #e4e4e8;
+}
+.app-shell .queue-toolbar .search {
+  max-width: 360px;
+  min-width: 180px;
+}
+.app-shell .queue-toolbar .search input {
+  width: 100%;
+  padding-left: 10px;
+  margin: 0;
+}
+.app-shell .queue-toolbar label {
+  font-weight: 400;
+  color: #71717a;
+  font-size: 12px;
+}
+.app-shell .queue-toolbar select {
+  min-width: 140px;
+  margin: 0;
+}
+.app-shell .dashboard-request-table {
+  min-width: 640px;
+  font-size: 13px;
+  color: #414149;
+  border-collapse: collapse;
+}
+.app-shell .dashboard-request-table :is(th, td) {
+  padding: 15px 18px;
+  border-bottom: 1px solid #ededf0;
+  vertical-align: middle;
+}
+.app-shell .dashboard-request-table th {
+  color: #75757e;
+  background: #fafafa;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: inherit;
+}
+.app-shell .dashboard-request-table tbody tr {
+  background: #fff;
+}
+.app-shell .dashboard-request-table tbody tr:hover {
+  background: #fafafa;
+}
+.app-shell .request-link {
+  display: inline;
+  text-align: left;
+  line-height: 1.5;
+  font-size: 13px;
+  font-weight: 500;
+}
+.app-shell .request-meta {
+  display: block;
+  margin-top: 4px;
+  color: #93939b;
+  font-size: 11px;
+}
+.app-shell .status {
+  display: inline-flex;
+  gap: 0;
+  padding: 3px 7px;
+  border: 1px solid #e6e6eb;
+  border-radius: 4px;
+  color: #62626c;
+  background: #f7f7f8;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.app-shell .priority {
+  color: #777780;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.app-shell .table-footer {
+  padding: 12px 16px;
+  color: #888891;
+  border: 0;
+  background: #fff;
+  font-size: 11px;
+  font-family: inherit;
+}
+.app-shell .table-footer > div {
+  display: flex;
+  gap: 8px;
+}
+.app-shell .empty {
+  padding: 48px 24px;
+  color: #777780;
+}
+.app-shell .empty h2 {
+  font-size: 16px;
+}
+.app-shell .empty p {
+  font-size: 13px;
+}
+.app-shell .dashboard-settings-section {
+  border: 1px solid #e4e4e8;
+  border-radius: 6px;
+  background: #fff;
+  margin: 16px 0;
+}
+.app-shell .dashboard-settings-section > summary {
+  padding: 18px 20px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+}
+.app-shell details > summary {
+  list-style: none;
+}
+.app-shell details > summary::-webkit-details-marker {
+  display: none;
+}
+.app-shell details > summary::after {
+  content: "Show";
+  float: right;
+  margin-left: 16px;
+  color: #81818a;
+  font-size: 11px;
+  font-weight: 400;
+}
+.app-shell details[open] > summary::after {
+  content: "Hide";
+}
+.app-shell .dashboard-settings-body {
+  padding: 0 20px 20px;
+}
+.app-shell .dashboard-settings-body .company-provider {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.app-shell
+  :is(
+    .workspace-setup,
+    .tool-builder,
+    .csv-transfer,
+    .team-memory,
+    .analytics-insights,
+    .triage-console
+  ) {
+  border-color: #e4e4e8;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: none;
+}
+.app-shell
+  :is(.setup-entry, .tool-builder-entry, .memory-entry, .insights-entry) {
+  background: #fff;
+  padding: 18px 20px;
+  color: #414149;
+}
+.app-shell
+  :is(.setup-entry, .tool-builder-entry, .memory-entry, .insights-entry)
+  strong {
+  color: #414149;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+}
+.app-shell
+  :is(.setup-entry, .tool-builder-entry, .memory-entry, .insights-entry)
+  span
+  > span {
+  font-size: 12px;
+  color: #81818a;
+}
+.app-shell
+  :is(
+    .civitas-console-chrome,
+    .tool-builder-baseline,
+    .tool-builder-preview-badge
+  ) {
+  color: #71717a;
+  background: #fafafa;
+  font-family: inherit;
+  box-shadow: none;
+}
+.app-shell .detail-panel {
+  width: min(620px, 100vw);
+  padding: 28px;
+  background: #fff;
+  border-left: 1px solid #e4e4e8;
+  box-shadow: -8px 0 32px #00000008;
+}
+.app-shell .prompt-heading h1 {
+  font-family: var(--font-editorial), Arial, sans-serif;
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 650;
+  letter-spacing: normal;
+}
+.app-shell .prompt-composer {
+  border-radius: 6px;
+  box-shadow: none;
+}
+.app-shell .prompt-composer textarea {
+  background: #fff;
+}
+.app-shell .panel-heading h2 {
+  font-size: 21px;
+  line-height: 1.35;
+}
+.app-shell .panel-heading .eyebrow {
+  display: none;
+}
+.app-shell .detail-section {
+  border-top-color: #e8e8eb;
+}
+.app-shell .detail-section h3 {
+  font-size: 15px;
+}
+.app-shell .comment {
+  background: #fafafa;
+  border-color: #e8e8eb;
+}
+.app-shell .mobile-workspace-navigation {
+  display: none;
+}
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+  .app-shell .content {
+    padding: 32px 24px;
+  }
+}
+@media (max-width: 720px) {
+  .app-shell {
+    display: block;
+  }
+  .app-shell .sidebar {
+    position: static;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 20px;
+    border-right: 0;
+    border-bottom: 1px solid #e8e8eb;
+  }
+  [data-company-theme].app-shell .sidebar .brand {
+    padding: 0;
+    max-width: 45%;
+    font-size: 14px;
+  }
+  .app-shell .sidebar nav,
+  .app-shell .dashboard-member {
+    display: none;
+  }
+  .app-shell .mobile-workspace-navigation {
+    display: block;
+    margin: 0;
+    max-width: 160px;
+  }
+  .app-shell .mobile-workspace-navigation select {
+    margin: 0;
+  }
+  .app-shell .content {
+    padding: 28px 20px;
+  }
+  .app-shell .page-heading {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: nowrap;
+  }
+  .app-shell .page-heading > div {
+    flex: 1 1 auto;
+  }
+  .app-shell .page-heading h1 {
+    font-size: 20px;
+  }
+  .app-shell .page-heading .new-request-button {
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 34px;
+    padding: 7px 12px;
+  }
+  .app-shell .banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .app-shell .queue-toolbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .app-shell .queue-toolbar .search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .app-shell .queue-toolbar .inline-label {
+    flex: 1;
+    min-width: 0;
+  }
+  .app-shell .queue-toolbar select {
+    min-width: 0;
+    width: 100%;
+  }
+  .app-shell .table-footer {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .app-shell .detail-panel {
+    padding: 22px;
+  }
+}

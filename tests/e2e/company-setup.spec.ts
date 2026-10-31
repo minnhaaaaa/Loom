@@ -4,12 +4,21 @@ test("company setup previews brand colors, typography and identity without savin
   page,
 }) => {
   await page.goto("/app");
-  await page.getByRole("link", { name: "Company setup", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Main", exact: true })
+    .getByRole("link", { name: "Settings", exact: true })
+    .click();
   const setup = page.locator("#company-setup");
+  await expect(setup).not.toHaveAttribute("open", "");
+  await setup.locator(":scope > summary").click();
   await setup.getByLabel("Company name", { exact: true }).fill("Nimbus");
   await expect(
     page.getByRole("link", { name: "Nimbus home", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Nimbus home", exact: true }),
+  ).toHaveText("Nimbus");
+  await expect(page.locator(".company-logo, .company-seal")).toHaveCount(0);
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
   await setup.getByRole("button", { name: "Indigo", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveCSS(

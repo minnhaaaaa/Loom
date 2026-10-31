@@ -63,7 +63,7 @@ test("an owner publishes a reviewed tool and a requester opens the same definiti
     await page.goto("/app?view=records");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     await page
-      .getByRole("button", { name: "+ New request", exact: true })
+      .getByRole("button", { name: "New request", exact: true })
       .click();
     const form = page.getByRole("dialog");
     await expect(

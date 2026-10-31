@@ -97,7 +97,6 @@ export function AnalyticsInsights({ refreshKey }: { refreshKey: string }) {
             Waiting time, weekly flow, and the work on each analyst’s desk.
           </span>
         </span>
-        <span aria-hidden="true">↗</span>
       </summary>
       {open && (
         <div className="insights-body" aria-busy={busy}>

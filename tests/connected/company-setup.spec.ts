@@ -157,6 +157,16 @@ test("admin onboarding persists company branding, connects a real MCP client, an
     await expect(
       page.getByRole("link", { name: `${company} home`, exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: `${company} home`, exact: true }),
+    ).toHaveText(company);
+    await expect(page.locator(".company-logo, .company-seal")).toHaveCount(0);
+    const reloadedSettings = (await (
+      await page.request.get("/api/workspaces/settings")
+    ).json()) as WorkspaceSettings;
+    expect(reloadedSettings.branding.logoDataUrl).toBe(
+      settings.branding.logoDataUrl,
+    );
     await expect(setup).not.toHaveAttribute("open", "");
     await expect(
       page.getByLabel("New agent access token", { exact: true }),
@@ -244,6 +254,12 @@ test("admin onboarding persists company branding, connects a real MCP client, an
       await expect(
         colleague.getByRole("link", { name: `${company} home`, exact: true }),
       ).toBeVisible();
+      await expect(
+        colleague.getByRole("link", { name: `${company} home`, exact: true }),
+      ).toHaveText(company);
+      await expect(
+        colleague.locator(".company-logo, .company-seal"),
+      ).toHaveCount(0);
       await expect(colleague.locator(".app-shell")).toHaveCSS(
         "--brand-primary",
         "#3832a0",

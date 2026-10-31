@@ -101,7 +101,7 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
     expect((await colleague.request.get("/api/memory")).status()).toBe(403);
     await expect(colleague.locator("#team-memory")).toHaveCount(0);
     await colleague
-      .getByRole("button", { name: "+ New request", exact: true })
+      .getByRole("button", { name: "New request", exact: true })
       .click();
     const form = colleague.getByRole("dialog");
     await form

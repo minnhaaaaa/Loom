@@ -5,7 +5,8 @@ test("workspace settings opens an onboarding draft and preserves its fields acro
 }) => {
   await page.goto("/app");
   await page
-    .getByRole("link", { name: "Workspace settings", exact: true })
+    .getByRole("navigation", { name: "Main", exact: true })
+    .getByRole("link", { name: "Settings", exact: true })
     .click();
   const builder = page.locator(".tool-builder");
   await builder.getByText("Explore the tool builder", { exact: true }).click();
@@ -35,9 +36,7 @@ test("workspace settings opens an onboarding draft and preserves its fields acro
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Workspace settings",
-  );
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Settings");
   await expect(page.locator(".current-tool-label")).toContainText(
     "Data requests",
   );
