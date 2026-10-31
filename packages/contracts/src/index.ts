@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { PublishedTool } from "./tools";
+import type { WorkspaceSettings } from "./settings";
 
 export const statuses = [
   "new",
@@ -44,6 +46,18 @@ export const intakeSchema = z
     businessQuestion: text(4000),
     reportingPeriod: z.string().trim().max(200).default(""),
     dataset: z.string().trim().max(200).default(""),
+    customValues: z
+      .record(
+        z.string().regex(/^custom_[a-z][a-z0-9_]{0,31}$/),
+        z.string().trim().max(2000),
+      )
+      .refine(
+        (values) =>
+          Object.keys(values).length <= 8 &&
+          JSON.stringify(values).length <= 8000,
+        "Use at most eight custom fields and 8,000 characters of encoded custom values.",
+      )
+      .optional(),
   })
   .strict();
 export type Intake = z.infer<typeof intakeSchema>;
@@ -76,13 +90,18 @@ export const commandSchema = z.discriminatedUnion("type", [
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export const createSchema = z
-  .object({ commandId: z.uuid(), values: intakeSchema })
+  .object({
+    commandId: z.uuid(),
+    values: intakeSchema,
+    expectedToolRevision: z.number().int().positive().optional(),
+  })
   .strict();
 export const mutationSchema = z
   .object({
     commandId: z.uuid(),
     expectedVersion: z.number().int().positive(),
     command: commandSchema,
+    expectedToolRevision: z.number().int().positive().optional(),
   })
   .strict();
 export type RequestRecord = Intake & {
@@ -130,51 +149,22 @@ export const deskQuerySchema = z
   .strict();
 export type DeskQuery = z.infer<typeof deskQuerySchema>;
 export type DeskSnapshot = {
+  settings?: WorkspaceSettings;
+  workspace?: { id: string; name: string };
+  refreshIntervalMs?: number;
+  tool?: PublishedTool;
   page?: { index: number; size: number; hasMore: boolean };
   mode: "preview" | "connected";
   membership: Membership | null;
   requests: PublicRequest[];
   members: Membership[];
 };
-export const toolSpec = {
-  schemaVersion: 1,
-  templateId: "request-desk",
-  title: "Data requests",
-  fields: [
-    {
-      id: "title",
-      label: "Request title",
-      type: "text",
-      requiredAt: "intake",
-      maxLength: 160,
-    },
-    {
-      id: "businessQuestion",
-      label: "Business question",
-      type: "textarea",
-      requiredAt: "intake",
-      maxLength: 4000,
-    },
-    {
-      id: "reportingPeriod",
-      label: "Reporting period",
-      type: "text",
-      requiredAt: "ready",
-      maxLength: 200,
-    },
-    {
-      id: "dataset",
-      label: "Dataset",
-      type: "text",
-      requiredAt: "ready",
-      maxLength: 200,
-    },
-  ],
-  views: [
-    { id: "queue", component: "request-table" },
-    { id: "intake", component: "request-form" },
-  ],
-} as const;
+export * from "./tools";
+export * from "./workspaces";
+export * from "./memory";
+export * from "./conversation";
+export * from "./agents";
+export * from "./settings";
 export type AnalyticsResult = {
   queryId: "queue-summary-v1";
   queriedAt: string;
@@ -208,6 +198,21 @@ export const csvCommitSchema = z
   })
   .strict();
 
+export const knowledgeProvenanceSchema = z
+  .object({
+    type: z.literal("reviewed_decision"),
+    proposalId: z.uuid(),
+    proposalHash: z.string().regex(/^[a-f0-9]{64}$/),
+    runId: z.uuid(),
+    requestId: z.uuid(),
+    requestVersion: z.number().int().positive(),
+    reviewedBy: z.uuid(),
+    recordedBy: z.uuid(),
+    recordedAt: z.iso.datetime(),
+    rationale: z.string().trim().min(1).max(2000),
+  })
+  .strict();
+export type KnowledgeProvenance = z.infer<typeof knowledgeProvenanceSchema>;
 export const knowledgeInputSchema = z
   .object({
     title: z.string().trim().min(1).max(160),
@@ -218,6 +223,7 @@ export const knowledgeInputSchema = z
     effectiveFrom: z.iso.date(),
     effectiveUntil: z.iso.date().nullable().default(null),
     supersedesId: z.uuid().nullable().default(null),
+    provenance: knowledgeProvenanceSchema.optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -277,7 +283,7 @@ export type TriageRun = {
   model: string | null;
   instructions: string;
   promptVersion: string | null;
-  toolRevision: "request-desk-v1";
+  toolRevision: string;
   status: "queued" | "running" | "completed" | "cancelled" | "timed_out";
   version: number;
   checkpoint: number;
@@ -290,9 +296,11 @@ export type ProposalContent = {
   id: string;
   revision: 1;
   initiatorId: string;
-  engine: "openrouter-v1";
+  engine: "openrouter-v1" | "external-mcp-v1" | "conversation-v1";
+  sourceConnectionId?: string;
+  sourceTaskId?: string;
   inference: ModelInference;
-  toolRevision: "request-desk-v1";
+  toolRevision: string;
   requestId: string;
   expectedVersion: number;
   before: RequestRecord;
@@ -336,6 +344,17 @@ export const proposalReviewSchema = z
     action: z.enum(["approve", "reject"]),
   })
   .strict();
+export const proposalKnowledgeSchema = z
+  .object({
+    commandId: z.uuid(),
+    hash: z.string().regex(/^[a-f0-9]{64}$/),
+    title: z.string().trim().min(1).max(160),
+    body: z.string().trim().min(1).max(4000),
+    rationale: z.string().trim().min(1).max(2000),
+    kind: z.enum(["procedure", "glossary", "routing"]).default("procedure"),
+  })
+  .strict();
+export type ProposalKnowledgeInput = z.infer<typeof proposalKnowledgeSchema>;
 
 export const modelSuggestionSchema = z
   .object({
@@ -355,7 +374,7 @@ export type ModelInference = {
   promptTokens: number | null;
   completionTokens: number | null;
   cost: number | null;
-  durationMs: number;
+  durationMs: number | null;
 };
 
 // A flat, nullable parameter object avoids nested union grammars in provider decoders.

@@ -31,6 +31,7 @@ import {
   type CsvMapping,
   type CsvReview,
 } from "./csv";
+import { publishedTool } from "./tool-definitions";
 export type ImportPreview = CsvReview & {
   batchId: string;
   previewHash: string;
@@ -210,7 +211,10 @@ export async function exportRequests(actor: Actor, input: Partial<DeskQuery>) {
       ...(member.role === "requester" ? [] : ["priority"]),
       "createdAt",
       "updatedAt",
-    ] as const;
+      ...(await publishedTool(sql, actor)).spec.fields
+        .filter((field) => field.id.startsWith("custom_"))
+        .map((field) => field.id),
+    ];
     return (
       "\ufeff" +
       [
@@ -218,7 +222,13 @@ export async function exportRequests(actor: Actor, input: Partial<DeskQuery>) {
         ...rows.map((row) => {
           const visible = visibleRequest(member, mapRequest(row));
           return fields
-            .map((field) => csvCell(visible[field as keyof typeof visible]))
+            .map((field) =>
+              csvCell(
+                field.startsWith("custom_")
+                  ? visible.customValues?.[field]
+                  : visible[field as keyof typeof visible],
+              ),
+            )
             .join(",");
         }),
       ].join("\r\n") +

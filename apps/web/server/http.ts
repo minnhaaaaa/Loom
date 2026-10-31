@@ -5,7 +5,15 @@ import { ZodError } from "zod";
 import { personas, workspaceId, type Actor } from "@loom/contracts";
 import { DomainError } from "@loom/domain";
 import { DatabaseError, DatabaseUnavailable } from "@loom/db-exasol";
+import {
+  accountContext,
+  sessionActor,
+  revokeSession,
+  selectSessionWorkspace,
+} from "./accounts";
+import type { SessionGrant } from "@loom/contracts";
 const cookieName = "loom_demo_session";
+const accountCookieName = "loom_session";
 const ttl = 8 * 60 * 60;
 function sessionSecret() {
   const secret = process.env.LOOM_SESSION_SECRET;
@@ -31,16 +39,47 @@ function sign(payload: string) {
     .update(payload)
     .digest("base64url");
 }
+export function assertCredentialAuth() {
+  const mode = process.env.LOOM_AUTH_MODE || "local-demo";
+  if (mode !== "workspace" && !(mode === "local-demo" && demoEnabled()))
+    throw new DomainError(
+      "AUTH_DISABLED",
+      "Account sign-in is not enabled. Configure workspace authentication on the server.",
+      403,
+    );
+  const origin = new URL(process.env.APP_ORIGIN || "http://localhost:3000");
+  if (
+    origin.protocol !== "https:" &&
+    !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)
+  )
+    throw new DomainError(
+      "AUTH_CONFIGURATION",
+      "Workspace authentication requires an HTTPS origin or loopback for local development.",
+      503,
+    );
+  sessionSecret();
+}
 export async function actorFromCookie(): Promise<Actor | null> {
+  const jar = await cookies();
+  const accountToken = jar.get(accountCookieName)?.value;
+  if (accountToken) {
+    assertCredentialAuth();
+    return sessionActor(accountToken);
+  }
   if (!demoEnabled()) return null;
-  const value = (await cookies()).get(cookieName)?.value;
+  const value = jar.get(cookieName)?.value;
   if (!value) return null;
-  const [userId, issued, signature, ...extra] = value.split(".");
+  const parts = value.split(".");
+  const scoped = parts[0] === "v2";
+  const [userId, selectedWorkspaceId, issued, signature, ...extra] = scoped
+    ? parts.slice(1)
+    : [parts[0], workspaceId, ...parts.slice(1)];
   if (
     extra.length ||
     !userId ||
     !issued ||
     !signature ||
+    !/^[0-9a-f-]{36}$/i.test(selectedWorkspaceId || "") ||
     !personas.some((p) => p.id === userId)
   )
     return null;
@@ -51,25 +90,32 @@ export async function actorFromCookie(): Promise<Actor | null> {
     Date.now() - stamp > ttl * 1000
   )
     return null;
-  const expected = sign(`${userId}.${issued}`);
+  const expected = sign(
+    scoped
+      ? `v2.${userId}.${selectedWorkspaceId}.${issued}`
+      : `${userId}.${issued}`,
+  );
   if (
     !/^[A-Za-z0-9_-]{43}$/.test(signature) ||
     !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
   )
     return null;
-  return { userId, workspaceId };
+  return { userId, workspaceId: selectedWorkspaceId };
 }
 export async function requireActor() {
   const actor = await actorFromCookie();
   if (!actor)
     throw new DomainError(
       "UNAUTHENTICATED",
-      "Choose a local demo persona to continue.",
+      "Sign in or choose a local demo persona to continue.",
       401,
     );
   return actor;
 }
-export async function startSession(userId: string) {
+export async function startSession(
+  userId: string,
+  selectedWorkspaceId = workspaceId,
+) {
   if (!demoEnabled())
     throw new DomainError(
       "DEMO_DISABLED",
@@ -82,8 +128,10 @@ export async function startSession(userId: string) {
       "Choose a known demo persona.",
       422,
     );
-  const payload = `${userId}.${Date.now()}`;
-  (await cookies()).set(cookieName, `${payload}.${sign(payload)}`, {
+  const payload = `v2.${userId}.${selectedWorkspaceId}.${Date.now()}`;
+  const signed = `${payload}.${sign(payload)}`;
+  await endSession();
+  (await cookies()).set(cookieName, signed, {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.APP_ORIGIN?.startsWith("https:") ?? false,
@@ -92,7 +140,53 @@ export async function startSession(userId: string) {
   });
 }
 export async function endSession() {
-  (await cookies()).delete(cookieName);
+  const jar = await cookies();
+  const token = jar.get(accountCookieName)?.value;
+  if (token) await revokeSession(token);
+  jar.delete(accountCookieName);
+  jar.delete(cookieName);
+}
+export async function installAccountSession(grant: SessionGrant) {
+  const jar = await cookies();
+  const oldToken = jar.get(accountCookieName)?.value;
+  if (oldToken && oldToken !== grant.token) await revokeSession(oldToken);
+  jar.set(accountCookieName, grant.token, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.APP_ORIGIN?.startsWith("https:") ?? false,
+    path: "/",
+    maxAge: ttl,
+  });
+  jar.delete(cookieName);
+}
+export async function currentAccount() {
+  const context = await accountContext(await actorFromCookie());
+  let enabled = false;
+  try {
+    assertCredentialAuth();
+    enabled = true;
+  } catch {
+    /* Configuration remains private; mutations provide actionable errors. */
+  }
+  return {
+    ...context,
+    registrationEnabled: context.registrationEnabled && enabled,
+  };
+}
+export async function switchWorkspace(id: string) {
+  const actor = await requireActor();
+  const jar = await cookies();
+  const token = jar.get(accountCookieName)?.value;
+  if (token) return selectSessionWorkspace(token, id);
+  const context = await accountContext(actor);
+  if (!context.workspaces.some((workspace) => workspace.id === id))
+    throw new DomainError(
+      "ACCESS_DENIED",
+      "You do not have access to this workspace.",
+      403,
+    );
+  await startSession(actor.userId, id);
+  return { ...actor, workspaceId: id };
 }
 export function checkMutation(request: Request) {
   const expected = new URL(process.env.APP_ORIGIN || "http://localhost:3000")
@@ -177,11 +271,25 @@ export function endpoint(
           },
           422,
         );
-      if (error instanceof DomainError)
-        return response(
-          { error: { code: error.code, message: error.message, requestId } },
+      if (error instanceof DomainError) {
+        const result = response(
+          {
+            error: {
+              code: error.code,
+              message: error.message,
+              requestId,
+              ...error.details,
+            },
+          },
           error.status,
         );
+        if (error.details?.retryAfterSeconds)
+          result.headers.set(
+            "Retry-After",
+            String(error.details.retryAfterSeconds),
+          );
+        return result;
+      }
       if (error instanceof DatabaseUnavailable) {
         console.error(
           JSON.stringify({

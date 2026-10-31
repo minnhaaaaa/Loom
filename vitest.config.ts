@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 export default defineConfig({
   resolve: {
     alias: {
+      "@": fileURLToPath(new URL("./apps/web", import.meta.url)),
       "@exasol/exasol-driver-ts": fileURLToPath(
         new URL(
           "./packages/db-exasol/node_modules/@exasol/exasol-driver-ts/dist/index.esm.js",

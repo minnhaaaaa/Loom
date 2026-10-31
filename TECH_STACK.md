@@ -1,6 +1,6 @@
 # Loom technical stack
 
-Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live persistence, approved knowledge, OpenRouter-backed inference/review implemented. Free-router integration is configured; live generation, browser, and restart verification status is recorded in RUNBOOK. Reviewed: 2026-10-22.
+Status: implementation resumed; Next.js foundation and Exasol adapter implemented, live persistence, approved knowledge, OpenRouter-backed inference/review implemented. The designer has a separately configured, live-verified free endpoint; operating-agent browser/restart verification remains distinct in RUNBOOK. Reviewed: 2026-10-27.
 
 **Exasol Personal is the required and selected primary data platform. Next.js App Router is the recommended application framework.** This replaces the earlier React/Vite + Fastify + PostgreSQL/Supabase design. The frontend stays basic for a later redesign.
 
@@ -8,57 +8,59 @@ See [README.md](README.md) for the problem and contest requirements, [PLAN.md](P
 
 ## Verified platform findings
 
-| Finding from primary sources | Consequence for Loom |
-| --- | --- |
-| The matching [ExaThon rules](https://www.exasol.com/events/exathon-india-2026/) require Exasol Personal as the data platform. | Core records and analytics must actually run on Exasol, with reproducible query evidence. |
-| [Personal documentation](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm) describes a free, fully functional edition for individual use with a single-user restriction. | Demo with synthetic personas; resolve applicable event/edition permissions before real shared use. A shared backend credential does not establish licensing permission. |
-| The current [developer hub](https://www.exasol.com/developers/) supports local Linux/WSL using Podman, alongside native macOS and Windows instructions. | Use the current local starter kit on this Linux workspace; do not assume Docker alone is the supported launcher path. |
-| [Transaction management](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm) documents serializable transactions, object-level locking, collision rollbacks, and default autocommit. | Batch small writes, explicitly control transaction scope, and test full-transaction retries. PostgreSQL row-lock/queue recipes cannot be copied. |
-| The official [TypeScript driver](https://github.com/exasol/exasol-driver-ts) supports encrypted Node connections, prepared statements, and local file import. | Keep the TypeScript backend; isolate the driver behind a repository adapter. |
-| [Constraint guidance](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm) distinguishes supported keys from unsupported UNIQUE/CHECK constraints. | Use enabled primary keys for command receipts and membership identities; validate business rules in the application. |
+| Finding from primary sources                                                                                                                                                                                     | Consequence for Loom                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The matching [ExaThon rules](https://www.exasol.com/events/exathon-india-2026/) require Exasol Personal as the data platform.                                                                                    | Core records and analytics must actually run on Exasol, with reproducible query evidence.                                                                               |
+| [Personal documentation](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm) describes a free, fully functional edition for individual use with a single-user restriction.                        | Demo with synthetic personas; resolve applicable event/edition permissions before real shared use. A shared backend credential does not establish licensing permission. |
+| The current [developer hub](https://www.exasol.com/developers/) supports local Linux/WSL using Podman, alongside native macOS and Windows instructions.                                                          | Use the current local starter kit on this Linux workspace; do not assume Docker alone is the supported launcher path.                                                   |
+| [Transaction management](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm) documents serializable transactions, object-level locking, collision rollbacks, and default autocommit. | Batch small writes, explicitly control transaction scope, and test full-transaction retries. PostgreSQL row-lock/queue recipes cannot be copied.                        |
+| The official [TypeScript driver](https://github.com/exasol/exasol-driver-ts) supports encrypted Node connections, prepared statements, and local file import.                                                    | Keep the TypeScript backend; isolate the driver behind a repository adapter.                                                                                            |
+| [Constraint guidance](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm) distinguishes supported keys from unsupported UNIQUE/CHECK constraints.                               | Use enabled primary keys for command receipts and membership identities; validate business rules in the application.                                                    |
 
 The general getting-started index contains older platform wording. Use the dedicated Personal page, current developer hub, and selected release documentation; record the tested release during M0. Free database software does not imply free cloud infrastructure. The earlier research revision performed no installation. During implementation, the old launcher failed on Linux. Podman was then installed and a checksum-verified 2.3.0 launcher brought up local Personal successfully. No cloud resources were created. See RUNBOOK for tested versions and results.
 
 ## Selected baseline
 
-| Area | Selection | Purpose |
-| --- | --- | --- |
-| Language/runtime | TypeScript, supported Node.js LTS, pnpm workspaces | Shared contracts and domain code. Pin compatible versions during implementation. |
-| Application framework | Next.js App Router with React and TypeScript | Basic queue, form, details, analytics, and review screens in one application. |
-| UI | Semantic HTML and a small plain-CSS token sheet initially | Accessible labels, keyboard focus, responsive layout; easy future redesign. Add primitives only as needed. |
-| Tables/forms/server state | TanStack Table/Query, React Hook Form, Zod | Reusable controls, validation, and authorized refetch. Server checks remain authoritative. |
-| HTTP/server boundary | Next.js Route Handlers in the Node.js runtime | Same-origin API, validated commands, identity checks, and structured errors. No separate Fastify server initially. |
-| Primary database | Exasol Personal | Requests, history, memberships, tool definitions, approved knowledge, proposals, execution receipts, audit, imports, and query evidence. |
-| Database driver | `@exasol/exasol-driver-ts` with Node `ws` | Server-only TLS connections and bound SQL values. Driver 0.8.1 passed the current live checks through an adapter using its public prepared-statement commands. |
-| SQL/data access | Loom-owned Exasol repositories and reviewed versioned SQL | No assumed Drizzle/Prisma Exasol dialect. Separate data access from domain services. |
-| Analytics | Exasol SQL views and parameterized query registry | Backlog age, status duration, SLA risk, missing requirements, duplicate candidates, and owner workload. |
-| Authentication | Backend-verified identity contract using `jose` | Local-only synthetic demo identities; configured OIDC/JWT for an appropriately licensed shared deployment. No production bypass. |
-| Authorization | Explicit workspace/role predicates in the API and repository layer | Owner, operator, requester, viewer. No PostgreSQL RLS assumption and no browser DB credentials. |
-| Saved-record updates | Authorized polling/refetch initially | Basic working collaboration prototype without Supabase Realtime. SSE is optional after persistence works. |
-| CSV parsing | `csv-parse` 7.0.3, server-only | Bounded UTF-8 parsing, explicit column mapping, persisted Exasol preview, atomic import, and formula-safe scoped export. See RUNBOOK for current limits. |
-| Source files | Bounded upload staging on a private local volume; canonical text/metadata in Exasol | Keep raw files outside SQL where appropriate. Download access is checked by the API. No mandatory cloud storage. |
-| Model integration | Server-only OpenRouter adapter using native fetch and strict JSON-schema responses | Configurable model ID, free-form task, approved knowledge, bounded inference outside SQL transactions. No hardcoded recommendations or fallback engine. |
-| Agent state | Explicit persisted runs, steps, immutable proposals, and receipts in Exasol | The `openrouter-v1` runner persists input snapshots, inference-attempt leases, checkpoints, model/usage metadata, and exact reviewed proposals. At most 20 records and two explicit calls per checkpoint; live restart verification remains pending. |
-| Mutation concurrency | One write coordinator in one backend instance | Serialize local commands, membership changes, and run persistence; use database transactions and expected versions. Not a distributed lock. |
-| Retrieval | Authorized active approved knowledge supplied as model context | Bounded small-corpus context, no hardcoded dataset matcher. General retrieval/ranking remains pending. |
-| Tests/evaluation | Vitest, real Exasol integration fixtures, Playwright, Promptfoo | Verify real SQL, commit/rollback, isolation boundaries, retries, UI flow, and grounded suggestions. |
-| Observability | Pino, Exasol-backed run/query/execution metadata | Query ID, parameters digest, data revision, row count, latency, run ID, review outcome. |
-| Delivery | Local Exasol Personal plus one self-hosted Next.js Node process | Reproducible synthetic-data demo. Horizontal replicas and serverless deployment are outside the first concurrency contract. |
+| Area                      | Selection                                                                           | Purpose                                                                                                                                                                                                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language/runtime          | TypeScript, supported Node.js LTS, pnpm workspaces                                  | Shared contracts and domain code. Pin compatible versions during implementation.                                                                                                                                                                     |
+| Application framework     | Next.js App Router with React and TypeScript                                        | Basic queue, form, details, analytics, and review screens in one application.                                                                                                                                                                        |
+| UI                        | Semantic HTML and a small plain-CSS token sheet initially                           | Accessible labels, keyboard focus, responsive layout; easy future redesign. Add primitives only as needed.                                                                                                                                           |
+| Tables/forms/server state | TanStack Table/Query, React Hook Form, Zod                                          | Reusable controls, validation, and authorized refetch. Server checks remain authoritative.                                                                                                                                                           |
+| HTTP/server boundary      | Next.js Route Handlers in the Node.js runtime                                       | Same-origin API, validated commands, identity checks, and structured errors. No separate Fastify server initially.                                                                                                                                   |
+| Primary database          | Exasol Personal                                                                     | Requests, history, memberships, tool definitions, approved knowledge, proposals, execution receipts, audit, imports, and query evidence.                                                                                                             |
+| Database driver           | `@exasol/exasol-driver-ts` with Node `ws`                                           | Server-only TLS connections and bound SQL values. Driver 0.8.1 passed the current live checks through an adapter using its public prepared-statement commands.                                                                                       |
+| SQL/data access           | Loom-owned Exasol repositories and reviewed versioned SQL                           | No assumed Drizzle/Prisma Exasol dialect. Separate data access from domain services.                                                                                                                                                                 |
+| Analytics                 | Exasol SQL views and parameterized query registry                                   | Backlog age, status duration, SLA risk, missing requirements, duplicate candidates, and owner workload.                                                                                                                                              |
+| Authentication            | Salted Node scrypt passwords, opaque hashed Exasol sessions, and HTTP-only cookies  | Workspace accounts, invite acceptance, and role authorization; explicit loopback-only demo identities. OIDC/SSO remains planned.                                                                                                                     |
+| Authorization             | Explicit workspace/role predicates in the API and repository layer                  | Owner, operator, requester, viewer. No PostgreSQL RLS assumption and no browser DB credentials.                                                                                                                                                      |
+| Saved-record updates      | Authorized polling/refetch initially                                                | Basic working collaboration prototype without Supabase Realtime. SSE is optional after persistence works.                                                                                                                                            |
+| CSV parsing               | `csv-parse` 7.0.3, server-only                                                      | Bounded UTF-8 parsing, explicit column mapping, persisted Exasol preview, atomic import, and formula-safe scoped export. See RUNBOOK for current limits.                                                                                             |
+| Source files              | Bounded upload staging on a private local volume; canonical text/metadata in Exasol | Keep raw files outside SQL where appropriate. Download access is checked by the API. No mandatory cloud storage.                                                                                                                                     |
+| Model integration         | Server-only OpenRouter adapter using native fetch and strict JSON-schema responses  | Configurable model ID, free-form task, approved knowledge, bounded inference outside SQL transactions. No hardcoded recommendations or fallback engine.                                                                                              |
+| External agents           | Official `@modelcontextprotocol/sdk` Streamable HTTP transport                      | Workspace-scoped bearer connections expose reads and review-only proposals to Codex, Claude Code, and compatible clients. The company runs its agent.                                                                                                |
+| Company appearance        | Versioned Exasol settings and derived CSS variables                                 | Owner onboarding publishes a raster logo, contrast-aware palette, bounded fonts and corners; colleagues receive the saved workspace theme.                                                                                                           |
+| Agent state               | Explicit persisted runs, steps, immutable proposals, and receipts in Exasol         | The `openrouter-v1` runner persists input snapshots, inference-attempt leases, checkpoints, model/usage metadata, and exact reviewed proposals. At most 20 records and two explicit calls per checkpoint; live restart verification remains pending. |
+| Mutation concurrency      | One write coordinator in one backend instance                                       | Serialize local commands, membership changes, and run persistence; use database transactions and expected versions. Not a distributed lock.                                                                                                          |
+| Retrieval                 | Authorized active approved knowledge supplied as model context                      | Bounded small-corpus context, no hardcoded dataset matcher. General retrieval/ranking remains pending.                                                                                                                                               |
+| Tests/evaluation          | Vitest, real Exasol integration fixtures, Playwright, Promptfoo                     | Verify real SQL, commit/rollback, isolation boundaries, retries, UI flow, and grounded suggestions.                                                                                                                                                  |
+| Observability             | Pino, Exasol-backed run/query/execution metadata                                    | Query ID, parameters digest, data revision, row count, latency, run ID, review outcome.                                                                                                                                                              |
+| Delivery                  | Local Exasol Personal plus one self-hosted Next.js Node process                     | Reproducible synthetic-data demo. Horizontal replicas and serverless deployment are outside the first concurrency contract.                                                                                                                          |
 
 This table describes the target stack; implemented components and verification limits are recorded in RUNBOOK. TanStack, React Hook Form, jose, AI SDK, Pino, and Promptfoo are not installed yet; the first basic UI uses React state/native controls and local sessions use Node HMAC. Exasol is optimized for analytics; the initial write workload is deliberately small and serialized. Do not claim production OLTP throughput from a successful demo.
 
 ## What changes from the previous stack
 
-| Earlier assumption | Revised decision |
-| --- | --- |
-| Separate Vite frontend and Fastify API | Next.js pages/layouts and Node Route Handlers; shared domain modules remain independent of the framework. |
-| PostgreSQL as authoritative store | Exasol Personal stores canonical application records and performs analytical queries. No duplicate authoritative PostgreSQL store. |
-| Supabase database/Auth/Storage/Realtime bundle | Remove the bundle requirement. Identity, private upload staging, and saved-record refresh have explicit application contracts. |
-| Drizzle with `pg` and PostgreSQL migrations | Exasol driver adapter and `exasol/migrations` SQL history. |
-| JSONB/UUID/partial indexes/RLS policies | Portable scalar columns, canonical validated JSON text, explicit workspace checks, and Exasol-tested constraints. |
-| PostgreSQL full-text search and pgvector | Rule/key matching and bounded normalized text lookup; semantic retrieval deferred. |
-| pg-boss and `SKIP LOCKED` | Persisted work items plus one runner/coordinator; prove recovery before adding parallel workers. |
-| Transaction-local actor settings and per-row locks | Verified actor passed to every repository call; single write path and Exasol transaction/version checks. |
+| Earlier assumption                                 | Revised decision                                                                                                                   |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Separate Vite frontend and Fastify API             | Next.js pages/layouts and Node Route Handlers; shared domain modules remain independent of the framework.                          |
+| PostgreSQL as authoritative store                  | Exasol Personal stores canonical application records and performs analytical queries. No duplicate authoritative PostgreSQL store. |
+| Supabase database/Auth/Storage/Realtime bundle     | Remove the bundle requirement. Identity, private upload staging, and saved-record refresh have explicit application contracts.     |
+| Drizzle with `pg` and PostgreSQL migrations        | Exasol driver adapter and `exasol/migrations` SQL history.                                                                         |
+| JSONB/UUID/partial indexes/RLS policies            | Portable scalar columns, canonical validated JSON text, explicit workspace checks, and Exasol-tested constraints.                  |
+| PostgreSQL full-text search and pgvector           | Rule/key matching and bounded normalized text lookup; semantic retrieval deferred.                                                 |
+| pg-boss and `SKIP LOCKED`                          | Persisted work items plus one runner/coordinator; prove recovery before adding parallel workers.                                   |
+| Transaction-local actor settings and per-row locks | Verified actor passed to every repository call; single write path and Exasol transaction/version checks.                           |
 
 Keep the earlier papers and repository comparisons as research history, but mark PostgreSQL-specific implementations as superseded or deferred.
 
@@ -120,18 +122,18 @@ The web, contracts, domain, db-exasol, analytics, migration, and script director
 
 ## Configuration contract
 
-| Configuration | Visibility/purpose |
-| --- | --- |
-| `EXASOL_HOST`, `EXASOL_PORT`, `EXASOL_SCHEMA` | Backend connection target and code-validated schema. |
-| `EXASOL_USER`, `EXASOL_PASSWORD` | Backend only; authorized Personal deployment credentials. |
-| `EXASOL_CA_FILE` | Backend path to trusted deployment CA material. |
-| `EXASOL_READ_POOL_SIZE`, `EXASOL_WRITE_CONCURRENCY` | Small evaluated read pool; write concurrency fixed to one initially. |
-| `LOOM_AUTH_MODE` | Explicit local-demo or configured identity-provider mode. Demo mode disabled for production. |
-| `OIDC_ISSUER`, `OIDC_JWKS_URL`, `OIDC_AUDIENCE` | Required when configured JWT identity is used. |
-| `APP_ORIGIN` | Same-origin Next.js application and permitted mutation origin; no Vite-specific variables. |
-| `UPLOAD_DIRECTORY` | Private local upload staging; outside public web assets. |
-| `LLM_PROVIDER`, `LLM_MODEL`, provider credential | Backend only, selected through fixture evaluation. |
-| Run/upload/query limits | Bounded result rows, deadlines, retries, and model spend. |
+| Configuration                                       | Visibility/purpose                                                                           |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `EXASOL_HOST`, `EXASOL_PORT`, `EXASOL_SCHEMA`       | Backend connection target and code-validated schema.                                         |
+| `EXASOL_USER`, `EXASOL_PASSWORD`                    | Backend only; authorized Personal deployment credentials.                                    |
+| `EXASOL_CA_FILE`                                    | Backend path to trusted deployment CA material.                                              |
+| `EXASOL_READ_POOL_SIZE`, `EXASOL_WRITE_CONCURRENCY` | Small evaluated read pool; write concurrency fixed to one initially.                         |
+| `LOOM_AUTH_MODE`                                    | Explicit local-demo or configured identity-provider mode. Demo mode disabled for production. |
+| `OIDC_ISSUER`, `OIDC_JWKS_URL`, `OIDC_AUDIENCE`     | Required when configured JWT identity is used.                                               |
+| `APP_ORIGIN`                                        | Same-origin Next.js application and permitted mutation origin; no Vite-specific variables.   |
+| `UPLOAD_DIRECTORY`                                  | Private local upload staging; outside public web assets.                                     |
+| `LLM_PROVIDER`, `LLM_MODEL`, provider credential    | Backend only, selected through fixture evaluation.                                           |
+| Run/upload/query limits                             | Bounded result rows, deadlines, retries, and model spend.                                    |
 
 A redacted `.env.example` is now provided. `LOOM_SESSION_SECRET` signs local synthetic sessions; `LOOM_ALLOW_DEMO_PRODUCTION` explicitly permits loopback-only synthetic sign-in in a production build. `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_MAX_OUTPUT_TOKENS`, and `OPENROUTER_TIMEOUT_MS` configure the implemented provider adapter. OIDC, storage, and pool configuration rows remain future contracts. Do not copy local credentials into documentation. Retire the earlier `DATABASE_URL_*`, `SUPABASE_*`, and embedding-specific variables from the selected baseline.
 
@@ -140,7 +142,7 @@ A redacted `.env.example` is now provided. `LOOM_SESSION_SECRET` signs local syn
 - Prefer local Personal on the current Linux host using the documented Podman route. Record launcher, database, and driver versions and hardware actually tested.
 - No cloud account is needed for the local path. AWS/Azure are alternatives, not pre-authorized infrastructure creation or free compute.
 - Personal's individual/single-user terms must be distinguished from the future multi-user product. Use public/synthetic data and role personas for the event demonstration. Obtain applicable organizer/vendor clarification before an actual shared service; do not infer an exception from a shared SQL login.
-- Text AI, UDFs, MCP, and advanced deployment features are optional future spikes. Local/cloud availability differs; the core workflow must work with ordinary SQL and the supported driver.
+- Exasol-provided Text AI, UDFs, MCP, and advanced deployment features are optional future spikes. Loom's application-level MCP endpoint is implemented separately with the official SDK. Local/cloud availability differs; the core workflow uses ordinary SQL and the supported driver.
 - If Node driver compatibility blocks M0, evaluate [PyExasol](https://github.com/exasol/pyexasol) behind a narrow adapter. Add Python only with a recorded reason; it is not the default.
 
 ## Primary references
@@ -152,3 +154,9 @@ A redacted `.env.example` is now provided. `LOOM_SESSION_SECRET` signs local syn
 OpenRouter integration references: [structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs), [provider routing/parameter support](https://openrouter.ai/docs/guides/routing/provider-selection), [chat completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request).
 
 Free-tier deployment: set `OPENROUTER_MODEL=openrouter/free` and `OPENROUTER_FREE_ONLY=true` (the latter defaults to true). The model ID remains configuration, not application logic. Free-only requests include zero input/output/per-request price limits. The router selects compatible free models per request, subject to account privacy/capacity limits; successive requests may use the same model. Inference metadata preserves the actual model. Leave optional reasoning overrides unset so endpoints with mandatory reasoning remain eligible. `pnpm model:check` checks a live synthetic request. [Free router documentation](https://openrouter.ai/openrouter/free), [price caps](https://openrouter.ai/docs/guides/routing/provider-selection#max-price).
+
+Tool-building checkpoint: strict Loom-owned ToolSpec contracts and a small React component catalog now drive the request-family UI. Data/IT templates share one renderer. Native React controls provide manual refinement; a separate server-only OpenRouter adapter generates complete validated drafts. Exasol stores immutable draft/revision JSON, current publication pointers, lifecycle events, custom request values, and generation leases. Each workspace currently has one published tool; no json-render dependency or arbitrary code generation was introduced. See RUNBOOK for publication, compatibility, and current live-model limits.
+
+AI designer verification: `OPENROUTER_TOOL_MODEL` optionally overrides the generic triage model for generation. The local tested designer is `dots-studio/dots-3-note-preview:free`; no model ID is hardcoded in application logic. The flat v4 transport, real Exasol creation/refinement check, and real-provider production browser publication journey pass at reported cost zero. Structured provider errors and persisted cooldowns support explicit retries; actual inference metadata is retained with completed generations.
+
+Workspace access checkpoint: Node crypto scrypt, opaque database-backed sessions, and explicit workspace-role membership now support colleague accounts without introducing a second persistence platform. Exasol stores identities, session digests, invitation digests, membership revisions and audit. Shared records use authorized configurable polling with explicit stale-edit review. Local demo identities remain isolated by auth mode; shared-host mode uses password accounts and secure same-origin cookies. SSO/email verification/recovery and distributed coordination remain future extensions.

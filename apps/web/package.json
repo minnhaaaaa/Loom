@@ -13,6 +13,7 @@
     "@loom/contracts": "workspace:*",
     "@loom/db-exasol": "workspace:*",
     "@loom/domain": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@next/env": "16.4.2",
     "csv-parse": "^7.0.3",
     "next": "16.4.2",

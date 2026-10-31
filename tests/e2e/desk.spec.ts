@@ -5,7 +5,7 @@ test("preview is explicitly read-only and supports queue inspection", async ({
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await page.goto("/?view=records");
   await expect(
     page.getByText("Read-only sample preview", { exact: true }),
   ).toBeVisible();
@@ -43,7 +43,7 @@ test("preview is explicitly read-only and supports queue inspection", async ({
 test("intake renders the supported field specification without pretending to save", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/?view=records");
   await page
     .getByRole("button", { name: "+ New request", exact: true })
     .click();
@@ -58,7 +58,7 @@ test("intake renders the supported field specification without pretending to sav
 });
 test("mobile preview keeps the page within the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/?view=records");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

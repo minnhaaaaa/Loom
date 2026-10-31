@@ -1,6 +1,6 @@
 # Loom implementation plan
 
-Status: manual desk, approved knowledge, and OpenRouter inference/review implemented; live free-model schema verification passed; browser/restart checks are tracked separately; milestones still have unchecked scope. Updated: 2026-10-22.
+Status: first versioned tool-building slice implemented alongside the manual desk and reviewed agent workflow. Live AI tool creation/refinement and the reviewed publication browser journey pass; broad quality evaluation and remaining milestone gates are separate work. Updated: 2026-10-27.
 
 ## Objective
 
@@ -8,7 +8,7 @@ Deliver a working data-request desk that a team lead can describe, refine, and s
 
 The user has accepted coordination pain as a promising problem. This is product direction, not evidence of willingness to pay or measured time savings. Validate those through user exercises with synthetic data; the event submission excludes employer/proprietary data.
 
-Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.md](ARCHITECTURE.md) together. Milestones are ordered by dependencies, not calendar promises. Checked tasks have a verified implementation; unchecked tasks include partial work awaiting the stated acceptance checks. No milestone is complete yet. See [RUNBOOK.md](RUNBOOK.md) for the current build.
+Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.md](ARCHITECTURE.md) together. Milestones are ordered by dependencies, not calendar promises. Checked tasks have a verified implementation; unchecked tasks include partial work awaiting the stated acceptance checks. Completed implementation slices and remaining acceptance gates are distinguished below. See [RUNBOOK.md](RUNBOOK.md) for the current build.
 
 ## Current checkpoint
 
@@ -19,6 +19,10 @@ Read [README.md](README.md), [TECH_STACK.md](TECH_STACK.md), and [ARCHITECTURE.m
 - SQL-backed search/status filters and 25-row pagination, reviewed CSV mapping/import, atomic batch receipts, and scoped CSV export are implemented. Imports start with 100 rows per batch; exports with 500 matching records.
 - Approved internal knowledge now supports drafts, owner approval, supersession, retirement, source hashes, effective dates, and evidence inspection. OpenRouter inference saves checkpoints and exact model-generated proposals, with inference outside Exasol transactions and approval through the shared command path.
 - The heuristic engine is removed. `openrouter-v1` requires an explicit key/model and free-form task. Test-only provider fixtures verify orchestration; a live free model completed the full schema at reported cost zero. Richer retrieval/analytics, generated tool publication, proposal editing, and production identity remain planned.
+
+## Tool-building checkpoint — 2026-10-27
+
+The next implementation slice follows Loom's core describe → assemble → refine → share workflow. See M2 and RUNBOOK for completed behavior, verification, and the remaining live-generation gate. The prior checkpoint above describes the pre-builder implementation and should not be read as the current feature boundary.
 
 ## Delivery rules
 
@@ -43,7 +47,7 @@ Dependencies: documentation revision complete; user resumed implementation on 20
 - [ ] Prove distinct mutation routes share one process-wide coordinator in the production Node build. No replicas or serverless deployment in this baseline.
 - [ ] Define ToolSpec, action/proposal/event/error contracts and the owner/operator/requester/viewer matrix.
 - [x] Seed two workspaces and synthetic role identities. Verify API and repository isolation, including direct forged requests.
-- [ ] Render a fixed request template without an LLM; evaluate json-render only as a thin optional adapter.
+- [x] Render a fixed request template without an LLM; use the Loom-owned catalog renderer without an additional json-render adapter.
 - [ ] Persist one bounded run/checkpoint and resume it after a server restart through an authenticated advance request. The previous engine passed; the new live-model restart path still needs verification.
 
 Acceptance: a real Exasol connection passes transaction, key, identity-isolation, and concurrent-route checks; a static tool renders in Next.js; persisted state survives restart. Record tested versions and limitations. Mock-only success does not satisfy this milestone. If the TypeScript driver blocks progress, record the failing contract before evaluating PyExasol as a narrow fallback.
@@ -57,7 +61,7 @@ Dependencies: M0.
 - [x] Implement workspace membership and current-permission checks.
 - [x] Create request, comment, revision, activity, and audit tables with enabled composite workspace keys verified on Exasol.
 - [x] Implement request creation, own-request listing, team queue listing, details, comments, and controlled updates.
-- [ ] Render intake form, table, details, filters, and summary cards from `ToolSpec`.
+- [x] Render intake form, table, details, filters, and summary cards from `ToolSpec`.
 - [x] Support statuses `new`, `needs_info`, `ready`, `in_progress`, `done`, and `cancelled`.
 - [x] Separate hard intake requirements from readiness requirements; imported historical records may be incomplete and must be marked accordingly.
 - [x] Implement owner and due-date controls, pagination, and requester-visible status.
@@ -83,15 +87,17 @@ Acceptance: changing imported or persisted requests changes verified SQL metrics
 
 Dependencies: M1.
 
-- [ ] Generate a draft `ToolSpec` using the supported catalog and current template context.
-- [ ] Validate schema shape, field keys, view bindings, action references, limits, and transition references.
-- [ ] Show assumptions, unsupported requests, and an actionable validation error when generation fails.
-- [ ] Provide direct controls for labels, requiredness, visible fields, filters, and status labels.
-- [ ] Preview a draft and show changes relative to the published revision.
-- [ ] Publish using the expected current revision; keep existing clients on a valid published revision until refresh.
-- [ ] Limit MVP structural edits to compatible changes; require backfill or defer destructive/type-changing edits.
-- [ ] Restore an older compatible definition by publishing a new revision, without reverting business records.
-- [ ] Render an IT-request template through the same contracts and renderer.
+- [x] Generate a draft `ToolSpec` using the supported catalog and current template context.
+- [x] Validate schema shape, field keys, view bindings, action references, limits, and transition references.
+- [x] Show assumptions, unsupported requests, and an actionable validation error when generation fails.
+- [x] Provide direct controls for labels, requiredness, visible fields, filters, and status labels.
+- [x] Preview a draft and show changes relative to the published revision.
+- [x] Publish using the expected current revision; keep existing clients on a valid published revision until refresh.
+- [x] Limit MVP structural edits to compatible changes; require backfill or defer destructive/type-changing edits.
+- [x] Restore an older compatible definition by publishing a new revision, without reverting business records.
+- [x] Render an IT-request template through the same contracts and renderer.
+
+Current M2 implementation: the supported request-family tool-building slice is implemented and verified. Strict catalog validation, shared rendering, direct editing, optional custom fields, immutable drafts/revisions, exact-hash owner publication, compatible restoration, and actual model generation use the same contracts. A live synthetic check created a facilities desk with a Location field, published it, created a request, refined the tool with an Asset tag field, and published again without changing the existing request's data/version. A separate production browser journey used the real model, reloaded its saved draft, inspected inference metadata and assumptions, reviewed/published it, opened the result as a requester, and restored the original definition. All four successful live calls used the pinned free designer and reported cost zero. This is small-sample correctness evidence, not the proposed 95% generation-quality measurement. Scope remains one request-family tool per workspace; custom intake tightening, destructive edits, multiple independent tools, SSO/email verification/password recovery, and broad quality/productivity evaluation remain deferred.
 
 Acceptance: an owner describes a desk and gets a working draft; a follow-up adds an optional field without losing records. A required-field change shows its impact on existing requests. Unknown components or generated expressions never execute. Concurrent publication produces a clear conflict. The second template does not require a separate app implementation.
 
@@ -99,13 +105,15 @@ Acceptance: an owner describes a desk and gets a working draft; a follow-up adds
 
 Dependencies: M1; can proceed before M2 is complete.
 
-- [ ] Use authenticated polling/refetch after mutations, tab focus, reconnect, and a modest configurable interval.
-- [ ] Apply current role/own-request scope to every read, including activity, counts, exports, and query results.
-- [ ] Retain unsaved input on version conflict and show the authorized current state.
-- [ ] Clear inaccessible local data when a refresh is denied; isolate caches by identity and workspace.
-- [ ] Keep transactional outbox events for durable change history; SSE/presence are optional extensions after core correctness.
+- [x] Use authenticated polling/refetch after mutations, tab focus, reconnect, and a modest configurable interval.
+- [x] Apply current role/own-request scope to every read, including activity, counts, exports, and query results.
+- [x] Retain unsaved input on version conflict and show the authorized current state.
+- [x] Clear inaccessible local data when a refresh is denied; isolate caches by identity and workspace.
+- [x] Keep transactional outbox events for durable change history; SSE/presence are optional extensions after core correctness.
 
 Acceptance: two synthetic browser personas see acknowledged saved updates, simultaneous edits do not silently overwrite, and revocation denies subsequent fetches. Requesters never receive internal activity or other requesters' identifiers.
+
+Current M3 implementation: password accounts, expiring single-use invitations, authorized workspace switching/deep links, owner membership administration, polling of queue/details/access, and explicit version-conflict review are implemented. Database and two-browser journeys verify scope, last-owner protection, role changes, revocation, and preserved drafts. Public-host configuration is documented separately; SSO, email verification/reset, realtime presence/SSE and distributed replicas remain outside this slice. The account-only two-browser journey and all20 real SQL tests passed; public hosting remains a separate deployment choice.
 
 ## M4 — Approved team knowledge
 
@@ -115,13 +123,13 @@ Dependencies: M1.
 - [ ] Store canonical source revisions, content hashes, visibility, owners, and provenance.
 - [ ] Implement knowledge states: draft, approved, superseded, retired; preserve case-specific exceptions separately.
 - [x] Require an owner to publish reusable procedures or rules.
-- [ ] Add searchable active approved knowledge with explicit applicability and effective dates.
-- [ ] Implement bounded normalized-term retrieval and exact-key lookup in Exasol with access filtering before retrieval results reach the model.
+- [x] Add searchable active approved knowledge with explicit applicability and effective dates.
+- [x] Implement bounded normalized-term retrieval and exact-key lookup in Exasol with access filtering before retrieval results reach the model.
 - [x] Support source inspection and permission-checked evidence links.
 - [ ] Evaluate whether the model reliably identifies conflicting approved guidance and asks for clarification. This is no longer a hardcoded branch.
 - [ ] Defer semantic retrieval; if the lexical baseline fails, evaluate an Exasol-compatible approach against frozen authorized fixtures before choosing additional infrastructure.
 
-Current M4 scope: internal plain-text entries (up to 4,000 characters), immutable replacement drafts linked to their predecessor, owner-controlled lifecycle, validity dates, and bounded model context containing active approved prose. Full source upload, general search, requester-visible knowledge, and case-specific decision records remain unfinished.
+Current M4 scope: internal plain-text entries (up to 4,000 characters), immutable replacement drafts, owner-controlled lifecycle, validity dates, normalized keyword/ID/metadata search, bounded relevant model context, a source-linked relationship projection, and a combined activity timeline. Source uploads, semantic search, requester-visible knowledge, and historical graph reconstruction remain unfinished.
 
 Acceptance: an active approved routing rule is retrieved; a draft or retired rule is not treated as authority. A requester cannot retrieve internal procedures. Updating or revoking a source invalidates dependent reusable knowledge and pending proposals. Search failure is distinguishable from a legitimate no-match result.
 
@@ -150,11 +158,13 @@ Acceptance: agent-assisted triage completes on a selected batch. No request is m
 Dependencies: M4 and M5.
 
 - [ ] Let an operator record why a recommendation was corrected.
-- [ ] Let the agent or operator propose a scoped reusable rule with evidence.
+- [x] Let an operator propose a scoped reusable rule from an applied proposal with evidence.
 - [ ] Require owner review of applicability, precedence, effective date, and source visibility.
-- [ ] Preserve the original decision as a case-specific record regardless of rule publication.
-- [ ] Retrieve approved guidance on a subsequent request and expose its source/version.
-- [ ] Support supersession, retirement, and correction without rewriting history.
+- [x] Preserve the original decision as a case-specific record regardless of rule publication.
+- [x] Retrieve approved guidance on a subsequent request and expose its source/version.
+- [x] Support supersession, retirement, and correction without rewriting history.
+
+Current M6 scope: an eligible teammate writes guidance and a rationale from an applied proposal. The immutable draft records its proposal/hash/run/record/version/reviewer provenance. Source freshness is rechecked at draft creation and owner approval; the owner must approve separately before later retrieval. Replacements inherit verified lineage. Real Exasol tests verify the draft → approval → later citation loop with a test-only model fixture. Direct manual-correction capture, agent-authored rule proposals, explicit precedence controls, and broad model-quality evaluation remain deferred.
 
 Acceptance: a correction remains an exception until reviewed. Once approved as guidance, it influences an applicable later request. It does not influence unrelated requests or a user who lacks access. Retiring it removes it from future authoritative context and prevents pending dependent changes from being applied.
 
@@ -181,20 +191,20 @@ Create a small versioned knowledge corpus containing approved, draft, superseded
 
 All thresholds below are proposed release targets, not achieved results. Revise them with pilot evidence and report counts alongside percentages.
 
-| Dimension | Initial gate | How to assess |
-| --- | --- | --- |
-| Authorization | Zero unauthorized reads/writes in the defined isolation suite | Assert API responses, context inputs, query scope, storage access, and database state. |
-| Change integrity | Every stale or tampered approval rejected; every committed action audited | Concurrent transactions, proposal-edit tests, retry/replay tests. |
-| Request intake | Required intake checks deterministic and consistent | Schema and end-to-end fixture assertions; no model judge needed. |
-| Tool generation | At least 95% of supported prompts produce valid drafts within the configured attempt budget | Fixed supported prompt set; separately report semantic suitability. |
-| Owner suggestions | At least 85% correct on cases with clear approved routing evidence | Human-labeled owner IDs; unknown cases scored separately for abstention. |
-| Missing requirements | At least 90% precision and recall on labeled cases | Compare field IDs and clarification needs with gold labels. |
-| Evidence | At least 90% of actionable recommendations supported by the cited active guidance | Human review of claim-to-source support; citation existence alone is insufficient. |
-| Memory updates | All deterministic scope/retirement fixtures pass | Verify current approved rule selection, historical preservation, and invalidation. |
-| Retrieval | Record lexical baseline; target at least 90% recall@5 on applicable approved-rule cases | Gold evidence IDs, scoped to authorized searchable content. |
-| Product usefulness | Target at least 30% lower median coordination time versus current process | Time clarification, routing, and review on matched batches; report quality and sample size. |
-| Collaboration | No lost acknowledged updates in the concurrency suite | Two-user writes, reconnects, version conflicts, event redelivery. |
-| Cost and latency | Choose a budget before the pilot; record median and p95 per operation | Include unsuccessful generations and retries in cost totals. |
+| Dimension            | Initial gate                                                                                | How to assess                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Authorization        | Zero unauthorized reads/writes in the defined isolation suite                               | Assert API responses, context inputs, query scope, storage access, and database state.      |
+| Change integrity     | Every stale or tampered approval rejected; every committed action audited                   | Concurrent transactions, proposal-edit tests, retry/replay tests.                           |
+| Request intake       | Required intake checks deterministic and consistent                                         | Schema and end-to-end fixture assertions; no model judge needed.                            |
+| Tool generation      | At least 95% of supported prompts produce valid drafts within the configured attempt budget | Fixed supported prompt set; separately report semantic suitability.                         |
+| Owner suggestions    | At least 85% correct on cases with clear approved routing evidence                          | Human-labeled owner IDs; unknown cases scored separately for abstention.                    |
+| Missing requirements | At least 90% precision and recall on labeled cases                                          | Compare field IDs and clarification needs with gold labels.                                 |
+| Evidence             | At least 90% of actionable recommendations supported by the cited active guidance           | Human review of claim-to-source support; citation existence alone is insufficient.          |
+| Memory updates       | All deterministic scope/retirement fixtures pass                                            | Verify current approved rule selection, historical preservation, and invalidation.          |
+| Retrieval            | Record lexical baseline; target at least 90% recall@5 on applicable approved-rule cases     | Gold evidence IDs, scoped to authorized searchable content.                                 |
+| Product usefulness   | Target at least 30% lower median coordination time versus current process                   | Time clarification, routing, and review on matched batches; report quality and sample size. |
+| Collaboration        | No lost acknowledged updates in the concurrency suite                                       | Two-user writes, reconnects, version conflicts, event redelivery.                           |
+| Cost and latency     | Choose a budget before the pilot; record median and p95 per operation                       | Include unsuccessful generations and retries in cost totals.                                |
 
 Model judges can help assess phrasing and support, but cannot authorize actions or replace database assertions. Do not generalize small-sample pilot results into market-wide productivity claims.
 
@@ -238,15 +248,15 @@ Do not add a graph database, autonomous agent team, offline editing, arbitrary c
 
 ## Open decisions and risks
 
-| Decision/risk | Default | Evidence that changes it |
-| --- | --- | --- |
-| Event data and users | Synthetic analytics scenarios and consenting testers | Real-team pilots require separate data permission and applicable edition terms. |
-| Agent provider/model | One provider selected with fixtures | Grounded task quality, latency, price, and permitted data handling. |
-| Renderer adapter | Loom-owned schema, thin catalog renderer | M0 spike proves json-render fits without obscuring domain contracts. |
-| Semantic retrieval | Lexical/structured retrieval first | Measured retrieval failures and a passing hybrid-search comparison. |
-| Workflow too broad | Data-request desk first | Repeated demand for another workflow using the same primitives. |
-| Existing ticket tool already sufficient | Validate coordination benefit before integration breadth | Pilot users cannot demonstrate a meaningful reason to adopt Loom. |
-| Capacity remains the bottleneck | Report triage and fulfillment separately | Actual throughput and queue-age evidence. |
+| Decision/risk                           | Default                                                  | Evidence that changes it                                                        |
+| --------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Event data and users                    | Synthetic analytics scenarios and consenting testers     | Real-team pilots require separate data permission and applicable edition terms. |
+| Agent provider/model                    | One provider selected with fixtures                      | Grounded task quality, latency, price, and permitted data handling.             |
+| Renderer adapter                        | Loom-owned schema, thin catalog renderer                 | M0 spike proves json-render fits without obscuring domain contracts.            |
+| Semantic retrieval                      | Lexical/structured retrieval first                       | Measured retrieval failures and a passing hybrid-search comparison.             |
+| Workflow too broad                      | Data-request desk first                                  | Repeated demand for another workflow using the same primitives.                 |
+| Existing ticket tool already sufficient | Validate coordination benefit before integration breadth | Pilot users cannot demonstrate a meaningful reason to adopt Loom.               |
+| Capacity remains the bottleneck         | Report triage and fulfillment separately                 | Actual throughput and queue-age evidence.                                       |
 
 ## Definition of done
 

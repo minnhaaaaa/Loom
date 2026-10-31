@@ -96,6 +96,34 @@ describe("OpenRouter model adapter (HTTP fixtures, no live model calls)", () => 
       expect(fetch).toHaveBeenCalledTimes(1);
     }
   });
+  it("classifies body-level rate limits and non-JSON HTTP rate limits before envelope validation", async () => {
+    configured();
+    for (const response of [
+      Response.json(
+        {
+          error: { code: 429, message: "Private provider capacity diagnostic" },
+        },
+        { headers: { "Retry-After": "75" } },
+      ),
+      new Response("<html>Private upstream proxy diagnostic</html>", {
+        status: 429,
+        headers: { "Retry-After": "75" },
+      }),
+    ]) {
+      const fetch = vi.fn().mockResolvedValue(response);
+      vi.stubGlobal("fetch", fetch);
+      const error = await inferProposal({}, "configured/model").catch(
+        (failure: unknown) => failure,
+      );
+      expect(error).toMatchObject({
+        code: "MODEL_HTTP_429",
+        status: 429,
+        details: { retryable: true, retryAfterSeconds: 75 },
+      });
+      expect((error as Error).message).not.toContain("Private");
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
+  });
   it("rejects truncated, malformed, unsupported-action, and oversized outputs", async () => {
     configured();
     for (const body of [

@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { toolSpec } from "@loom/contracts";
+import { toolSpec, type ToolSpec } from "@loom/contracts";
 import type { CsvMapping } from "@/server/csv";
 import type { ImportPreview } from "@/server/imports";
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -25,16 +25,22 @@ const unmapped: CsvMapping = {
   dataset: null,
 };
 export function CsvTransfer({
+  spec = toolSpec,
   operates,
   search,
   status,
   onImported,
 }: {
+  spec?: ToolSpec;
   operates: boolean;
   search: string;
   status: string;
   onImported: () => Promise<void>;
 }) {
+  const csvFields = spec.fields.filter(
+    (field): field is typeof field & { id: keyof CsvMapping } =>
+      Object.hasOwn(unmapped, field.id),
+  );
   const [text, setText] = useState(""),
     [headers, setHeaders] = useState<string[]>([]),
     [mapping, setMapping] = useState<CsvMapping>(unmapped);
@@ -67,7 +73,7 @@ export function CsvTransfer({
       setHeaders(data.headers);
       setMapping(
         Object.fromEntries(
-          toolSpec.fields.map((field) => {
+          csvFields.map((field) => {
             const index = data.headers.findIndex((h) =>
               [field.id.toLowerCase(), field.label.toLowerCase()].includes(
                 h.toLowerCase(),
@@ -183,7 +189,7 @@ export function CsvTransfer({
           </label>
           {headers.length > 0 && (
             <div className="csv-mapping">
-              {toolSpec.fields.map((field) => (
+              {csvFields.map((field) => (
                 <label key={field.id}>
                   {field.label}
                   <select
@@ -232,7 +238,7 @@ export function CsvTransfer({
                   <thead>
                     <tr>
                       <th>CSV record</th>
-                      {toolSpec.fields.map((f) => (
+                      {csvFields.map((f) => (
                         <th key={f.id}>{f.label}</th>
                       ))}
                       <th>Validation</th>
@@ -242,7 +248,7 @@ export function CsvTransfer({
                     {preview.rows.map((row) => (
                       <tr key={row.number}>
                         <td>{row.number}</td>
-                        {toolSpec.fields.map((f) => (
+                        {csvFields.map((f) => (
                           <td key={f.id}>{row.values?.[f.id] || "—"}</td>
                         ))}
                         <td>

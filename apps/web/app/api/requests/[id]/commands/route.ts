@@ -18,6 +18,7 @@ export async function POST(
       body.commandId,
       body.expectedVersion,
       body.command,
+      body.expectedToolRevision,
     );
   }, true)(request);
 }

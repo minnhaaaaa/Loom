@@ -10,6 +10,7 @@ export class DomainError extends Error {
     public code: string,
     message: string,
     public status = 422,
+    public details?: { retryAfterSeconds?: number; retryable?: boolean },
   ) {
     super(message);
   }
@@ -142,3 +143,16 @@ export function applyCommand(
 }
 
 export { activeKnowledge } from "./triage";
+export { brandTheme, brandContrast, type BrandThemeInput } from "./branding";
+export {
+  retrieveKnowledge,
+  buildMemoryGraph,
+  knowledgeQueryTerms,
+} from "./memory";
+export {
+  toolFieldValue,
+  toolRequirements,
+  assertToolValues,
+  assertToolAction,
+  assertToolCommand,
+} from "./tool-definition";

@@ -9,7 +9,7 @@ import {
   type TriageRun,
   type TriageStep,
   runStartSchema,
-  toolSpec,
+  type ToolSpec,
   modelSuggestionSchema,
   type Membership,
   type KnowledgeEntry,
@@ -19,6 +19,8 @@ import {
   applyCommand,
   transitions,
   DomainError,
+  assertToolCommand,
+  retrieveKnowledge,
 } from "@loom/domain";
 import {
   fromTimestamp,
@@ -30,6 +32,7 @@ import {
 } from "@loom/db-exasol";
 import {
   applyRequestCommand,
+  assertRecordSize,
   digest,
   getRequest,
   membersFor,
@@ -50,6 +53,8 @@ import {
   promptVersion,
   type ModelResult,
 } from "./openrouter";
+import { publishedTool } from "./tool-definitions";
+import { assertAgentConnection } from "./settings";
 function mapRun(row: Row): TriageRun {
   return {
     id: String(row.ID),
@@ -113,8 +118,8 @@ export async function listRuns(actor: Actor) {
   return readDatabase(async (sql) => {
     await requireOperator(sql, actor);
     const rows = await sql.query(
-      "SELECT * FROM AGENT_RUNS WHERE WORKSPACE_ID = ? AND INITIATOR_ID = ? ORDER BY CREATED_AT DESC,ID LIMIT 10",
-      [actor.workspaceId, actor.userId],
+      "SELECT * FROM AGENT_RUNS WHERE WORKSPACE_ID = ? ORDER BY CREATED_AT DESC,ID LIMIT 10",
+      [actor.workspaceId],
     );
     let configuration;
     try {
@@ -150,12 +155,13 @@ export async function startRun(
     const existing = await receipt<{ id: string }>(sql, actor, commandId, hash);
     if (existing) return getRun(sql, actor, existing.id);
     const config = modelConfiguration();
+    const tool = await publishedTool(sql, actor);
     for (const id of requestIds) await getRequest(sql, actor, member, id);
     const id = randomUUID(),
       now = new Date().toISOString(),
       expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
     await sql.execute(
-      "INSERT INTO AGENT_RUNS (WORKSPACE_ID,ID,INITIATOR_ID,REQUEST_IDS_JSON,STATUS,VERSION,CHECKPOINT,CREATED_AT,EXPIRES_AT,ENGINE,TOOL_REVISION,MODEL,INSTRUCTIONS,PROMPT_VERSION) VALUES (?,?,?,?,'queued',1,0,?,?,'openrouter-v1','request-desk-v1',?,?,?)",
+      "INSERT INTO AGENT_RUNS (WORKSPACE_ID,ID,INITIATOR_ID,REQUEST_IDS_JSON,STATUS,VERSION,CHECKPOINT,CREATED_AT,EXPIRES_AT,ENGINE,TOOL_REVISION,MODEL,INSTRUCTIONS,PROMPT_VERSION) VALUES (?,?,?,?,'queued',1,0,?,?,'openrouter-v1',?,?,?,?)",
       [
         actor.workspaceId,
         id,
@@ -163,6 +169,7 @@ export async function startRun(
         JSON.stringify(requestIds),
         sqlTimestamp(now),
         sqlTimestamp(expiresAt),
+        `request-desk-v${tool.revision}`,
         config.model,
         instructions,
         promptVersion,
@@ -173,12 +180,28 @@ export async function startRun(
     return getRun(sql, actor, id);
   });
 }
-function supportedRun(run: TriageRun) {
+function supportedRun(run: TriageRun, allowExternal = false) {
+  if (
+    allowExternal &&
+    run.engine === "conversation-v1" &&
+    run.promptVersion === "conversation-v1" &&
+    run.model &&
+    /^request-desk-v[1-9]\d*$/.test(run.toolRevision)
+  )
+    return;
+  if (
+    allowExternal &&
+    run.engine === "external-mcp-v1" &&
+    run.promptVersion === "external-mcp-v1" &&
+    /^external\/(codex|claude-code|other)$/.test(run.model || "") &&
+    /^request-desk-v[1-9]\d*$/.test(run.toolRevision)
+  )
+    return;
   if (
     run.engine !== "openrouter-v1" ||
     !run.model ||
     run.promptVersion !== promptVersion ||
-    run.toolRevision !== "request-desk-v1"
+    !/^request-desk-v[1-9]\d*$/.test(run.toolRevision)
   )
     throw new DomainError(
       "UNSUPPORTED_RUN",
@@ -188,6 +211,13 @@ function supportedRun(run: TriageRun) {
 }
 async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
   const member = await requireOperator(sql, actor);
+  const tool = await publishedTool(sql, actor);
+  if (run.toolRevision !== `request-desk-v${tool.revision}`)
+    throw new DomainError(
+      "STALE_TOOL",
+      "The tool was republished after this run started. Start a new run using its current definition.",
+      409,
+    );
   const request = await getRequest(
     sql,
     actor,
@@ -206,14 +236,42 @@ async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
       "This request has more than 20 comments. A bounded conversation retrieval strategy is required before model triage.",
       422,
     );
+  // Preserve a digest of the complete authorized active corpus. Retrieval limits
+  // the model's reading, never the dependencies checked before a later commit.
+  const query = [
+    request.dataset,
+    request.title,
+    run.instructions,
+    request.businessQuestion,
+    request.reportingPeriod,
+    ...Object.values(request.customValues || {}),
+  ]
+    .join(" ")
+    .slice(0, 4000);
+  const matches = retrieveKnowledge(knowledge, query, {
+    workspaceId: actor.workspaceId,
+    limit: 12,
+  });
   const context = {
     task: run.instructions,
     today: new Date().toISOString().slice(0, 10),
     request,
     comments,
-    knowledge,
+    knowledge: matches.map((match) => match.entry),
+    knowledgeDigest: knowledgeDigest(knowledge),
+    retrieval: {
+      method: "keyword-and-metadata-v1",
+      availableSources: knowledge.length,
+      selectedSources: matches.map(({ entry, score, matchedBy }) => ({
+        id: entry.id,
+        version: entry.version,
+        score,
+        matchedBy,
+      })),
+      bounded: matches.length < knowledge.length,
+    },
     members,
-    tool: toolSpec,
+    tool: tool.spec,
     allowedTransitions: transitions,
     promptVersion,
   };
@@ -225,12 +283,13 @@ async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
     );
   return context;
 }
-function validateSuggestion(
+export function validateSuggestion(
   result: ModelResult,
   request: RequestRecord,
   member: Membership,
   members: Membership[],
   knowledge: KnowledgeEntry[],
+  tool: ToolSpec,
 ) {
   const suggestion = modelSuggestionSchema.parse(result.suggestion);
   if (
@@ -252,6 +311,8 @@ function validateSuggestion(
       if (seen.has(key)) throw new Error("Duplicate action");
       seen.add(key);
       const next = applyCommand(member, after, command, members);
+      assertToolCommand(tool, command, next);
+      assertRecordSize(next);
       const stateValues = (value: typeof request) =>
         Object.fromEntries(
           Object.entries(value).filter(
@@ -443,6 +504,7 @@ export async function changeRun(
         member,
         context.members,
         context.knowledge,
+        context.tool,
       );
       let proposalId: string | null = null;
       if (suggestion.commands.length) {
@@ -455,7 +517,7 @@ export async function changeRun(
           initiatorId: run.initiatorId,
           engine: "openrouter-v1",
           inference: result.inference,
-          toolRevision: "request-desk-v1",
+          toolRevision: run.toolRevision,
           requestId: context.request.id,
           expectedVersion: context.request.version,
           before: context.request,
@@ -467,7 +529,7 @@ export async function changeRun(
             contentHash: entry.contentHash,
             title: entry.title,
           })),
-          knowledgeDigest: knowledgeDigest(context.knowledge),
+          knowledgeDigest: context.knowledgeDigest,
           reasons: suggestion.reasons,
           uncertainty: suggestion.uncertainty,
           expiresAt: run.expiresAt,
@@ -608,8 +670,8 @@ export async function reviewProposal(
         content.runId !== run.id ||
         content.requestId !== row.REQUEST_ID ||
         content.id !== id ||
-        content.engine !== "openrouter-v1" ||
-        content.toolRevision !== "request-desk-v1" ||
+        content.engine !== run.engine ||
+        content.toolRevision !== run.toolRevision ||
         content.initiatorId !== run.initiatorId
       )
         throw new DomainError(
@@ -624,7 +686,27 @@ export async function reviewProposal(
           "Request changed after triage. Reject this proposal and run triage again.",
           409,
         );
-      supportedRun(run);
+      supportedRun(run, true);
+      if (content.engine === "external-mcp-v1") {
+        if (!content.sourceConnectionId)
+          throw new DomainError(
+            "PROPOSAL_CONTEXT",
+            "This external proposal has no source connection.",
+            409,
+          );
+        await assertAgentConnection(
+          sql,
+          { workspaceId: actor.workspaceId, userId: run.initiatorId },
+          content.sourceConnectionId,
+        );
+      }
+      const currentTool = await publishedTool(sql, actor);
+      if (content.toolRevision !== `request-desk-v${currentTool.revision}`)
+        throw new DomainError(
+          "STALE_TOOL",
+          "The tool changed after triage. Reject this proposal and run triage again.",
+          409,
+        );
       const knowledge = await approvedKnowledge(sql, actor),
         today = new Date().toISOString().slice(0, 10);
       if (knowledgeDigest(knowledge) !== content.knowledgeDigest)

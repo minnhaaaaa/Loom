@@ -6,7 +6,7 @@ test("real Exasol workflow through the production UI and protected API", async (
   request,
 }) => {
   const title = `Browser fixture ${crypto.randomUUID().slice(0, 8)}`;
-  await page.goto("/");
+  await page.goto("/?view=records");
   await page
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[2].id);
@@ -167,7 +167,7 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
   page,
 }) => {
   const title = `CSV browser ${crypto.randomUUID().slice(0, 8)}`;
-  await page.goto("/");
+  await page.goto("/?view=records");
   await page
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[0].id);
@@ -236,6 +236,11 @@ test("CSV mapping, review, explicit commit, and scoped download in the productio
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[2].id);
   await expect(
+    page.getByText("Your work, in view", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("searchbox")).toHaveValue("");
+  await page.getByRole("searchbox").fill(title);
+  await expect(
     page.getByRole("heading", { name: "No matching requests" }),
   ).toBeVisible();
   await page.getByText("CSV import / export", { exact: true }).click();
@@ -278,10 +283,11 @@ test("live OpenRouter proposal and exact-change human review in the production U
   });
   expect(created.status()).toBe(200);
   const record = await created.json();
-  await page.goto("/");
+  await page.goto("/?view=settings");
   await page
     .getByRole("combobox", { name: "Demo persona" })
     .selectOption(personas[0].id);
+  await page.locator(".advanced-administration > summary").click();
   const workspace = page.getByRole("region", {
     name: "Triage and team knowledge",
   });
@@ -313,10 +319,6 @@ test("live OpenRouter proposal and exact-change human review in the production U
   await expect(
     workspace.getByText("Knowledge approved.", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("searchbox").fill(title);
-  await expect(
-    page.getByRole("region", { name: "Request queue" }).getByRole("row"),
-  ).toHaveCount(2);
   await workspace
     .getByText("Run triage and review proposals", { exact: true })
     .click();
@@ -352,6 +354,7 @@ test("live OpenRouter proposal and exact-change human review in the production U
     status: "new",
   });
   await page.reload();
+  await page.locator(".advanced-administration > summary").click();
   const restored = page.getByRole("region", {
     name: "Triage and team knowledge",
   });
@@ -359,7 +362,7 @@ test("live OpenRouter proposal and exact-change human review in the production U
     .getByText("Run triage and review proposals", { exact: true })
     .click();
   const recent = restored.getByRole("combobox", {
-    name: "Recent runs (your latest 10)",
+    name: "Recent runs (workspace latest 10)",
     exact: true,
   });
   await expect(recent.locator("option").nth(1)).toHaveAttribute("value", /.+/);

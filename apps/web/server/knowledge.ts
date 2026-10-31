@@ -5,6 +5,10 @@ import {
   type Actor,
   type KnowledgeEntry,
   type KnowledgeInput,
+  type KnowledgeProvenance,
+  type ProposalContent,
+  type ProposalKnowledgeInput,
+  proposalKnowledgeSchema,
   type Membership,
 } from "@loom/contracts";
 import { canOperate, DomainError, activeKnowledge } from "@loom/domain";
@@ -16,7 +20,8 @@ import {
   type Row,
   type SqlSession,
 } from "@loom/db-exasol";
-import { digest, membership, receipt } from "./desk";
+import { digest, getRequest, membership, receipt } from "./desk";
+import { publishedTool } from "./tool-definitions";
 export async function requireOperator(sql: SqlSession, actor: Actor) {
   const member = await membership(sql, actor);
   if (!canOperate(member))
@@ -157,30 +162,172 @@ export async function createKnowledge(
 ) {
   const values = knowledgeInputSchema.parse(input),
     hash = digest({ type: "knowledge-create", values });
+  if (values.provenance)
+    throw new DomainError(
+      "KNOWLEDGE_PROVENANCE",
+      "Create decision-backed knowledge from its reviewed proposal so the server can verify its source.",
+      422,
+    );
   return writeDatabase(async (sql) => {
     await requireOperator(sql, actor);
     const existing = await receipt<{ id: string }>(sql, actor, commandId, hash);
     if (existing) return getKnowledge(sql, actor, existing.id);
     await eligibleOwner(sql, actor, values);
-    if (values.supersedesId)
-      await getKnowledge(sql, actor, values.supersedesId);
-    const id = randomUUID(),
-      now = new Date().toISOString();
-    await sql.execute(
-      "INSERT INTO KNOWLEDGE_ENTRIES (WORKSPACE_ID,ID,VERSION,LIFECYCLE,KIND,DATASET,CONTENT_JSON,CONTENT_HASH,CREATED_BY,CREATED_AT,APPROVED_BY) VALUES (?,?,1,'draft',?,?,?,?,?,?,NULL)",
-      [
-        actor.workspaceId,
-        id,
-        values.kind,
-        values.dataset || null,
-        JSON.stringify(values),
-        digest(values),
-        actor.userId,
-        sqlTimestamp(now),
-      ],
-    );
-    await agentEvent(sql, actor, id, "knowledge_drafted", 1);
+    if (values.supersedesId) {
+      const previous = await getKnowledge(sql, actor, values.supersedesId);
+      // A replacement remains connected to the original reviewed decision.
+      // Clients cannot supply or rewrite the server-verified provenance.
+      if (previous.provenance) values.provenance = previous.provenance;
+    }
+    const id = await insertKnowledgeDraft(sql, actor, values);
     await saveReceipt(sql, actor, commandId, hash, { id });
+    return getKnowledge(sql, actor, id);
+  });
+}
+async function insertKnowledgeDraft(
+  sql: SqlSession,
+  actor: Actor,
+  values: KnowledgeInput,
+) {
+  const id = randomUUID();
+  await sql.execute(
+    "INSERT INTO KNOWLEDGE_ENTRIES (WORKSPACE_ID,ID,VERSION,LIFECYCLE,KIND,DATASET,CONTENT_JSON,CONTENT_HASH,CREATED_BY,CREATED_AT,APPROVED_BY) VALUES (?,?,1,'draft',?,?,?,?,?,?,NULL)",
+    [
+      actor.workspaceId,
+      id,
+      values.kind,
+      values.dataset || null,
+      JSON.stringify(values),
+      digest(values),
+      actor.userId,
+      sqlTimestamp(new Date().toISOString()),
+    ],
+  );
+  await agentEvent(sql, actor, id, "knowledge_drafted", 1);
+  return id;
+}
+async function reviewedDecisionSource(
+  sql: SqlSession,
+  actor: Actor,
+  proposalId: string,
+  proposalHash: string,
+) {
+  const member = await requireOperator(sql, actor);
+  const [row] = await sql.query(
+    "SELECT * FROM TRIAGE_PROPOSALS WHERE WORKSPACE_ID = ? AND ID = ?",
+    [actor.workspaceId, proposalId],
+  );
+  if (!row) throw new DomainError("NOT_FOUND", "Proposal not found.", 404);
+  const content = JSON.parse(String(row.CONTENT_JSON)) as ProposalContent;
+  if (row.CONTENT_HASH !== proposalHash || digest(content) !== proposalHash)
+    throw new DomainError(
+      "PROPOSAL_HASH",
+      "Proposal content does not match this decision. Refresh its saved review.",
+      409,
+    );
+  if (
+    content.workspaceId !== actor.workspaceId ||
+    content.id !== proposalId ||
+    content.runId !== row.RUN_ID ||
+    content.requestId !== row.REQUEST_ID ||
+    !["openrouter-v1", "external-mcp-v1", "conversation-v1"].includes(
+      content.engine,
+    )
+  )
+    throw new DomainError(
+      "PROPOSAL_CONTEXT",
+      "The decision source does not match its saved workspace and record.",
+      409,
+    );
+  if (row.LIFECYCLE !== "applied" || !row.REVIEWED_BY)
+    throw new DomainError(
+      "DECISION_NOT_REVIEWED",
+      "Apply a reviewed proposal before recording reusable guidance from it.",
+      409,
+    );
+  const current = await getRequest(sql, actor, member, content.requestId);
+  if (current.version !== content.after.version)
+    throw new DomainError(
+      "STALE_DECISION",
+      "The record changed after this decision. Review a new proposal before reusing it as guidance.",
+      409,
+    );
+  const tool = await publishedTool(sql, actor);
+  if (content.toolRevision !== `request-desk-v${tool.revision}`)
+    throw new DomainError(
+      "STALE_TOOL",
+      "The tool changed after this decision. Review a new proposal before reusing it as guidance.",
+      409,
+    );
+  for (const dependency of content.evidence) {
+    const entry = await getKnowledge(sql, actor, dependency.id);
+    if (
+      entry.version !== dependency.version ||
+      entry.contentHash !== dependency.contentHash ||
+      !activeKnowledge(entry, new Date().toISOString().slice(0, 10))
+    )
+      throw new DomainError(
+        "STALE_KNOWLEDGE",
+        "This decision's evidence changed or is no longer approved. Review a new proposal before reusing it.",
+        409,
+      );
+  }
+  return { content, reviewedBy: String(row.REVIEWED_BY) };
+}
+export async function createKnowledgeFromProposal(
+  actor: Actor,
+  proposalId: string,
+  input: ProposalKnowledgeInput,
+) {
+  const values = proposalKnowledgeSchema.parse(input);
+  const hash = digest({
+    type: "decision-knowledge-create",
+    proposalId,
+    ...values,
+  });
+  return writeDatabase(async (sql) => {
+    await requireOperator(sql, actor);
+    // Reconcile an acknowledged draft before rechecking its historical source.
+    const existing = await receipt<{ id: string }>(
+      sql,
+      actor,
+      values.commandId,
+      hash,
+    );
+    if (existing) return getKnowledge(sql, actor, existing.id);
+    const source = await reviewedDecisionSource(
+      sql,
+      actor,
+      proposalId,
+      values.hash,
+    );
+    const now = new Date().toISOString();
+    const provenance: KnowledgeProvenance = {
+      type: "reviewed_decision",
+      proposalId,
+      proposalHash: values.hash,
+      runId: source.content.runId,
+      requestId: source.content.requestId,
+      requestVersion: source.content.after.version,
+      reviewedBy: source.reviewedBy,
+      recordedBy: actor.userId,
+      recordedAt: now,
+      rationale: values.rationale,
+    };
+    const draft = knowledgeInputSchema.parse({
+      title: values.title,
+      kind: values.kind,
+      content: values.body,
+      dataset: source.content.after.dataset,
+      ownerId: null,
+      effectiveFrom: now.slice(0, 10),
+      effectiveUntil: null,
+      supersedesId: null,
+      provenance,
+    });
+    const id = await insertKnowledgeDraft(sql, actor, draft);
+    await agentEvent(sql, actor, proposalId, "decision_knowledge_drafted", 1);
+    await saveReceipt(sql, actor, values.commandId, hash, { id });
     return getKnowledge(sql, actor, id);
   });
 }
@@ -219,6 +366,25 @@ export async function changeKnowledge(
       );
     if (action === "approve") {
       await eligibleOwner(sql, actor, entry);
+      if (entry.provenance) {
+        const source = await reviewedDecisionSource(
+          sql,
+          actor,
+          entry.provenance.proposalId,
+          entry.provenance.proposalHash,
+        );
+        if (
+          source.content.runId !== entry.provenance.runId ||
+          source.content.requestId !== entry.provenance.requestId ||
+          source.content.after.version !== entry.provenance.requestVersion ||
+          source.reviewedBy !== entry.provenance.reviewedBy
+        )
+          throw new DomainError(
+            "KNOWLEDGE_PROVENANCE",
+            "The draft provenance no longer matches its reviewed decision.",
+            409,
+          );
+      }
       if (entry.supersedesId) {
         const previous = await getKnowledge(sql, actor, entry.supersedesId);
         if (previous.state !== "approved" || previous.kind !== entry.kind)

@@ -17,8 +17,13 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       APP_ORIGIN: "http://127.0.0.1:3200",
-      LOOM_AUTH_MODE: "local-demo",
+      LOOM_AUTH_MODE:
+        process.env.LOOM_TEST_AUTH_MODE === "workspace"
+          ? "workspace"
+          : "local-demo",
       LOOM_ALLOW_DEMO_PRODUCTION: "true",
+      LOOM_ALLOW_WORKSPACE_SIGNUP: "true",
+      LOOM_POLL_INTERVAL_MS: "1000",
     },
   },
 });

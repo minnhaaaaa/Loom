@@ -4,7 +4,7 @@ Status: implementation resumed; this document combines implemented foundation an
 
 Loom is a shared internal-tool workspace. The first workflow is a data-request desk: collect requirements, clarify missing details, retrieve team guidance, propose ownership, and track resolution. The design preserves a reusable request-and-review engine while limiting the first product to one workflow family.
 
-The Next.js manual desk, Exasol adapter, internal knowledge lifecycle, and an OpenRouter-backed proposal pipeline are implemented. Orchestration is verified against real Exasol with test-only model fixtures; the full live provider schema is verified on a free model at reported cost zero. Broader model evaluation and model-backed process recovery remain separate gates. Generated-tool publication, richer retrieval, and decision reuse remain proposed. [RUNBOOK.md](RUNBOOK.md) distinguishes actual behavior from future design. [TECH_STACK.md](TECH_STACK.md) selects the proposed dependencies; [PLAN.md](PLAN.md) defines delivery and acceptance checks.
+The Next.js manual desk, Exasol adapter, internal knowledge lifecycle, and an OpenRouter-backed proposal pipeline are implemented. Orchestration is verified against real Exasol with test-only model fixtures; the full live provider schema was previously verified on a free model at reported cost zero. Broader model evaluation and model-backed process recovery remain separate gates. The request-family tool-design/publication slice now includes onboarding and review templates, bounded keyword/metadata retrieval, a deterministic relationship projection, and reviewed decision reuse. Semantic retrieval and external ingestion remain proposed. [RUNBOOK.md](RUNBOOK.md) distinguishes actual behavior from future design. [TECH_STACK.md](TECH_STACK.md) selects the proposed dependencies; [PLAN.md](PLAN.md) defines delivery and acceptance checks.
 
 ## 1. Research method and limits
 
@@ -16,17 +16,17 @@ Research motivates patterns; it does not prove that this architecture is secure,
 
 ## 2. Decisions the evidence changes
 
-| Decision | Research/repository basis | Loom interpretation and limit |
-| --- | --- | --- |
-| Generate a persistent specification using supported components | [Jelly](https://arxiv.org/abs/2503.04084), [json-render](https://github.com/vercel-labs/json-render), [A2UI](https://github.com/a2ui-project/a2ui) | Store data, views, and allowed action references. Generation cannot create executable code or authority. Small research prototypes do not establish enterprise readiness. |
-| Combine prompts with direct controls | [DynaVis](https://arxiv.org/abs/2401.10880), [Data Formulator 2](https://www.microsoft.com/en-us/research/publication/data-formulator-2-iteratively-creating-rich-visualizations-with-ai/) | Use prompts to express intent, and forms/tables to repeat work. Keep editable drafts and history. Visualization results are suggestive for internal tools, not direct evidence. |
-| Coordinate through shared state and visible responsibilities | [Collaborative Gym](https://arxiv.org/abs/2412.15701), [shared-workspace study](https://arxiv.org/abs/2606.18413) | Humans and the agent refer to the same record IDs and versions. Ownership and review are explicit. The latter study uses simulated collaborators. |
-| Measure outcomes instead of assuming collaboration helps | [human-AI meta-analysis](https://arxiv.org/abs/2405.06087), [tau-bench](https://arxiv.org/abs/2406.12045) | Compare manual, assisted, and bounded autonomous evaluation baselines; check final database state and repeatability. No productivity claim is inherited from these studies. |
-| Retrieve scoped evidence rather than stuffing all history into a prompt | [RAG](https://arxiv.org/abs/2005.11401), [Lost in the Middle](https://arxiv.org/abs/2307.03172), [ALCE](https://arxiv.org/abs/2305.14627) | Assemble a small context with versioned source references. A citation can exist without supporting a recommendation; evaluate support separately. |
-| Give reusable knowledge a lifecycle and provenance | [MemGPT](https://arxiv.org/abs/2310.08560), [Zep](https://arxiv.org/abs/2501.13956), [LongMemEval](https://arxiv.org/abs/2410.10813) | Separate run context, case history, and approved guidance; retain temporal validity and sources. A reviewed rule is authoritative only within its approved scope. |
-| Keep action authorization outside the model | [AgentDojo](https://arxiv.org/abs/2406.13352), [InjecAgent](https://arxiv.org/abs/2403.02691), [CaMeL](https://arxiv.org/abs/2503.18813) | Treat retrieved instructions as untrusted content. Enforce allowed commands and approvals in code. Loom is not an implementation of CaMeL and inherits none of its formal guarantees. |
-| Use transactional records and version checks first | [Zanzibar](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/), [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf), [Exasol transactions](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm) | Recheck current authority at commit; use short atomic local writes and durable notifications. Compensation becomes relevant for later external effects. |
-| Defer CRDTs and graph infrastructure | [replicated JSON](https://arxiv.org/abs/1608.03960), [local-first software](https://www.inkandswitch.com/essay/local-first/), [GraphRAG](https://arxiv.org/abs/2404.16130) | The MVP needs shared saved records, not offline merging or corpus-wide sensemaking. Revisit these technologies when measured requirements justify them. |
+| Decision                                                                | Research/repository basis                                                                                                                                                                                                                                                          | Loom interpretation and limit                                                                                                                                                         |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generate a persistent specification using supported components          | [Jelly](https://arxiv.org/abs/2503.04084), [json-render](https://github.com/vercel-labs/json-render), [A2UI](https://github.com/a2ui-project/a2ui)                                                                                                                                 | Store data, views, and allowed action references. Generation cannot create executable code or authority. Small research prototypes do not establish enterprise readiness.             |
+| Combine prompts with direct controls                                    | [DynaVis](https://arxiv.org/abs/2401.10880), [Data Formulator 2](https://www.microsoft.com/en-us/research/publication/data-formulator-2-iteratively-creating-rich-visualizations-with-ai/)                                                                                         | Use prompts to express intent, and forms/tables to repeat work. Keep editable drafts and history. Visualization results are suggestive for internal tools, not direct evidence.       |
+| Coordinate through shared state and visible responsibilities            | [Collaborative Gym](https://arxiv.org/abs/2412.15701), [shared-workspace study](https://arxiv.org/abs/2606.18413)                                                                                                                                                                  | Humans and the agent refer to the same record IDs and versions. Ownership and review are explicit. The latter study uses simulated collaborators.                                     |
+| Measure outcomes instead of assuming collaboration helps                | [human-AI meta-analysis](https://arxiv.org/abs/2405.06087), [tau-bench](https://arxiv.org/abs/2406.12045)                                                                                                                                                                          | Compare manual, assisted, and bounded autonomous evaluation baselines; check final database state and repeatability. No productivity claim is inherited from these studies.           |
+| Retrieve scoped evidence rather than stuffing all history into a prompt | [RAG](https://arxiv.org/abs/2005.11401), [Lost in the Middle](https://arxiv.org/abs/2307.03172), [ALCE](https://arxiv.org/abs/2305.14627)                                                                                                                                          | Assemble a small context with versioned source references. A citation can exist without supporting a recommendation; evaluate support separately.                                     |
+| Give reusable knowledge a lifecycle and provenance                      | [MemGPT](https://arxiv.org/abs/2310.08560), [Zep](https://arxiv.org/abs/2501.13956), [LongMemEval](https://arxiv.org/abs/2410.10813)                                                                                                                                               | Separate run context, case history, and approved guidance; retain temporal validity and sources. A reviewed rule is authoritative only within its approved scope.                     |
+| Keep action authorization outside the model                             | [AgentDojo](https://arxiv.org/abs/2406.13352), [InjecAgent](https://arxiv.org/abs/2403.02691), [CaMeL](https://arxiv.org/abs/2503.18813)                                                                                                                                           | Treat retrieved instructions as untrusted content. Enforce allowed commands and approvals in code. Loom is not an implementation of CaMeL and inherits none of its formal guarantees. |
+| Use transactional records and version checks first                      | [Zanzibar](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/), [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf), [Exasol transactions](https://docs.exasol.com/db/latest/database_concepts/transaction_management.htm) | Recheck current authority at commit; use short atomic local writes and durable notifications. Compensation becomes relevant for later external effects.                               |
+| Defer CRDTs and graph infrastructure                                    | [replicated JSON](https://arxiv.org/abs/1608.03960), [local-first software](https://www.inkandswitch.com/essay/local-first/), [GraphRAG](https://arxiv.org/abs/2404.16130)                                                                                                         | The MVP needs shared saved records, not offline merging or corpus-wide sensemaking. Revisit these technologies when measured requirements justify them.                               |
 
 ## 3. System invariants
 
@@ -70,16 +70,16 @@ The single write coordinator serializes all mutations, including membership/rule
 
 ## 5. Modules and contracts
 
-| Module | Owns | Must not do |
-| --- | --- | --- |
-| Workspace and identity | Membership, role checks, actor context | Treat a workspace ID supplied by a client as proof of access. |
-| Tool definitions | Drafts, validation, compatible publication, history | Execute expressions or arbitrary schemas generated by a model. |
-| Requests | Intake, readiness checks, ownership, statuses, comments | Let a requester write operational fields through generic patch endpoints. |
-| Knowledge | Sources, approved guidance, provenance, applicability, retrieval | Promote a correction into global policy without review. |
-| Agent runs | Context snapshots, bounded steps, validated suggestions | Commit business updates or impersonate an approver. |
-| Proposals and commands | Immutable proposals, review, concurrency, atomic writes | Trust a previous permission check after state changes. |
-| Activity and delivery | Audit events, outbox, persisted work, authorized refresh | Claim browser delivery or an external effect occurred merely because it was enqueued. |
-| Evaluation | Fixtures, state assertions, quality and cost comparisons | Use an LLM judge as the authorization mechanism. |
+| Module                 | Owns                                                             | Must not do                                                                           |
+| ---------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Workspace and identity | Membership, role checks, actor context                           | Treat a workspace ID supplied by a client as proof of access.                         |
+| Tool definitions       | Drafts, validation, compatible publication, history              | Execute expressions or arbitrary schemas generated by a model.                        |
+| Requests               | Intake, readiness checks, ownership, statuses, comments          | Let a requester write operational fields through generic patch endpoints.             |
+| Knowledge              | Sources, approved guidance, provenance, applicability, retrieval | Promote a correction into global policy without review.                               |
+| Agent runs             | Context snapshots, bounded steps, validated suggestions          | Commit business updates or impersonate an approver.                                   |
+| Proposals and commands | Immutable proposals, review, concurrency, atomic writes          | Trust a previous permission check after state changes.                                |
+| Activity and delivery  | Audit events, outbox, persisted work, authorized refresh         | Claim browser delivery or an external effect occurred merely because it was enqueued. |
+| Evaluation             | Fixtures, state assertions, quality and cost comparisons         | Use an LLM judge as the authorization mechanism.                                      |
 
 Use shared input/output contracts and domain services from Node Route Handlers and bounded run execution. Domain modules do not depend on React or model-provider-specific response objects.
 
@@ -89,30 +89,30 @@ Use application-generated UUIDs stored initially as `VARCHAR(36)`, exact numeric
 
 Use enabled primary/composite keys and verified foreign keys; unsupported UNIQUE/CHECK constraints must not appear in migrations. Enforce business predicates in domain code. Confirm invalid inserts fail against the actual installed release, not merely a mock. See [data types](https://docs.exasol.com/db/latest/sql_references/data_types/datatypedetails.htm) and [constraint differences](https://docs.exasol.com/db/latest/migration_guides/oracle/execution/constraints.htm).
 
-| Entity | Important fields and relationships |
-| --- | --- |
-| `organizations` | Organization identity; not an automatic grant to all workspaces. |
-| `workspaces` | `organization_id`, name, notification revision, membership revision. |
-| `workspace_memberships` | Enabled primary key `(workspace_id, user_id)`, role, active status, revision. |
-| `tools` | `workspace_id`, template family, current published revision pointer. |
-| `tool_revisions` | `tool_id`, immutable specification, version, state, parent revision, author, publication time. |
-| `requests` | `workspace_id`, `tool_id`, creator/requester, title, business question, owner, priority, due date, status, custom values, readiness findings, `version`. |
-| `request_revisions` | Before/after changes, actor, command ID, previous/new version; immutable history. |
-| `comments` | Parent request, author, body, visibility (`internal` or `requester_visible`), timestamps. |
-| `source_documents` / `source_revisions` | Workspace, uploader, private storage key, content hash, revision, visibility, deletion state. |
-| `source_chunks` | Parent source revision, location/span, canonical text and normalized searchable terms; embeddings deferred. |
-| `knowledge_items` / `knowledge_revisions` | Kind, content, owner, scope, status, effective interval, precedence metadata, version. |
-| `knowledge_evidence` | Knowledge revision to source revision/span or reviewed decision; derived visibility dependencies. |
-| `decision_records` | Parent request/proposal, outcome, human explanation, case-specific scope, actor. |
-| `agent_runs` / `agent_steps` | Initiator, selected record IDs, fixed budgets, tool/prompt/model versions, status, checkpoint, usage and timings. |
-| `proposals` / `proposal_items` | Immutable action inputs, target versions, evidence revisions, expiry, content hash, current lifecycle state. |
-| `approvals` / `action_executions` | Reviewer, proposal hash, approval time, execution result, command ID referencing an enabled primary-key receipt. |
-| `audit_events` | Workspace, actor and delegated actor, action, resource, request/run/command IDs, revisions, outcome. |
-| `outbox_events` | Committed domain event, destination/scope, delivery state, retry information. |
-| `command_receipts` | Enabled `(workspace_id, command_id)` primary key, payload hash, result; atomic with domain writes. |
-| `work_items` | Run/step identity, expected revision, checkpoint, bounded retry state; no assumed distributed queue leasing. |
-| `query_evidence` | Named query/version, parameter digest, scoped source revisions, execution time, row count, bounded result reference. |
-| `import_batches` / `import_rows` | Source hash, column mapping, validated preview, row errors, commit key, resulting request IDs. |
+| Entity                                    | Important fields and relationships                                                                                                                       |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `organizations`                           | Organization identity; not an automatic grant to all workspaces.                                                                                         |
+| `workspaces`                              | `organization_id`, name, notification revision, membership revision.                                                                                     |
+| `workspace_memberships`                   | Enabled primary key `(workspace_id, user_id)`, role, active status, revision.                                                                            |
+| `tools`                                   | `workspace_id`, template family, current published revision pointer.                                                                                     |
+| `tool_revisions`                          | `tool_id`, immutable specification, version, state, parent revision, author, publication time.                                                           |
+| `requests`                                | `workspace_id`, `tool_id`, creator/requester, title, business question, owner, priority, due date, status, custom values, readiness findings, `version`. |
+| `request_revisions`                       | Before/after changes, actor, command ID, previous/new version; immutable history.                                                                        |
+| `comments`                                | Parent request, author, body, visibility (`internal` or `requester_visible`), timestamps.                                                                |
+| `source_documents` / `source_revisions`   | Workspace, uploader, private storage key, content hash, revision, visibility, deletion state.                                                            |
+| `source_chunks`                           | Parent source revision, location/span, canonical text and normalized searchable terms; embeddings deferred.                                              |
+| `knowledge_items` / `knowledge_revisions` | Kind, content, owner, scope, status, effective interval, precedence metadata, version.                                                                   |
+| `knowledge_evidence`                      | Knowledge revision to source revision/span or reviewed decision; derived visibility dependencies.                                                        |
+| `decision_records`                        | Parent request/proposal, outcome, human explanation, case-specific scope, actor.                                                                         |
+| `agent_runs` / `agent_steps`              | Initiator, selected record IDs, fixed budgets, tool/prompt/model versions, status, checkpoint, usage and timings.                                        |
+| `proposals` / `proposal_items`            | Immutable action inputs, target versions, evidence revisions, expiry, content hash, current lifecycle state.                                             |
+| `approvals` / `action_executions`         | Reviewer, proposal hash, approval time, execution result, command ID referencing an enabled primary-key receipt.                                         |
+| `audit_events`                            | Workspace, actor and delegated actor, action, resource, request/run/command IDs, revisions, outcome.                                                     |
+| `outbox_events`                           | Committed domain event, destination/scope, delivery state, retry information.                                                                            |
+| `command_receipts`                        | Enabled `(workspace_id, command_id)` primary key, payload hash, result; atomic with domain writes.                                                       |
+| `work_items`                              | Run/step identity, expected revision, checkpoint, bounded retry state; no assumed distributed queue leasing.                                             |
+| `query_evidence`                          | Named query/version, parameter digest, scoped source revisions, execution time, row count, bounded result reference.                                     |
+| `import_batches` / `import_rows`          | Source hash, column mapping, validated preview, row errors, commit key, resulting request IDs.                                                           |
 
 All tenant-owned tables include `workspace_id`. Composite foreign keys such as `(workspace_id, request_id)` prevent cross-workspace references even if application code supplies a valid ID from another workspace. Apply the same protection to source evidence, proposal targets, comments, owners, and tool references. An owner assignment must reference an eligible active member of the same workspace.
 
@@ -124,17 +124,17 @@ Design scoped query predicates for queue filters, membership lookup, active guid
 
 Roles are workspace-scoped. Platform/database administrators are operational identities outside this product matrix.
 
-| Operation | Owner | Operator | Requester | Viewer |
-| --- | --- | --- | --- | --- |
-| Read internal queue and internal comments | Yes | Yes | No | Yes |
-| Submit and read own requests | Yes | Yes | Yes | Read only |
-| Edit own request description / add requester-visible comment | Yes | Yes | Yes, own only | No |
-| Change owner, priority, due date, status | Yes | Yes | No | No |
-| Run internal triage agent | Yes | Yes | No in MVP | No |
-| Review and apply record proposals | Yes | Yes | No | No |
-| Read approved internal guidance and its permitted evidence | Yes | Yes | No | Yes |
-| Draft guidance or record a correction | Yes | Yes | No | No |
-| Publish/retire guidance, publish tool revisions, manage membership | Yes | No | No | No |
+| Operation                                                          | Owner | Operator | Requester     | Viewer    |
+| ------------------------------------------------------------------ | ----- | -------- | ------------- | --------- |
+| Read internal queue and internal comments                          | Yes   | Yes      | No            | Yes       |
+| Submit and read own requests                                       | Yes   | Yes      | Yes           | Read only |
+| Edit own request description / add requester-visible comment       | Yes   | Yes      | Yes, own only | No        |
+| Change owner, priority, due date, status                           | Yes   | Yes      | No            | No        |
+| Run internal triage agent                                          | Yes   | Yes      | No in MVP     | No        |
+| Review and apply record proposals                                  | Yes   | Yes      | No            | No        |
+| Read approved internal guidance and its permitted evidence         | Yes   | Yes      | No            | Yes       |
+| Draft guidance or record a correction                              | Yes   | Yes      | No            | No        |
+| Publish/retire guidance, publish tool revisions, manage membership | Yes   | No       | No            | No        |
 
 Requesters receive explicitly requester-visible comments and a safe subset of request fields. Internal reasoning, other requesters' records, internal comments, and internal evidence are excluded. Viewer access is intentionally broad read-only internal access; use it only for authorized internal colleagues.
 
@@ -160,26 +160,91 @@ Content already sent to a provider cannot be recalled after revocation. Minimize
 
 `ToolSpec` is a declarative document that references only known field types, components, built-in system fields, and action IDs. It does not contain JavaScript, SQL, HTML, arbitrary remote URLs, or expressions to evaluate.
 
-Illustrative specification; system fields such as `status`, `owner_id`, and `due_at` are defined by the request-desk family:
+The current built-in specification uses stable field IDs and a finite component/action catalog:
 
 ```json
 {
   "schemaVersion": 1,
   "templateId": "request-desk",
   "title": "Data requests",
+  "description": "Collect complete analytics requests, clarify requirements, and track delivery.",
   "fields": [
-    {"id": "business_question", "type": "text", "requiredAt": "intake"},
-    {"id": "reporting_period", "type": "text", "requiredAt": "ready"}
+    {
+      "id": "title",
+      "label": "Request title",
+      "type": "text",
+      "requiredAt": "intake",
+      "maxLength": 160,
+      "visible": true
+    },
+    {
+      "id": "businessQuestion",
+      "label": "Business question",
+      "type": "textarea",
+      "requiredAt": "intake",
+      "maxLength": 4000,
+      "visible": true
+    },
+    {
+      "id": "reportingPeriod",
+      "label": "Reporting period",
+      "type": "text",
+      "requiredAt": "ready",
+      "maxLength": 200,
+      "visible": true
+    },
+    {
+      "id": "dataset",
+      "label": "Dataset",
+      "type": "text",
+      "requiredAt": "ready",
+      "maxLength": 200,
+      "visible": true
+    }
   ],
   "views": [
     {
       "id": "queue",
-      "component": "request_table",
-      "columns": ["business_question", "reporting_period", "owner_id", "status", "due_at"]
+      "component": "request-table",
+      "columns": ["title", "status", "ownerName", "dueAt", "priority"]
     },
-    {"id": "intake", "component": "request_form"}
+    {
+      "id": "intake",
+      "component": "request-form"
+    },
+    {
+      "id": "details",
+      "component": "request-details"
+    },
+    {
+      "id": "filters",
+      "component": "request-filters",
+      "search": true,
+      "status": true
+    },
+    {
+      "id": "summary",
+      "component": "request-summary",
+      "metrics": ["open", "overdue", "unassigned", "incomplete"]
+    }
   ],
-  "actions": ["request.assign_owner", "request.transition", "request.add_comment"]
+  "actions": [
+    "request.create",
+    "request.edit_description",
+    "request.set_owner",
+    "request.set_priority",
+    "request.set_due_date",
+    "request.set_status",
+    "request.add_comment"
+  ],
+  "statusLabels": {
+    "new": "New",
+    "needs_info": "Needs information",
+    "ready": "Ready",
+    "in_progress": "In progress",
+    "done": "Done",
+    "cancelled": "Cancelled"
+  }
 }
 ```
 
@@ -227,14 +292,14 @@ Manual controls and approved agent proposals call the same command implementatio
 
 ### 10.1 Separate kinds of memory
 
-| Kind | Authority and lifecycle |
-| --- | --- |
-| Run working context | Short-lived inputs and checkpoints tied to one task; not a policy store. |
-| Request history | Historical facts and human decisions scoped to a request. |
-| Approved procedure/routing rule | Owner-reviewed, versioned, applicable to an explicit workspace/tool/topic. |
-| Glossary/definition | Owner-reviewed meaning with provenance and effective interval. |
-| Draft extracted insight | Candidate knowledge; excluded from authoritative instructions. |
-| Case exception | An observed decision that remains local unless separately generalized and approved. |
+| Kind                            | Authority and lifecycle                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------- |
+| Run working context             | Short-lived inputs and checkpoints tied to one task; not a policy store.            |
+| Request history                 | Historical facts and human decisions scoped to a request.                           |
+| Approved procedure/routing rule | Owner-reviewed, versioned, applicable to an explicit workspace/tool/topic.          |
+| Glossary/definition             | Owner-reviewed meaning with provenance and effective interval.                      |
+| Draft extracted insight         | Candidate knowledge; excluded from authoritative instructions.                      |
+| Case exception                  | An observed decision that remains local unless separately generalized and approved. |
 
 A knowledge item transitions from draft to approved, then superseded or retired. Record `valid_from`, optional `valid_to`, `recorded_at`, approver, source revisions, and applicability. Keep historical revisions queryable for authorized audit while using only currently applicable approved revisions for new recommendations.
 
@@ -358,40 +423,40 @@ Optional SSE or presence can follow the working baseline. Scope any stream using
 
 All routes below are proposed Next.js Node Route Handlers and workspace-scoped. Cookie-authenticated mutations require origin/CSRF checks; credentials never use NEXT_PUBLIC variables. IDs are checked for ownership; request/response serializers apply field visibility.
 
-| Operation | Proposed route | Key contract |
-| --- | --- | --- |
-| Generate tool draft | `POST /api/workspaces/:w/tools/drafts` | Owner; bounded description; creates asynchronous generation run. |
-| Publish a tool revision | `POST /api/workspaces/:w/tools/:t/publish` | Owner; draft ID and expected published revision. |
-| List/create requests | `GET/POST /api/workspaces/:w/tools/:t/requests` | Role-scoped filters and editable fields. |
-| Execute manual request command | `POST /api/workspaces/:w/requests/:r/commands` | Known command ID, expected version, idempotency key. |
-| Preview/commit import | `POST /api/workspaces/:w/imports`, `POST .../imports/:i/commit` | Owner/operator; bounded file, validated mapping, exact preview revision. |
-| Retrieve knowledge | `GET /api/workspaces/:w/knowledge/search` | Internal access; approved/applicable results and permitted evidence. |
-| Publish guidance | `POST /api/workspaces/:w/knowledge/:k/publish` | Owner; expected version, sources, scope, precedence. |
-| Start/read/cancel agent run | `POST/GET /api/workspaces/:w/runs`, `POST .../runs/:id/cancel` | Role and run ownership; fixed selected scope and budget. |
-| Advance persisted run | `POST /api/workspaces/:w/runs/:id/advance` | Current authorization, bounded step budget, expected checkpoint revision. |
-| Read analytical evidence | `GET /api/workspaces/:w/analytics/:queryId` | Code-owned named query, validated bound filters, scoped result and evidence. |
-| Review proposal | `GET /api/workspaces/:w/proposals/:p` | Current target/evidence visibility. |
-| Approve or reject | `POST /api/workspaces/:w/proposals/:p/approve`, `POST .../reject` | Exact hash/selection, expected proposal revision, reviewer and command checks. |
-| Read activity | `GET /api/workspaces/:w/activity` | Internal history or separately filtered own-request activity. |
+| Operation                      | Proposed route                                                    | Key contract                                                                   |
+| ------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Generate tool draft            | `POST /api/workspaces/:w/tools/drafts`                            | Owner; bounded description; creates asynchronous generation run.               |
+| Publish a tool revision        | `POST /api/workspaces/:w/tools/:t/publish`                        | Owner; draft ID and expected published revision.                               |
+| List/create requests           | `GET/POST /api/workspaces/:w/tools/:t/requests`                   | Role-scoped filters and editable fields.                                       |
+| Execute manual request command | `POST /api/workspaces/:w/requests/:r/commands`                    | Known command ID, expected version, idempotency key.                           |
+| Preview/commit import          | `POST /api/workspaces/:w/imports`, `POST .../imports/:i/commit`   | Owner/operator; bounded file, validated mapping, exact preview revision.       |
+| Retrieve knowledge             | `GET /api/workspaces/:w/knowledge/search`                         | Internal access; approved/applicable results and permitted evidence.           |
+| Publish guidance               | `POST /api/workspaces/:w/knowledge/:k/publish`                    | Owner; expected version, sources, scope, precedence.                           |
+| Start/read/cancel agent run    | `POST/GET /api/workspaces/:w/runs`, `POST .../runs/:id/cancel`    | Role and run ownership; fixed selected scope and budget.                       |
+| Advance persisted run          | `POST /api/workspaces/:w/runs/:id/advance`                        | Current authorization, bounded step budget, expected checkpoint revision.      |
+| Read analytical evidence       | `GET /api/workspaces/:w/analytics/:queryId`                       | Code-owned named query, validated bound filters, scoped result and evidence.   |
+| Review proposal                | `GET /api/workspaces/:w/proposals/:p`                             | Current target/evidence visibility.                                            |
+| Approve or reject              | `POST /api/workspaces/:w/proposals/:p/approve`, `POST .../reject` | Exact hash/selection, expected proposal revision, reviewer and command checks. |
+| Read activity                  | `GET /api/workspaces/:w/activity`                                 | Internal history or separately filtered own-request activity.                  |
 
 Use `401` for invalid identity, `403` for denied capabilities, `404` for unknown or intentionally undisclosed resources, `409` for version/idempotency conflicts, `422` for unsupported/invalid specifications, and `429` for resource limits. Errors contain a stable code and request ID without leaking another workspace's data.
 
 ## 15. Failure and recovery behavior
 
-| Failure | Required behavior |
-| --- | --- |
-| Model emits invalid fields/actions | Reject output; bounded repair attempt; preserve draft/error without executing. |
-| Evidence absent or contradictory | Explain missing/ambiguous guidance; request clarification; do not invent authority. |
-| Retrieval/indexing unavailable | Surface temporary failure; distinguish it from no results. Manual request operations remain available. |
-| Record/tool/rule changes during review | Reject stale execution, show a permitted current view, and require fresh review. |
-| Membership revoked during a run | Stop later retrieval/delivery; block command commit; retain access-restricted audit metadata. |
-| API response lost after commit | Same idempotency key returns the recorded execution result after authorization. |
-| Server/request execution interrupted | Resume through a new authenticated advance request from persisted state; reuse only valid checkpoints; reject duplicate completion. |
-| Notification missed | Authorized refresh on reconnect/focus/next operation restores current state. |
-| Import fails mid-processing | Keep preview/error state; commit an approved bounded batch atomically; retry cannot duplicate committed rows. |
-| Run cancelled/timed out | Persist terminal state and partial item outcomes; block subsequent proposed/apply work for that cancelled run. |
-| Source removed | Remove retrieval access, invalidate derived authority, and redact protected evidence displays. |
-| Later connector times out after a remote call | Mark outcome uncertain and reconcile by provider idempotency/status APIs; never assume failure means no effect. |
+| Failure                                       | Required behavior                                                                                                                   |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Model emits invalid fields/actions            | Reject output; bounded repair attempt; preserve draft/error without executing.                                                      |
+| Evidence absent or contradictory              | Explain missing/ambiguous guidance; request clarification; do not invent authority.                                                 |
+| Retrieval/indexing unavailable                | Surface temporary failure; distinguish it from no results. Manual request operations remain available.                              |
+| Record/tool/rule changes during review        | Reject stale execution, show a permitted current view, and require fresh review.                                                    |
+| Membership revoked during a run               | Stop later retrieval/delivery; block command commit; retain access-restricted audit metadata.                                       |
+| API response lost after commit                | Same idempotency key returns the recorded execution result after authorization.                                                     |
+| Server/request execution interrupted          | Resume through a new authenticated advance request from persisted state; reuse only valid checkpoints; reject duplicate completion. |
+| Notification missed                           | Authorized refresh on reconnect/focus/next operation restores current state.                                                        |
+| Import fails mid-processing                   | Keep preview/error state; commit an approved bounded batch atomically; retry cannot duplicate committed rows.                       |
+| Run cancelled/timed out                       | Persist terminal state and partial item outcomes; block subsequent proposed/apply work for that cancelled run.                      |
+| Source removed                                | Remove retrieval access, invalidate derived authority, and redact protected evidence displays.                                      |
+| Later connector times out after a remote call | Mark outcome uncertain and reconcile by provider idempotency/status APIs; never assume failure means no effect.                     |
 
 Keep file processing bounded and outside transactions. CSV exports protect against spreadsheet formula injection. Markdown is rendered with raw HTML disabled or sanitized. Do not fetch arbitrary linked URLs, accept generated code, or log source contents by default.
 
@@ -409,18 +474,18 @@ Deploy one self-hosted Next.js Node process alongside local Exasol Personal for 
 
 ## 17. Architecture decisions and expansion triggers
 
-| ID | Decision | Revisit trigger |
-| --- | --- | --- |
-| ADR-001 | Next.js App Router, Node handlers, modular TypeScript domain services | Independently scaling or specialized workloads appear in measurements. |
-| ADR-002 | Loom-owned persistent `ToolSpec`; fixed renderer catalog | M0 adapter evaluation or real workflow requirements demand a wider protocol. |
+| ID      | Decision                                                                                  | Revisit trigger                                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| ADR-001 | Next.js App Router, Node handlers, modular TypeScript domain services                     | Independently scaling or specialized workloads appear in measurements.                                           |
+| ADR-002 | Loom-owned persistent `ToolSpec`; fixed renderer catalog                                  | M0 adapter evaluation or real workflow requirements demand a wider protocol.                                     |
 | ADR-003 | Exasol Personal as sole canonical domain store and analytical engine; validated JSON text | Real SQL/driver tests or measured write contention require reconsideration without weakening event requirements. |
-| ADR-004 | Explicit server/repository workspace and own-request predicates | Nested sharing relationships justify OpenFGA or equivalent. |
-| ADR-005 | Review-bound proposals, version checks, atomic local execution | External actions require per-connector authorization and reconciliation. |
-| ADR-006 | Approved scoped guidance distinct from case history | A real workflow requires a richer authority/temporal model. |
-| ADR-007 | Structured/lexical retrieval first | Frozen evaluation demonstrates semantic retrieval adds material value. |
-| ADR-008 | Exasol receipts/outbox/checkpoints and one process-wide mutation coordinator | Multiple writers, unattended jobs, or replicas require a new scheduling/concurrency contract. |
-| ADR-009 | Saved-record collaboration without CRDT | Offline writes or character-level simultaneous editing become necessary. |
-| ADR-010 | One bounded agent, no autonomous agent team | Measured tasks require independent specialist execution beyond the current runner. |
+| ADR-004 | Explicit server/repository workspace and own-request predicates                           | Nested sharing relationships justify OpenFGA or equivalent.                                                      |
+| ADR-005 | Review-bound proposals, version checks, atomic local execution                            | External actions require per-connector authorization and reconciliation.                                         |
+| ADR-006 | Approved scoped guidance distinct from case history                                       | A real workflow requires a richer authority/temporal model.                                                      |
+| ADR-007 | Structured/lexical retrieval first                                                        | Frozen evaluation demonstrates semantic retrieval adds material value.                                           |
+| ADR-008 | Exasol receipts/outbox/checkpoints and one process-wide mutation coordinator              | Multiple writers, unattended jobs, or replicas require a new scheduling/concurrency contract.                    |
+| ADR-009 | Saved-record collaboration without CRDT                                                   | Offline writes or character-level simultaneous editing become necessary.                                         |
+| ADR-010 | One bounded agent, no autonomous agent team                                               | Measured tasks require independent specialist execution beyond the current runner.                               |
 
 External connectors, scheduled autonomous work, PDF/Office parsing, graph memory, expanded SSO, and multi-workspace sharing need explicit future design. A growing bibliography is not a reason to add all referenced technologies.
 
@@ -428,65 +493,65 @@ External connectors, scheduled autonomous work, PDF/Office parsing, graph memory
 
 Review depth: **A** = abstract/author publication summary; **S** = selected full-text sections or results also examined. Years indicate first publication/preprint unless a conference is explicitly named. Each implication is Loom's interpretation, not a claim the source tested Loom.
 
-| ID | Primary source | Depth | Contribution, limitation, and use |
-| --- | --- | --- | --- |
-| P01 | Cao et al., [Generative and Malleable User Interfaces with Generative and Evolving Task-Driven Data Model](https://arxiv.org/abs/2503.04084), CHI 2025 | S | Jelly generates/refines UI from task models; supports persistent specifications. Eight-person exploratory study and limited task/layout coverage. |
-| P02 | Vaithilingam et al., [DynaVis: Dynamically Synthesized UI Widgets for Visualization Editing](https://arxiv.org/abs/2401.10880), CHI 2024 | S | Persistent controls complement language; informs direct manipulation. Visualization-specific, 24-person study; not an internal-workflow trial. |
-| P03 | Wang et al., [Data Formulator 2](https://www.microsoft.com/en-us/research/publication/data-formulator-2-iteratively-creating-rich-visualizations-with-ai/), CHI 2025 | A | Blended interaction and iteration history; informs draft/history UX. Eight participants; visualization authoring scope. |
-| P04 | Amershi et al., [Guidelines for Human-AI Interaction](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/), CHI 2019 | A | Interaction guidance and practitioner evaluation; informs correction and capability visibility. Not a guarantee of usable or correct automation. |
-| P05 | Shao et al., [Collaborative Gym](https://arxiv.org/abs/2412.15701), 2024; revised 2026 | S | Shared environment and process/outcome evaluation; informs dual control and task metrics. Task-specific comparisons do not establish Loom productivity. |
-| P06 | Kotalwar et al., [Searching for Synergy in Shared Workspace Human-AI Collaboration](https://arxiv.org/abs/2606.18413), 2026 workshop/preprint | S | Coordination structures and shared memory; informs ownership/review. Human collaborators are simulated, limiting external validity. |
-| P07 | Vaccaro et al., [When combinations of humans and AI are useful](https://arxiv.org/abs/2405.06087), Nature Human Behaviour 2024 | S | Meta-analysis distinguishes augmentation from outperforming the better solo baseline; motivates controlled evaluation. Heterogeneous tasks and systems. |
-| P08 | Lewis et al., [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401), NeurIPS 2020 | A | External retrieval plus generation; foundation for evidence context. Original model/training and Wikipedia tasks differ from enterprise policies. |
-| P09 | Liu et al., [Lost in the Middle: How Language Models Use Long Contexts](https://arxiv.org/abs/2307.03172), 2023 preprint | A | Context position affects retrieval/use; motivates bounded relevant context. Does not establish a universal limit for current models. |
-| P10 | Asai et al., [Self-RAG](https://arxiv.org/abs/2310.11511), 2023; ICLR 2024 | A | Adaptive retrieval and critique; motivates relevance/support checks. A trained reflection-token method, not equivalent to asking a generic model to verify itself. |
-| P11 | Gao et al., [Enabling Large Language Models to Generate Text with Citations](https://arxiv.org/abs/2305.14627), EMNLP 2023 | A | ALCE separates correctness and citation quality; informs evidence evaluation. Citation formatting alone does not imply support. |
-| P12 | Packer et al., [MemGPT: Towards LLMs as Operating Systems](https://arxiv.org/abs/2310.08560), 2023 | A | Memory tiers and context management; informs run/history/knowledge separation. Not a policy governance architecture. |
-| P13 | Park et al., [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442), 2023 | A | Observation, retrieval, and reflection; informs candidate insight extraction. Evaluates simulated behavior/believability, not enterprise truth or authorization. |
-| P14 | Chhikara et al., [Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory](https://arxiv.org/abs/2504.19413), 2025 | A | Extraction/consolidation and memory evaluation; informs lifecycle comparisons. Vendor-authored conversational benchmarks do not establish Loom's quality or cost. |
-| P15 | Rasmussen et al., [Zep: A Temporal Knowledge Graph Architecture for Agent Memory](https://arxiv.org/abs/2501.13956), 2025 | S | Episodes, temporal facts, invalidation, and retrieval; informs provenance/effective intervals. Vendor-authored graph architecture; adopting its concepts does not require its backend. |
-| P16 | Edge et al., [From Local to Global: A Graph RAG Approach to Query-Focused Summarization](https://arxiv.org/abs/2404.16130), 2024 | A | Community summaries address corpus-wide questions. Loom's initial exact request/rule lookup does not justify this pipeline. |
-| P17 | Yao et al., [ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629), 2022; ICLR 2023 | A | Interleaved reasoning/actions/retrieval; informs bounded tool use. Adds no authorization or injection-resistance guarantee. |
-| P18 | Yao et al., [tau-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains](https://arxiv.org/abs/2406.12045), 2024 | S | Policy-following, final-state evaluation, and repeated-trial reliability; informs command assertions. Simulated users and benchmark domains differ from a pilot team. |
-| P19 | Debenedetti et al., [AgentDojo](https://arxiv.org/abs/2406.13352), 2024 | A | Tests tool agents on untrusted data and attacks; informs adversarial fixtures. Passing a finite suite is not proof of injection immunity. |
-| P20 | Zhan et al., [InjecAgent](https://arxiv.org/abs/2403.02691), Findings of ACL 2024 | A | Indirect injection and exfiltration scenarios; informs source/tool trust boundaries. Historical model attack rates are not forecasts for Loom. |
-| P21 | Debenedetti et al., [Defeating Prompt Injections by Design](https://arxiv.org/abs/2503.18813), 2025 | S | CaMeL separates control/data and enforces capabilities; informs server-enforced actions. Loom does not implement the interpreter or inherit the paper's guarantees. |
-| P22 | Kleppmann and Beresford, [A Conflict-Free Replicated JSON Datatype](https://arxiv.org/abs/1608.03960), 2016; revised 2017 | A | Formal convergence for replicated JSON; reference for later collaborative document editing. Convergence does not enforce approval/business semantics. |
-| P23 | Kleppmann et al., [Local-first software: You own your data, in spite of the cloud](https://www.inkandswitch.com/essay/local-first/), Onward! 2019 | S | Collaboration, ownership, and offline design principles. Useful future direction; MVP remains server-authoritative and online. |
-| P24 | Pang et al., [Zanzibar: Google's Consistent, Global Authorization System](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/), USENIX ATC 2019 | A | Relationship policies and consistency of access decisions. Informs current-authority checks; Google-scale infrastructure is unnecessary here. |
-| P25 | Garcia-Molina and Salem, [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf), SIGMOD 1987 | A | Decomposition and compensating transactions; informs later external-action recovery. Compensation cannot universally reverse arbitrary external effects. |
-| P26 | Wu et al., [LongMemEval](https://arxiv.org/abs/2410.10813), 2024; revised 2025 | S | Knowledge updates, temporal reasoning, cross-session recall, and abstention; informs memory fixtures. Chat benchmark, not a workflow benchmark. |
-| P27 | Es et al., [Ragas: Automated Evaluation of Retrieval Augmented Generation](https://arxiv.org/abs/2309.15217), 2023; revised 2025 | A | Separates retrieval/context and generation evaluation dimensions. Reference-free/judge metrics supplement human labels and deterministic checks. |
+| ID  | Primary source                                                                                                                                                                    | Depth | Contribution, limitation, and use                                                                                                                                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P01 | Cao et al., [Generative and Malleable User Interfaces with Generative and Evolving Task-Driven Data Model](https://arxiv.org/abs/2503.04084), CHI 2025                            | S     | Jelly generates/refines UI from task models; supports persistent specifications. Eight-person exploratory study and limited task/layout coverage.                                      |
+| P02 | Vaithilingam et al., [DynaVis: Dynamically Synthesized UI Widgets for Visualization Editing](https://arxiv.org/abs/2401.10880), CHI 2024                                          | S     | Persistent controls complement language; informs direct manipulation. Visualization-specific, 24-person study; not an internal-workflow trial.                                         |
+| P03 | Wang et al., [Data Formulator 2](https://www.microsoft.com/en-us/research/publication/data-formulator-2-iteratively-creating-rich-visualizations-with-ai/), CHI 2025              | A     | Blended interaction and iteration history; informs draft/history UX. Eight participants; visualization authoring scope.                                                                |
+| P04 | Amershi et al., [Guidelines for Human-AI Interaction](https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/), CHI 2019                        | A     | Interaction guidance and practitioner evaluation; informs correction and capability visibility. Not a guarantee of usable or correct automation.                                       |
+| P05 | Shao et al., [Collaborative Gym](https://arxiv.org/abs/2412.15701), 2024; revised 2026                                                                                            | S     | Shared environment and process/outcome evaluation; informs dual control and task metrics. Task-specific comparisons do not establish Loom productivity.                                |
+| P06 | Kotalwar et al., [Searching for Synergy in Shared Workspace Human-AI Collaboration](https://arxiv.org/abs/2606.18413), 2026 workshop/preprint                                     | S     | Coordination structures and shared memory; informs ownership/review. Human collaborators are simulated, limiting external validity.                                                    |
+| P07 | Vaccaro et al., [When combinations of humans and AI are useful](https://arxiv.org/abs/2405.06087), Nature Human Behaviour 2024                                                    | S     | Meta-analysis distinguishes augmentation from outperforming the better solo baseline; motivates controlled evaluation. Heterogeneous tasks and systems.                                |
+| P08 | Lewis et al., [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401), NeurIPS 2020                                                  | A     | External retrieval plus generation; foundation for evidence context. Original model/training and Wikipedia tasks differ from enterprise policies.                                      |
+| P09 | Liu et al., [Lost in the Middle: How Language Models Use Long Contexts](https://arxiv.org/abs/2307.03172), 2023 preprint                                                          | A     | Context position affects retrieval/use; motivates bounded relevant context. Does not establish a universal limit for current models.                                                   |
+| P10 | Asai et al., [Self-RAG](https://arxiv.org/abs/2310.11511), 2023; ICLR 2024                                                                                                        | A     | Adaptive retrieval and critique; motivates relevance/support checks. A trained reflection-token method, not equivalent to asking a generic model to verify itself.                     |
+| P11 | Gao et al., [Enabling Large Language Models to Generate Text with Citations](https://arxiv.org/abs/2305.14627), EMNLP 2023                                                        | A     | ALCE separates correctness and citation quality; informs evidence evaluation. Citation formatting alone does not imply support.                                                        |
+| P12 | Packer et al., [MemGPT: Towards LLMs as Operating Systems](https://arxiv.org/abs/2310.08560), 2023                                                                                | A     | Memory tiers and context management; informs run/history/knowledge separation. Not a policy governance architecture.                                                                   |
+| P13 | Park et al., [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442), 2023                                                                 | A     | Observation, retrieval, and reflection; informs candidate insight extraction. Evaluates simulated behavior/believability, not enterprise truth or authorization.                       |
+| P14 | Chhikara et al., [Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory](https://arxiv.org/abs/2504.19413), 2025                                               | A     | Extraction/consolidation and memory evaluation; informs lifecycle comparisons. Vendor-authored conversational benchmarks do not establish Loom's quality or cost.                      |
+| P15 | Rasmussen et al., [Zep: A Temporal Knowledge Graph Architecture for Agent Memory](https://arxiv.org/abs/2501.13956), 2025                                                         | S     | Episodes, temporal facts, invalidation, and retrieval; informs provenance/effective intervals. Vendor-authored graph architecture; adopting its concepts does not require its backend. |
+| P16 | Edge et al., [From Local to Global: A Graph RAG Approach to Query-Focused Summarization](https://arxiv.org/abs/2404.16130), 2024                                                  | A     | Community summaries address corpus-wide questions. Loom's initial exact request/rule lookup does not justify this pipeline.                                                            |
+| P17 | Yao et al., [ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629), 2022; ICLR 2023                                                       | A     | Interleaved reasoning/actions/retrieval; informs bounded tool use. Adds no authorization or injection-resistance guarantee.                                                            |
+| P18 | Yao et al., [tau-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains](https://arxiv.org/abs/2406.12045), 2024                                                | S     | Policy-following, final-state evaluation, and repeated-trial reliability; informs command assertions. Simulated users and benchmark domains differ from a pilot team.                  |
+| P19 | Debenedetti et al., [AgentDojo](https://arxiv.org/abs/2406.13352), 2024                                                                                                           | A     | Tests tool agents on untrusted data and attacks; informs adversarial fixtures. Passing a finite suite is not proof of injection immunity.                                              |
+| P20 | Zhan et al., [InjecAgent](https://arxiv.org/abs/2403.02691), Findings of ACL 2024                                                                                                 | A     | Indirect injection and exfiltration scenarios; informs source/tool trust boundaries. Historical model attack rates are not forecasts for Loom.                                         |
+| P21 | Debenedetti et al., [Defeating Prompt Injections by Design](https://arxiv.org/abs/2503.18813), 2025                                                                               | S     | CaMeL separates control/data and enforces capabilities; informs server-enforced actions. Loom does not implement the interpreter or inherit the paper's guarantees.                    |
+| P22 | Kleppmann and Beresford, [A Conflict-Free Replicated JSON Datatype](https://arxiv.org/abs/1608.03960), 2016; revised 2017                                                         | A     | Formal convergence for replicated JSON; reference for later collaborative document editing. Convergence does not enforce approval/business semantics.                                  |
+| P23 | Kleppmann et al., [Local-first software: You own your data, in spite of the cloud](https://www.inkandswitch.com/essay/local-first/), Onward! 2019                                 | S     | Collaboration, ownership, and offline design principles. Useful future direction; MVP remains server-authoritative and online.                                                         |
+| P24 | Pang et al., [Zanzibar: Google's Consistent, Global Authorization System](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/), USENIX ATC 2019 | A     | Relationship policies and consistency of access decisions. Informs current-authority checks; Google-scale infrastructure is unnecessary here.                                          |
+| P25 | Garcia-Molina and Salem, [Sagas](https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf), SIGMOD 1987                                                                    | A     | Decomposition and compensating transactions; informs later external-action recovery. Compensation cannot universally reverse arbitrary external effects.                               |
+| P26 | Wu et al., [LongMemEval](https://arxiv.org/abs/2410.10813), 2024; revised 2025                                                                                                    | S     | Knowledge updates, temporal reasoning, cross-session recall, and abstention; informs memory fixtures. Chat benchmark, not a workflow benchmark.                                        |
+| P27 | Es et al., [Ragas: Automated Evaluation of Retrieval Augmented Generation](https://arxiv.org/abs/2309.15217), 2023; revised 2025                                                  | A     | Separates retrieval/context and generation evaluation dimensions. Reference-free/judge metrics supplement human labels and deterministic checks.                                       |
 
 ## 19. Open-source repository register
 
 Status means a proposed relationship to Loom: **Adopt** = intended dependency/service subject to version/license checks; **Spike** = evaluate a thin adapter; **Reference** = study patterns without a runtime dependency; **Defer** = a possible future dependency requiring evidence. No repository was installed, executed, or forked for this documentation task.
 
-| ID | Repository / reviewed material | Status | Relevant pattern and boundary |
-| --- | --- | --- | --- |
-| R01 | [appsmithorg/appsmith](https://github.com/appsmithorg/appsmith), README | Reference | Internal-tool composition and data bindings. Full platform breadth exceeds MVP; do not assume hosted features are all community code. |
-| R02 | [ToolJet/ToolJet](https://github.com/ToolJet/ToolJet), README/license section | Reference | Component catalog, collaborative app editing, queries/integrations. CE and hosted AI capabilities differ; review exact licensing before reuse. |
-| R03 | [Budibase/budibase](https://github.com/Budibase/budibase), README and agent docs | Reference | Apps, data, automations, agents, and review controls. Demonstrates competitive overlap, not a Loom differentiation claim. |
-| R04 | [vercel-labs/json-render](https://github.com/vercel-labs/json-render), README/registry examples | Spike | Catalog-based JSON UI and component registry. Keep Loom schema independent; server validation remains necessary. |
-| R05 | [a2ui-project/a2ui](https://github.com/a2ui-project/a2ui), README | Reference | Declarative updatable UI and trusted catalog. Former Google URL redirects here; protocol is evolving, so interoperability is deferred. |
-| R06 | [microsoft/data-formulator](https://github.com/microsoft/data-formulator), README/publication | Reference | Iterative prompt/direct-control authoring. Its analysis/code-execution functionality is outside Loom's MVP. |
-| R07 | [SALT-NLP/collaborative-gym](https://github.com/SALT-NLP/collaborative-gym), README | Reference | Shared environment actions, user intervention, process/outcome evaluation. Evaluation infrastructure is not an enterprise workflow backend. |
-| R08 | [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph), README | Defer | Checkpoints, durable state, and human interrupts. For a future TypeScript adoption assess LangGraph.js, not the Python package. |
-| R09 | [mem0ai/mem0](https://github.com/mem0ai/mem0), README | Reference | Memory extraction and retrieval patterns. Managed-platform benchmark claims must not be attributed to the open-source SDK. |
-| R10 | [getzep/graphiti](https://github.com/getzep/graphiti), README | Defer | Temporal facts, episode provenance, and hybrid graph retrieval. Additional graph operations/backends require a validated need. |
-| R11 | [letta-ai/letta-code](https://github.com/letta-ai/letta-code), README and legacy Letta pointer | Reference | Stateful harness and persistent memory. The old Letta repo points to this active source; do not assume the retired V1 server is the current API. |
-| R12 | [microsoft/graphrag](https://github.com/microsoft/graphrag), README | Reference | Graph extraction and community summaries. README reports maintenance mode; not selected as a new MVP dependency. |
-| R13 | [supabase/supabase](https://github.com/supabase/supabase), README and Auth/RLS/Realtime docs | Reference; superseded | Earlier bundled-platform choice; not part of the Exasol baseline. |
-| R14 | [pgvector/pgvector](https://github.com/pgvector/pgvector), README/filtering docs | Reference | Filtered retrieval caveats; PostgreSQL extension cannot be installed into Exasol. |
-| R15 | [timgit/pg-boss](https://github.com/timgit/pg-boss), README | Reference; superseded | Durable-job/idempotency patterns; PostgreSQL runtime dependency removed. |
-| R16 | [drizzle-team/drizzle-orm](https://github.com/drizzle-team/drizzle-orm), README/transaction docs | Reference; superseded | Typed repository patterns; no assumed Exasol dialect. |
-| R17 | [fastify/fastify](https://github.com/fastify/fastify), README/validation docs | Reference; superseded | Fixed-schema/API boundaries; Next.js handles the initial server endpoints. |
-| R18 | [vercel/ai](https://github.com/vercel/ai), package README/structured-data docs | Adopt | Provider adapters, tool calls, structured generation. Validate outputs and enforce permissions outside the SDK. |
-| R19 | [yjs/yjs](https://github.com/yjs/yjs), README | Defer | Shared types and collaborative text. Not needed for saved-record synchronization. |
-| R20 | [automerge/automerge](https://github.com/automerge/automerge), README | Defer | Replicated documents and sync. Offline merging is a different contract from approved business transactions. |
-| R21 | [openfga/openfga](https://github.com/openfga/openfga), README | Defer | Zanzibar-inspired relationship authorization. Revisit if membership policies become insufficient. |
-| R22 | [temporalio/temporal](https://github.com/temporalio/temporal), README | Defer | Durable workflows and retries. Extra infrastructure is not justified for bounded local proposal generation. |
-| R23 | [promptfoo/promptfoo](https://github.com/promptfoo/promptfoo), README | Adopt | Model/prompt comparisons and adversarial evaluation. Judge scores supplement final-state assertions. |
+| ID  | Repository / reviewed material                                                                   | Status                | Relevant pattern and boundary                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R01 | [appsmithorg/appsmith](https://github.com/appsmithorg/appsmith), README                          | Reference             | Internal-tool composition and data bindings. Full platform breadth exceeds MVP; do not assume hosted features are all community code.            |
+| R02 | [ToolJet/ToolJet](https://github.com/ToolJet/ToolJet), README/license section                    | Reference             | Component catalog, collaborative app editing, queries/integrations. CE and hosted AI capabilities differ; review exact licensing before reuse.   |
+| R03 | [Budibase/budibase](https://github.com/Budibase/budibase), README and agent docs                 | Reference             | Apps, data, automations, agents, and review controls. Demonstrates competitive overlap, not a Loom differentiation claim.                        |
+| R04 | [vercel-labs/json-render](https://github.com/vercel-labs/json-render), README/registry examples  | Spike                 | Catalog-based JSON UI and component registry. Keep Loom schema independent; server validation remains necessary.                                 |
+| R05 | [a2ui-project/a2ui](https://github.com/a2ui-project/a2ui), README                                | Reference             | Declarative updatable UI and trusted catalog. Former Google URL redirects here; protocol is evolving, so interoperability is deferred.           |
+| R06 | [microsoft/data-formulator](https://github.com/microsoft/data-formulator), README/publication    | Reference             | Iterative prompt/direct-control authoring. Its analysis/code-execution functionality is outside Loom's MVP.                                      |
+| R07 | [SALT-NLP/collaborative-gym](https://github.com/SALT-NLP/collaborative-gym), README              | Reference             | Shared environment actions, user intervention, process/outcome evaluation. Evaluation infrastructure is not an enterprise workflow backend.      |
+| R08 | [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph), README                      | Defer                 | Checkpoints, durable state, and human interrupts. For a future TypeScript adoption assess LangGraph.js, not the Python package.                  |
+| R09 | [mem0ai/mem0](https://github.com/mem0ai/mem0), README                                            | Reference             | Memory extraction and retrieval patterns. Managed-platform benchmark claims must not be attributed to the open-source SDK.                       |
+| R10 | [getzep/graphiti](https://github.com/getzep/graphiti), README                                    | Defer                 | Temporal facts, episode provenance, and hybrid graph retrieval. Additional graph operations/backends require a validated need.                   |
+| R11 | [letta-ai/letta-code](https://github.com/letta-ai/letta-code), README and legacy Letta pointer   | Reference             | Stateful harness and persistent memory. The old Letta repo points to this active source; do not assume the retired V1 server is the current API. |
+| R12 | [microsoft/graphrag](https://github.com/microsoft/graphrag), README                              | Reference             | Graph extraction and community summaries. README reports maintenance mode; not selected as a new MVP dependency.                                 |
+| R13 | [supabase/supabase](https://github.com/supabase/supabase), README and Auth/RLS/Realtime docs     | Reference; superseded | Earlier bundled-platform choice; not part of the Exasol baseline.                                                                                |
+| R14 | [pgvector/pgvector](https://github.com/pgvector/pgvector), README/filtering docs                 | Reference             | Filtered retrieval caveats; PostgreSQL extension cannot be installed into Exasol.                                                                |
+| R15 | [timgit/pg-boss](https://github.com/timgit/pg-boss), README                                      | Reference; superseded | Durable-job/idempotency patterns; PostgreSQL runtime dependency removed.                                                                         |
+| R16 | [drizzle-team/drizzle-orm](https://github.com/drizzle-team/drizzle-orm), README/transaction docs | Reference; superseded | Typed repository patterns; no assumed Exasol dialect.                                                                                            |
+| R17 | [fastify/fastify](https://github.com/fastify/fastify), README/validation docs                    | Reference; superseded | Fixed-schema/API boundaries; Next.js handles the initial server endpoints.                                                                       |
+| R18 | [vercel/ai](https://github.com/vercel/ai), package README/structured-data docs                   | Adopt                 | Provider adapters, tool calls, structured generation. Validate outputs and enforce permissions outside the SDK.                                  |
+| R19 | [yjs/yjs](https://github.com/yjs/yjs), README                                                    | Defer                 | Shared types and collaborative text. Not needed for saved-record synchronization.                                                                |
+| R20 | [automerge/automerge](https://github.com/automerge/automerge), README                            | Defer                 | Replicated documents and sync. Offline merging is a different contract from approved business transactions.                                      |
+| R21 | [openfga/openfga](https://github.com/openfga/openfga), README                                    | Defer                 | Zanzibar-inspired relationship authorization. Revisit if membership policies become insufficient.                                                |
+| R22 | [temporalio/temporal](https://github.com/temporalio/temporal), README                            | Defer                 | Durable workflows and retries. Extra infrastructure is not justified for bounded local proposal generation.                                      |
+| R23 | [promptfoo/promptfoo](https://github.com/promptfoo/promptfoo), README                            | Adopt                 | Model/prompt comparisons and adversarial evaluation. Judge scores supplement final-state assertions.                                             |
 
 | R24 | [exasol/exasol-personal](https://github.com/exasol/exasol-personal), repository overview and linked setup docs | Adopt | Official Personal launcher; verify current Linux/Podman setup, hardware, version, and edition terms. |
 | R25 | [exasol/exasol-driver-ts](https://github.com/exasol/exasol-driver-ts), README and driver user guide | Adopt | Server-only TypeScript adapter, prepared bindings, explicit connection transactions, TLS. The 0.8.1 adapter passes current live checks; public protocol commands avoid a prepare-error connection leak. |
@@ -517,7 +582,6 @@ Verify analytical output against hand-calculated synthetic fixtures and repeat f
 
 The single-process coordinator and small write batches are deliberate responses to this analytical database's transaction model. If M0 reveals unacceptable contention or incompatible key/driver behavior, document that result and revise the design before building on it. Do not silently replace Exasol with a mocked or PostgreSQL-backed runtime.
 
-
 ## Implemented manual data transfer checkpoint — 2026-10-22
 
 The request desk now runs scoped search/status filtering in Exasol, with deterministic creation-time/ID ordering and 25-row offset pages. Offset values are schema-validated bounded integers rendered into reviewed SQL because Exasol documents restrictions on parameterized LIMIT/OFFSET; all user text and identity predicates remain bound values. Search uses literal `INSTR`, so wildcard or quote input cannot widen access. Live inserts may shift page boundaries. Frozen snapshots and cursor pagination are future work.
@@ -530,12 +594,11 @@ Exports run a separately authorized query across matching pages, with a hard 500
 
 Implementation references: [Exasol SELECT and ordering/limits](https://docs.exasol.com/db/latest/sql/select.htm), [prepared LIMIT/OFFSET restriction](https://docs.exasol.com/db/latest/changelogs/15257.htm), [literal substring search](https://docs.exasol.com/db/7.1/sql_references/functions/alphabeticallistfunctions/instr.htm), and [CSV parser options and record bounds](https://csv.js.org/parse/options/). Real database fixtures cover page boundaries, scoped search/export, preview-only behavior, invalid batches, replay, imported history, and rollback after a later SQL failure; production browser tests cover mapping, review, commit, and download.
 
-
 ## Implemented OpenRouter pipeline — 2026-10-22
 
 The user rejected deterministic recommendations. The previous heuristic engine, exact-dataset matching, canned clarification text, and recomputed recommendation approval are removed. All new suggestions come from the explicitly configured OpenRouter model using the operator's free-form task and authorized context. There is no default model, fake production response, or rule-based fallback. Permission checks, action schemas, field/transition validation, version checks, and review requirements remain deterministic enforcement boundaries; they do not choose recommendations.
 
-Migration `004_openrouter_runs` adds model/task/prompt metadata and durable `MODEL_ATTEMPTS` with input hashes/snapshots, command identity, bounded attempt number, lifecycle, lease, result, and sanitized error code. Historical heuristic runs remain readable but cannot advance or execute proposals. The fixed template remains `request-desk-v1`; generated tool definitions are still future work.
+Migration `004_openrouter_runs` adds model/task/prompt metadata and durable `MODEL_ATTEMPTS` with input hashes/snapshots, command identity, bounded attempt number, lifecycle, lease, result, and sanitized error code. Historical heuristic runs remain readable but cannot advance or execute proposals. At that October 22 checkpoint the template was fixed at `request-desk-v1`; the October 27 tool-definition checkpoint below supersedes that limitation.
 
 Each advance reserves one checkpoint in a short coordinated transaction, then releases the SQL connection and coordinator before calling OpenRouter. A two-minute pending lease blocks duplicate calls. At most two explicit provider attempts are permitted per record checkpoint. A fresh transaction checks current actor/initiator permissions, run state/version, target snapshot, members/comments, active approved knowledge, and prompt/template context before storing a result. Concurrent edits or cancellation discard output. The in-process abort is best effort; durable run state prevents cancelled responses from becoming proposals. Crashes can require retry after lease expiry, potentially causing another provider charge. Exactly-once model billing is not claimed.
 
@@ -548,3 +611,63 @@ Proposals bind the model's exact ordered commands, target/version/before/after s
 Implementation references: [OpenRouter structured output](https://openrouter.ai/docs/guides/features/structured-outputs), [provider parameter and data-policy routing](https://openrouter.ai/docs/guides/routing/provider-selection), [chat completion API](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request). Live Exasol tests use an explicitly test-only provider fixture to exercise leases, replay, invalid outputs, stale context during inference, cancellation/revocation, and exact approval. HTTP fixture tests verify provider requests and failure handling. The configured model is `openrouter/free`; each request lets OpenRouter choose a compatible free model, and actual model identity is recorded. Earlier live responses were malformed or semantically ineffective and are not proof of working end-to-end generation. The current flat transport passed a synthetic free-router call with a valid comment action and reported cost zero; browser/restart verification is tracked separately in RUNBOOK. The key remains private. Earlier free candidates were blocked by account privacy policies or upstream capacity; no privacy setting or paid fallback was enabled. The old deterministic restart result remains superseded until the model-backed restart check passes.
 
 Free-only deployment defaults to enforcing `:free` IDs or `openrouter/free` and OpenRouter `provider.max_price` of zero for prompt, completion, and request charges. Provider/model choice stays in configuration. `OPENROUTER_REASONING_ENABLED` can control optional model reasoning; completion budgets include hidden reasoning on supported endpoints, so incomplete responses are rejected rather than used as fabricated results. References: [free-model router](https://openrouter.ai/openrouter/free), [price caps](https://openrouter.ai/docs/guides/routing/provider-selection#max-price), [reasoning budgets](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+
+## Implemented tool-definition checkpoint — 2026-10-27
+
+`packages/contracts/src/tools.ts` owns the strict finite catalog, referential validation, compatible-change checks, and two request-family templates. The shared renderer drives intake/details, queue columns, filters, status labels, and summary selection. It renders descriptor values as React text/native controls; no generated expressions, HTML, SQL, or JavaScript execute.
+
+Each workspace has one published request-family definition in this slice. `TOOLS` stores its revision pointer; `TOOL_DRAFTS` and `TOOL_REVISIONS` retain immutable schema-validated JSON and hashes. Revision 1 is the built-in data desk; first publication records that baseline and publishes revision 2 atomically. Draft save/publication use owner checks and the shared command-receipt coordinator. `TOOL_EVENTS` records tool lifecycle separately from request-specific audit/outbox rows; publication propagation currently uses authorized polling, not notification delivery.
+
+`TOOL_GENERATIONS` durably reserves generation commands, model/prompt versions, leases, and a two-attempt budget. Provider calls happen outside transactions; output is retained only after owner and published-revision rechecks. The builder shows assumptions, unsupported capabilities, structural differences, compatibility warnings, and exact saved-draft review. Native fetch uses the existing OpenRouter privacy/free-price policies. Live free-model output reliability remains a separate gate from mocked transport/service correctness.
+
+Custom text/textarea values use `REQUESTS.CUSTOM_VALUES_JSON`, with stable keys, bounded input, and current-spec validation through the shared request command service. The UI pins an open form's revision and preserves its input on a publication conflict. Agent runs/proposals now pin actual published revisions and reject stale definitions. Compatible revision restoration changes only tool structure; published field removal/type changes/key renaming/intake tightening are blocked.
+
+Known scope: one request-family tool per workspace, fixed workflow states and core field meanings, synthetic identity, latest-20 draft/history lists, core-only CSV import, custom-aware export, and core-only completeness metrics. Multiple independent tools, production sharing/identity, richer analytics/retrieval, decision reuse, retention, and live-model quality evaluation remain unfinished.
+
+## Verified AI designer pipeline — 2026-10-27
+
+The designer uses optional `OPENROUTER_TOOL_MODEL` independently of the operating-agent model. The tested local endpoint is `dots-studio/dots-3-note-preview:free`; free-only price caps and the existing privacy filter remain enabled. Prompt `tool-designer-v4` requests flat bounded catalog choices; decoding preserves existing field order and fixed metadata and validates the assembled specification. Finalization rejects incompatibility against both the published definition and edited base before persisting output. Completed generation metadata is joined into authorized draft reads and survives replay/reload.
+
+Provider failures are classified from HTTP errors and body-level errors, with sanitized messages and bounded `Retry-After` seconds. A failed generation's lease timestamp stores its cooldown; retrying during it consumes no attempt or provider call. The builder preserves edits, uses the same ID for retries, and requires explicit new-generation action after exhaustion. There are no automatic retries, generated-response fallbacks, paid routing fallbacks, or model-authored authority.
+
+Live verification covers initial tool creation with a custom Location field, follow-up addition of Asset tag, two explicit publications, record preservation, and the production browser path from description through persisted draft reload, exact review, publication, and requester rendering. Four calls reported cost zero. Larger quality, availability, injection-resistance, productivity, and live-triage/restart evaluations remain separate gates.
+
+## Workspace access and shared records checkpoint — 2026-10-27
+
+Migration006 adds canonical password users/unique normalized login identities, opaque hashed eight-hour sessions, hash-only HMAC-derived one-use24h invitations, membership versions, workspace lifecycle events, and account-scoped workspace-creation receipts. Expensive salted scrypt derivation occurs outside coordinated write transactions. Membership/credential/invitation state is rechecked before commits. Existing account emails require authenticated acceptance; links cannot overwrite credentials or grant ownership. Owners can promote members with version checks, but cannot remove the last active owner.
+
+Credential authentication and workspace authorization are separate: an authenticated user may have an inactive current membership, allowing recovery/new invitations, while every business service still requires active scoped membership. Workspace creation uses user-scoped receipts when a canonical identity exists, so it cannot write receipts into a revoked workspace. Legacy scoped HMAC persona cookies work only in explicit loopback demo mode; rejected demo sign-in requests do not revoke real sessions.
+
+Client queue/detail/access polling defaults to three seconds. Dirty descriptions pin record/tool versions and remain separate from incoming saved metadata; conflict resolution is explicit. Role/identity/workspace changes replace scope and clear inaccessible caches/forms. Requester serialization excludes internal comments, priority, member lists, aggregate metrics and internal activity. Stable `/w/<id>` links select only authorized workspaces, while invitation tokens use fragments and POST bodies with no-referrer responses.
+
+The first shared deployment remains one Node process/Exasol store. Credential mode requires HTTPS except for local loopback. Public signup is an explicit bootstrap setting; invitations remain enabled when signup is closed. Email verification/delivery, reset/SSO, retention and distributed coordination remain planned. See DEPLOYMENT.md for free testing paths and hosting/edition requirements.
+
+## Process and organizational-memory checkpoint — 2026-10-28
+
+The Company Brain reference informs a smaller, implemented Loom memory loop: deterministic saved facts → approved source retrieval → bounded model proposal → exact human review → separately approved reusable guidance. No model-generated edge is admitted into the relationship projection. Exasol remains the sole canonical store; a graph database and vector index are not dependencies.
+
+The new pure memory module ranks normalized keyword/metadata matches and projects recorded relationships into source/version-bearing edges. The authorized `/api/memory` adapter prefilters source candidates in SQL, returns explicit bounds, and merges request, tool, access, and agent events for the timeline. Source validity-date filtering applies to currently approved knowledge and does not claim temporal graph reconstruction. Ownership context in guidance is distinct from authorship and approval facts. Proposal citations retain cited versions and never assert that the citation supports the recommendation.
+
+Agent context selects up to 12 sources from the existing bounded authorized corpus, includes published field semantics/custom values, and retains a hash over the entire approved corpus for stale-write protection. Retrieval failures, no matches, and provider failures remain distinct. Prompt `triage-llm-v3` treats retrieved content as reference data; this is not a formal guarantee against prompt injection.
+
+Human-authored knowledge derived from an applied proposal stores its proposal ID/hash, run, record/version, reviewer, author, timestamp, and rationale in immutable content JSON. Creation and separate owner approval both validate the source; direct provenance forgery is rejected. Replacements inherit verified lineage. The source decision is historical evidence, while the approved guidance remains an explicit owner-managed policy item. Keyword relevance and validity govern subsequent retrieval; automatic generalization, semantic embeddings, connector ingestion, infrastructure topology, and blast-radius analysis are not implemented.
+
+Onboarding and project-review templates reuse the fixed renderer/actions and retain existing custom field data. All field-level proposed changes use the published vocabulary. The system still supports one request-family tool per workspace and one Node writer process. The later conversation checkpoint replaces the process-guide home screen with a single prompt; the manual builder and knowledge/run controls remain in administration.
+
+## Company identity and external agent boundary — 2026-10-28
+
+Workspace branding is versioned presentation data in Exasol, separate from the tool specification. Owners publish a company name, validated raster logo, two fixed-format colors, and bounded typography/corner choices. All active members receive safe settings in their authorized desk snapshot. A pure theme function derives readable foreground roles and fixed CSS variables; neither arbitrary CSS nor external asset URLs is accepted. Unsaved previews are local to the editing owner and clear when identity/workspace/role changes.
+
+External clients connect to a stateless Streamable HTTP MCP endpoint through workspace-scoped, expiring, hash-only credentials. Authentication maps the credential to its issuing owner and rechecks current membership. The tool surface exposes authorized reads and proposal submission, with Host/Origin guards and bounded payloads. It cannot approve proposals, publish tools, change branding, execute arbitrary code, or directly mutate requests. The company runs its Codex/Claude Code/MCP client; Loom does not impersonate a vendor login or host the agent process.
+
+External proposals reuse the existing validation, immutable before/after snapshots, source references, exact review hash, command receipts and atomic command service. They pin the current tool revision, request version, full approved corpus digest and connection ID. Human review rechecks all dependencies and credential eligibility, so token revocation or owner demotion prevents pending external writes. Already applied decisions remain historical facts. Null external inference metrics express unknown usage rather than invented zero costs. Shared run discovery is restricted to current internal operators/owners.
+
+## Conversation entry point — 2026-10-28
+
+The default interface is a single prompt composer. The table and manual administration are separate views; generated record proposals and tool drafts appear in conversation only when relevant. Business intent is interpreted by the configured model/client, rather than a keyword router or a fixed triage form. The existing bounded action/component catalog remains the execution boundary.
+
+Migration008 stores atomic prompt/context/result turns in `CONVERSATION_TURNS`. Each turn belongs to one actor and workspace; history is filtered against the exact current membership role before display or model reuse. Context contains a bounded recent record sample, relevant approved sources, recent permitted conversation, tool revision, members where authorized, and capability flags. A full approved-corpus digest protects against source changes. This is not an exhaustive organization search or an external-source ingestion pipeline.
+
+The built-in agent reserves a durable command and five-minute lease, releases the coordinator before inference, validates strict output, then revalidates all pinned context before saving a reply, citations, and immutable proposals. A tool-design request uses the existing designer and saves an unpublished draft. Draft generation can leave an unreferenced draft if final conversation validation fails; it never publishes automatically. Completed/failed command retries return saved results, while explicit new commands can make a fresh provider attempt. Lease expiry permits recovery without claiming exactly-once provider billing.
+
+External prompts remain queued until a selected MCP client reads `loom_list_tasks` and responds through `loom_reply_task`. Task-linked proposals retain connection/task lineage; `loom_propose_tool` creates an owner-only unpublished draft within the same coordinated validation boundary. Task version/context hashes, current author scope, connection eligibility, and workspace context are checked again before acceptance. External clients can prepare work but cannot approve it or publish tools. Requester/viewer tasks are not exposed to an owner-level external credential. Loom does not launch the client or promise automatic remote execution.

@@ -11,6 +11,7 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "paths": {
+      "@/*": ["./apps/web/*"],
       "@loom/contracts": ["./packages/contracts/src/index.ts"],
       "@loom/domain": ["./packages/domain/src/index.ts"],
       "@loom/db-exasol": ["./packages/db-exasol/src/index.ts"],

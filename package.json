@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @loom/web dev",
     "build": "pnpm --filter @loom/web build",
-    "start": "pnpm --filter @loom/web start",
+    "start": "node --env-file-if-exists=.env apps/web/node_modules/next/dist/bin/next start apps/web --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit && pnpm --filter @loom/web typecheck",
     "lint": "eslint .",
     "test": "vitest run",
@@ -26,7 +26,9 @@
     "db:start": ".local/bin/exasol start --deployment-dir .local/exasol",
     "db:stop": ".local/bin/exasol stop --deployment-dir .local/exasol",
     "test:restart": "tsx --env-file-if-exists=.env scripts/check-triage-restart.ts",
-    "model:check": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/check-model.ts"
+    "model:check": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/check-model.ts",
+    "tool:check": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/check-tool-generation.ts",
+    "test:e2e:sharing": "LOOM_TEST_AUTH_MODE=workspace pnpm test:e2e:connected tests/connected/collaboration.spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

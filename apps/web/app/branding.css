@@ -1,0 +1,317 @@
+/* Company palettes are scoped to a workspace, including its detail panel.
+   All values come from the fixed, contrast-aware brandTheme() token set. */
+[data-company-theme] {
+  color: var(--ink);
+  background: var(--paper);
+  font-family: var(--brand-font-body);
+  color-scheme: light;
+}
+[data-company-theme] :is(button, input, select, textarea) {
+  font-family: var(--brand-font-body);
+}
+[data-company-theme] :focus-visible {
+  outline-color: var(--brand-link);
+}
+[data-company-theme] ::selection {
+  color: var(--brand-on-accent);
+  background: var(--brand-accent);
+}
+[data-company-theme] button {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  border-radius: var(--brand-button-radius);
+}
+[data-company-theme] button:hover:not(:disabled) {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+[data-company-theme] button.secondary {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+}
+[data-company-theme] button.secondary:hover:not(:disabled) {
+  color: var(--brand-link);
+  background: var(--soft);
+  border-color: var(--brand-link);
+}
+[data-company-theme] button.quiet {
+  color: var(--brand-link);
+  background: transparent;
+  border-color: transparent;
+}
+[data-company-theme] button.quiet:hover:not(:disabled) {
+  color: var(--brand-link);
+  background: var(--soft);
+  border-color: transparent;
+}
+[data-company-theme] :is(input, select, textarea) {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+  border-radius: var(--brand-control-radius);
+}
+[data-company-theme] :is(input, select, textarea):hover,
+[data-company-theme] :is(input, select, textarea):focus {
+  border-color: var(--brand-link);
+}
+[data-company-theme] :is(input, select, textarea):disabled {
+  color: var(--muted);
+  background: var(--soft);
+}
+[data-company-theme] :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--brand-link);
+}
+[data-company-theme] :is(.sidebar, .civitas-console-chrome) {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary);
+}
+[data-company-theme] .sidebar :focus-visible {
+  outline-color: var(--brand-on-primary);
+}
+[data-company-theme] .sidebar :is(.brand, .sidebar-note strong),
+[data-company-theme] .sidebar nav a {
+  color: var(--brand-on-primary);
+}
+[data-company-theme]
+  .sidebar
+  :is(.brand-caption, .workspace-label, .sidebar-note p, .environment),
+[data-company-theme] .sidebar nav .civitas-arrow {
+  color: var(--brand-sidebar-muted);
+}
+[data-company-theme] .sidebar nav a:hover {
+  background: var(--brand-sidebar-hover);
+}
+[data-company-theme] .sidebar nav .nav-active,
+[data-company-theme] .skip-link {
+  color: var(--brand-on-accent);
+  background: var(--brand-accent);
+}
+[data-company-theme] .sidebar nav .nav-active:hover {
+  color: var(--brand-on-accent);
+  background: var(--brand-accent-hover);
+}
+[data-company-theme] .sidebar nav .nav-count {
+  color: var(--brand-on-accent);
+  background: transparent;
+  border: 1px solid currentColor;
+}
+[data-company-theme] .sidebar .environment,
+[data-company-theme] .sidebar-orbit :is(i, b) {
+  border-color: var(--brand-sidebar-line);
+}
+[data-company-theme] .sidebar-orbit b {
+  color: var(--brand-on-primary);
+  font-family: var(--brand-font-display);
+}
+[data-company-theme] .sidebar-orbit i:first-child::after,
+[data-company-theme] .environment .dot {
+  background: var(--brand-on-primary);
+}
+[data-company-theme] :is(.civitas-seal, .brand-mark, .process-step-number) {
+  color: var(--brand-on-accent);
+  background: var(--brand-accent);
+}
+[data-company-theme] :is(.civitas-wordmark, .civitas-seal, .brand-mark),
+[data-company-theme] .page-heading h1,
+[data-company-theme] .stats .civitas-metric > strong,
+[data-company-theme]
+  :is(.account-access-intro, .invitation-accept, .join-page)
+  :is(h1, h2) {
+  font-family: var(--brand-font-display);
+}
+[data-company-theme] .topbar {
+  background: var(--surface);
+}
+[data-company-theme]
+  :is(.banner, .tool-builder-baseline, .workspace-access-invite) {
+  color: var(--brand-link);
+  background: var(--soft);
+  border-color: var(--line);
+}
+[data-company-theme] :is(.banner strong, .eyebrow, .notice, .request-link),
+[data-company-theme]
+  :is(.tool-builder-entry, .memory-entry, .workspace-access-share > summary)
+  strong,
+[data-company-theme] .comment strong,
+[data-company-theme] .memory-entry {
+  color: var(--brand-link);
+}
+[data-company-theme] .request-link:hover:not(:disabled) {
+  color: var(--brand-link);
+  background: transparent;
+}
+[data-company-theme]
+  :is(
+    .stats,
+    .queue,
+    .tool-builder,
+    .tool-builder-console,
+    .tool-builder-preview,
+    .process-journey,
+    .team-memory,
+    .memory-source,
+    .memory-empty,
+    .memory-map-link,
+    .triage-console,
+    .csv-transfer,
+    .account-access,
+    .workspace-access-bar,
+    .workspace-access-share,
+    .invitation-accept-card,
+    .comment,
+    .knowledge-entry,
+    .proposal-review
+  ) {
+  border-color: var(--line);
+  border-radius: var(--brand-panel-radius);
+}
+[data-company-theme]
+  :is(
+    .queue-toolbar,
+    .tool-builder-preview,
+    .account-access,
+    .workspace-access-bar,
+    .invitation-accept-card,
+    .triage-console
+  ) {
+  background: var(--surface);
+}
+[data-company-theme]
+  :is(
+    .tool-builder-entry,
+    .memory-entry,
+    .tool-builder-describe,
+    .tool-builder-preview-title,
+    .tool-builder-preview-badge,
+    .tool-builder-publish-actions,
+    .tool-builder-add-field,
+    .workspace-access-share > summary,
+    .workspace-access-invite,
+    .comment,
+    .decision-learning,
+    .account-access-tabs,
+    .invitation-accept-person
+  ) {
+  background: var(--soft);
+}
+[data-company-theme]
+  :is(
+    .proposal-review,
+    .knowledge-entry,
+    .memory-source,
+    .memory-empty,
+    .memory-map-link,
+    .tool-builder-preview-filters
+  ) {
+  background: var(--paper);
+}
+[data-company-theme] :is(.table-footer, th) {
+  color: var(--muted);
+  background: var(--soft);
+}
+[data-company-theme] td,
+[data-company-theme] .activity li,
+[data-company-theme] .tool-builder-field {
+  border-color: var(--line);
+}
+[data-company-theme] tbody tr:hover {
+  background: var(--soft);
+}
+[data-company-theme] .content > .stats > .civitas-metric:first-child {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary);
+}
+[data-company-theme] .content > .stats > .civitas-metric:first-child > span,
+[data-company-theme] .content > .stats > .civitas-metric:first-child > small {
+  color: var(--brand-on-primary);
+}
+[data-company-theme]
+  .civitas-console-chrome
+  > span:last-child:not(:nth-child(2)) {
+  color: var(--brand-on-primary);
+}
+[data-company-theme] .civitas-console-lights i {
+  background: var(--brand-sidebar-muted);
+}
+[data-company-theme] .civitas-console-lights i:last-child {
+  background: var(--brand-on-primary);
+}
+[data-company-theme] .memory-map-center {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary);
+  border-radius: var(--brand-panel-radius);
+}
+[data-company-theme] .memory-map-center > :is(span, small) {
+  color: var(--brand-on-primary);
+}
+[data-company-theme] .memory-map-links,
+[data-company-theme] .memory-map-link::before {
+  border-color: var(--line);
+}
+[data-company-theme] .memory-views .secondary[aria-pressed="true"],
+[data-company-theme] .tool-builder-template-bar .secondary[aria-pressed="true"],
+[data-company-theme] .account-access-tabs button[aria-selected="true"],
+[data-company-theme]
+  .account-access-tabs
+  button[aria-selected="true"]:hover:not(:disabled) {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+[data-company-theme] .account-access-tabs button:hover:not(:disabled) {
+  color: var(--brand-link);
+  background: var(--soft);
+}
+[data-company-theme] .detail-panel {
+  background: var(--surface);
+  box-shadow: -20px 0 70px var(--brand-shadow);
+}
+[data-company-theme] .panel-backdrop {
+  background: var(--brand-overlay);
+}
+[data-company-theme] :is(.account-access, .invitation-accept-card) {
+  box-shadow: 0 10px 30px var(--brand-shadow);
+}
+/* Workflow states retain their meaning; company colors do not signal errors. */
+[data-company-theme] :is(.status-ready, .status-in_progress) {
+  color: var(--brand-link);
+  background: var(--soft);
+}
+[data-company-theme] .new-request-button {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+[data-company-theme] .new-request-button:hover:not(:disabled) {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary-hover);
+}
+[data-company-theme]
+  :is(
+    .tool-builder-intro h2,
+    .workspace-access-heading h2,
+    .tool-builder-section-heading,
+    .table-footer button
+  ) {
+  font-family: var(--brand-font-body);
+}
+[data-company-theme]
+  :is(
+    .sidebar nav a,
+    .status,
+    .tool-builder-preview-filters > span,
+    .tool-builder-check,
+    .decision-learning
+  ) {
+  border-radius: var(--brand-control-radius);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-company-theme] *,
+  [data-company-theme] *::before,
+  [data-company-theme] *::after {
+    transition: none !important;
+  }
+}

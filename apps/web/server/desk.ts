@@ -12,6 +12,7 @@ import {
   type Membership,
   type RequestDetails,
   type RequestRecord,
+  dataRequestTemplate,
 } from "@loom/contracts";
 import { sampleRequests } from "@loom/contracts/fixtures";
 import {
@@ -20,6 +21,10 @@ import {
   canOperate,
   DomainError,
   requireMembership,
+  assertToolAction,
+  assertToolCommand,
+  assertToolValues,
+  toolRequirements,
 } from "@loom/domain";
 import {
   DatabaseUnavailable,
@@ -32,6 +37,8 @@ import {
   type SqlSession,
 } from "@loom/db-exasol";
 import { queueSummary } from "@loom/analytics";
+import { publishedTool } from "./tool-definitions";
+import { settingsFor } from "./settings";
 
 function mapMembership(row: Row): Membership {
   return {
@@ -71,6 +78,7 @@ export function mapRequest(row: Row): RequestRecord {
     businessQuestion: String(row.BUSINESS_QUESTION),
     reportingPeriod: String(row.REPORTING_PERIOD ?? ""),
     dataset: String(row.DATASET ?? ""),
+    customValues: JSON.parse(String(row.CUSTOM_VALUES_JSON || "{}")),
     requesterId: String(row.REQUESTER_ID),
     requesterName: String(row.REQUESTER_NAME),
     ownerId: row.OWNER_ID ? String(row.OWNER_ID) : null,
@@ -137,6 +145,8 @@ export async function snapshot(
       );
     return {
       mode: "preview",
+      refreshIntervalMs: 3000,
+      tool: { revision: 1, spec: dataRequestTemplate, publishedAt: null },
       membership: null,
       requests: sampleRequests,
       members: personas.map((p) => ({
@@ -159,7 +169,25 @@ export async function snapshot(
     ).map(mapRequest);
     return {
       mode: "connected",
+      workspace: {
+        id: actor.workspaceId,
+        name: String(
+          (
+            await sql.query("SELECT NAME FROM WORKSPACES WHERE ID = ?", [
+              actor.workspaceId,
+            ])
+          )[0]?.NAME || "Workspace",
+        ),
+      },
+      refreshIntervalMs: (() => {
+        const value = Number(process.env.LOOM_POLL_INTERVAL_MS || 3000);
+        return Number.isInteger(value) && value >= 1000 && value <= 30000
+          ? value
+          : 3000;
+      })(),
       membership: member,
+      settings: await settingsFor(sql, actor),
+      tool: await publishedTool(sql, actor),
       page: { index: query.page, size: 25, hasMore: requests.length > 25 },
       requests: requests.slice(0, 25).map((r) => visibleRequest(member, r)),
       members: member.role === "requester" ? [] : await membersFor(sql, actor),
@@ -174,12 +202,17 @@ export async function details(actor: Actor, id: string) {
       `SELECT C.ID,C.BODY,C.VISIBILITY,C.CREATED_AT,M.NAME FROM COMMENTS C JOIN MEMBERSHIPS M ON M.WORKSPACE_ID=C.WORKSPACE_ID AND M.USER_ID=C.AUTHOR_ID WHERE C.WORKSPACE_ID = ? AND C.REQUEST_ID = ?${member.role === "requester" ? " AND C.VISIBILITY = 'requester_visible'" : ""} ORDER BY C.CREATED_AT,C.ID LIMIT 100`,
       [actor.workspaceId, id],
     );
-    const activity = await sql.query(
-      "SELECT A.ID,A.ACTION_KIND,A.VERSION,A.CREATED_AT,M.NAME FROM AUDIT_EVENTS A JOIN MEMBERSHIPS M ON M.WORKSPACE_ID=A.WORKSPACE_ID AND M.USER_ID=A.ACTOR_ID WHERE A.WORKSPACE_ID = ? AND A.REQUEST_ID = ? ORDER BY A.CREATED_AT DESC,A.ID LIMIT 100",
-      [actor.workspaceId, id],
-    );
+    const activity =
+      member.role === "requester"
+        ? []
+        : await sql.query(
+            "SELECT A.ID,A.ACTION_KIND,A.VERSION,A.CREATED_AT,M.NAME FROM AUDIT_EVENTS A JOIN MEMBERSHIPS M ON M.WORKSPACE_ID=A.WORKSPACE_ID AND M.USER_ID=A.ACTOR_ID WHERE A.WORKSPACE_ID = ? AND A.REQUEST_ID = ? ORDER BY A.CREATED_AT DESC,A.ID LIMIT 100",
+            [actor.workspaceId, id],
+          );
     return {
       request: visibleRequest(member, request),
+      membership: member,
+      tool: await publishedTool(sql, actor),
       comments: comments.map((r) => ({
         id: String(r.ID),
         body: String(r.BODY),
@@ -241,7 +274,22 @@ export async function receipt<T = RequestRecord>(
     "SELECT ACTOR_ID,PAYLOAD_HASH,RESULT_JSON FROM COMMAND_RECEIPTS WHERE WORKSPACE_ID = ? AND COMMAND_ID = ?",
     [actor.workspaceId, commandId],
   );
-  if (!row) return null;
+  if (!row) {
+    const [generation] = await sql.query(
+      "SELECT ACTOR_ID,PAYLOAD_HASH FROM TOOL_GENERATIONS WHERE WORKSPACE_ID = ? AND COMMAND_ID = ?",
+      [actor.workspaceId, commandId],
+    );
+    if (
+      generation &&
+      (generation.ACTOR_ID !== actor.userId || generation.PAYLOAD_HASH !== hash)
+    )
+      throw new DomainError(
+        "IDEMPOTENCY_CONFLICT",
+        "This command ID was already reserved for a different action.",
+        409,
+      );
+    return null;
+  }
   if (row.ACTOR_ID !== actor.userId || row.PAYLOAD_HASH !== hash)
     throw new DomainError(
       "IDEMPOTENCY_CONFLICT",
@@ -309,8 +357,13 @@ export async function createRequest(
   actor: Actor,
   commandId: string,
   values: Intake,
+  expectedToolRevision?: number,
 ) {
-  const hash = digest({ type: "create", values });
+  const hash = digest({
+    type: "create",
+    values,
+    ...(expectedToolRevision === undefined ? {} : { expectedToolRevision }),
+  });
   return writeDatabase(async (sql) => {
     const member = await membership(sql, actor);
     assertWriter(member);
@@ -319,6 +372,7 @@ export async function createRequest(
       await getRequest(sql, actor, member, existing.id);
       return visibleRequest(member, existing);
     }
+    await assertToolRevision(sql, actor, expectedToolRevision);
     const request = await insertRequest(
       sql,
       actor,
@@ -340,6 +394,9 @@ export async function insertRequest(
   values: Intake,
   imported = false,
 ) {
+  const { spec } = await publishedTool(sql, actor);
+  assertToolAction(spec, "request.create");
+  assertToolValues(spec, values);
   const now = new Date().toISOString();
   const request: RequestRecord = {
     ...values,
@@ -351,16 +408,15 @@ export async function insertRequest(
     ownerName: null,
     priority: "normal",
     status:
-      imported && (!values.dataset || !values.reportingPeriod)
-        ? "needs_info"
-        : "new",
+      imported && toolRequirements(spec, values).length ? "needs_info" : "new",
     dueAt: null,
     version: 1,
     createdAt: now,
     updatedAt: now,
   };
+  assertRecordSize(request);
   await sql.execute(
-    "INSERT INTO REQUESTS (WORKSPACE_ID,ID,REQUESTER_ID,TITLE,BUSINESS_QUESTION,REPORTING_PERIOD,DATASET,OWNER_ID,PRIORITY,STATUS,DUE_AT,VERSION,CREATED_AT,UPDATED_AT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO REQUESTS (WORKSPACE_ID,ID,REQUESTER_ID,TITLE,BUSINESS_QUESTION,REPORTING_PERIOD,DATASET,CUSTOM_VALUES_JSON,OWNER_ID,PRIORITY,STATUS,DUE_AT,VERSION,CREATED_AT,UPDATED_AT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     [
       actor.workspaceId,
       request.id,
@@ -369,6 +425,7 @@ export async function insertRequest(
       values.businessQuestion,
       values.reportingPeriod || null,
       values.dataset || null,
+      JSON.stringify(values.customValues || {}),
       null,
       "normal",
       request.status,
@@ -396,8 +453,14 @@ export async function mutateRequest(
   commandId: string,
   expectedVersion: number,
   command: Command,
+  expectedToolRevision?: number,
 ) {
-  const hash = digest({ id, expectedVersion, command });
+  const hash = digest({
+    id,
+    expectedVersion,
+    command,
+    ...(expectedToolRevision === undefined ? {} : { expectedToolRevision }),
+  });
   return writeDatabase(async (sql) => {
     const member = await membership(sql, actor);
     assertWriter(member, command);
@@ -405,6 +468,7 @@ export async function mutateRequest(
     assertReadable(member, request);
     const existing = await receipt(sql, actor, commandId, hash);
     if (existing) return visibleRequest(member, existing);
+    await assertToolRevision(sql, actor, expectedToolRevision);
     const next = await applyRequestCommand(
       sql,
       actor,
@@ -445,13 +509,17 @@ export async function applyRequestCommand(
     command,
     await membersFor(sql, actor),
   );
+  const { spec } = await publishedTool(sql, actor);
+  assertToolCommand(spec, command, next);
+  assertRecordSize(next);
   const changed = await sql.execute(
-    "UPDATE REQUESTS SET TITLE=?,BUSINESS_QUESTION=?,REPORTING_PERIOD=?,DATASET=?,OWNER_ID=?,PRIORITY=?,STATUS=?,DUE_AT=?,VERSION=?,UPDATED_AT=? WHERE WORKSPACE_ID=? AND ID=? AND VERSION=?",
+    "UPDATE REQUESTS SET TITLE=?,BUSINESS_QUESTION=?,REPORTING_PERIOD=?,DATASET=?,CUSTOM_VALUES_JSON=?,OWNER_ID=?,PRIORITY=?,STATUS=?,DUE_AT=?,VERSION=?,UPDATED_AT=? WHERE WORKSPACE_ID=? AND ID=? AND VERSION=?",
     [
       next.title,
       next.businessQuestion,
       next.reportingPeriod || null,
       next.dataset || null,
+      JSON.stringify(next.customValues || {}),
       next.ownerId,
       next.priority,
       next.status,
@@ -492,6 +560,30 @@ export async function applyRequestCommand(
     saveReceipt,
   );
   return next;
+}
+
+export function assertRecordSize(request: RequestRecord) {
+  if (JSON.stringify(request).length > 19_000)
+    throw new DomainError(
+      "RECORD_TOO_LARGE",
+      "The combined request fields are too large. Shorten the description or optional details before saving.",
+      422,
+    );
+}
+
+async function assertToolRevision(
+  sql: SqlSession,
+  actor: Actor,
+  expected?: number,
+) {
+  const current = await publishedTool(sql, actor);
+  if (expected !== undefined && expected !== current.revision)
+    throw new DomainError(
+      "TOOL_REVISION_CONFLICT",
+      "The tool changed while you were editing. Your input is preserved; close and reopen this form to review the current fields before saving.",
+      409,
+    );
+  return current;
 }
 
 export const defaultWorkspace = workspaceId;
