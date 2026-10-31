@@ -1,0 +1,240 @@
+/* The desk editor stays a compact form within the dashboard's dark palette. */
+.app-shell .tool-builder-simple .tool-builder-body {
+  width: 100%;
+  max-width: 760px;
+  padding: 8px 20px 24px;
+}
+.app-shell .tool-builder-simple :is(label, legend) {
+  color: var(--dashboard-text);
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: none;
+}
+.app-shell .tool-builder-simple .tool-builder-body > label {
+  display: block;
+  margin: 8px 0 24px;
+}
+.app-shell .tool-builder-simple :is(input, textarea, select) {
+  min-width: 0;
+  font-size: 13px;
+}
+.app-shell .tool-builder-simple textarea {
+  resize: vertical;
+}
+.app-shell .tool-builder-simple :is(h3, h4) {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.app-shell .tool-builder-simple .tool-simple-fields {
+  margin: 0 0 12px;
+}
+.app-shell .tool-builder-simple .tool-simple-field {
+  border-bottom: 1px solid var(--dashboard-line);
+}
+.app-shell
+  .tool-builder-simple
+  :is(.tool-simple-field, .tool-simple-add, .tool-simple-section)
+  > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px 0;
+  color: var(--dashboard-text);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.app-shell .tool-builder-simple .tool-simple-field > summary > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-shell .tool-builder-simple .tool-simple-field > summary > small {
+  margin-left: auto;
+  color: var(--dashboard-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.app-shell
+  .tool-builder-simple
+  :is(.tool-simple-field, .tool-simple-add, .tool-simple-section)
+  > summary::after {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 26px;
+  text-align: right;
+}
+.app-shell .tool-builder-simple .tool-simple-field > summary::after {
+  margin-left: 0;
+}
+.app-shell .tool-builder-simple details > summary:hover {
+  color: var(--dashboard-focus);
+}
+.app-shell .tool-builder-simple details > summary:focus-visible {
+  outline: 2px solid var(--dashboard-focus);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.app-shell .tool-builder-simple .tool-simple-field-editor {
+  padding: 4px 0 16px;
+}
+.app-shell .tool-builder-simple .tool-simple-field-editor > label {
+  display: block;
+}
+.app-shell .tool-builder-simple .tool-builder-field-options {
+  gap: 12px 20px;
+  margin-top: 12px;
+}
+.app-shell .tool-builder-simple .tool-builder-field-options select {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.app-shell .tool-builder-simple .tool-simple-add {
+  margin-top: 4px;
+}
+.app-shell .tool-builder-simple .tool-simple-add > summary {
+  color: var(--dashboard-muted);
+}
+.app-shell .tool-builder-simple .tool-builder-add-field {
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+  background: transparent;
+}
+.app-shell .tool-builder-simple .tool-simple-section {
+  border-top: 1px solid var(--dashboard-line);
+}
+.app-shell .tool-builder-simple .tool-simple-section[open] {
+  padding-bottom: 18px;
+}
+.app-shell .tool-builder-simple .tool-simple-section > label {
+  display: block;
+  margin: 8px 0 16px;
+}
+.app-shell .tool-builder-simple fieldset {
+  min-width: 0;
+  margin: 12px 0 18px;
+  padding: 0;
+  border: 0;
+}
+.app-shell .tool-builder-simple legend {
+  margin-bottom: 12px;
+}
+.app-shell .tool-builder-simple .tool-builder-check-grid {
+  gap: 12px 20px;
+  margin: 4px 0 8px;
+}
+.app-shell .tool-builder-simple .tool-builder-check {
+  min-height: 24px;
+  font-size: 12px;
+}
+.app-shell .tool-builder-simple .tool-builder-template-bar {
+  gap: 8px;
+  padding: 8px 0 18px;
+}
+.app-shell .tool-builder-simple .tool-builder-template-bar > span {
+  flex-basis: 100%;
+  margin: 0 0 4px;
+}
+.app-shell .tool-builder-simple .tool-builder-describe {
+  padding: 4px 0 0;
+  border: 0;
+  background: transparent;
+}
+.app-shell .tool-builder-simple .tool-builder-describe textarea {
+  background: var(--dashboard-surface);
+}
+.app-shell .tool-builder-simple .tool-builder-describe-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app-shell .tool-builder-simple .tool-builder-preview-column {
+  position: static;
+  margin-top: 4px;
+}
+.app-shell .tool-builder-simple .tool-builder-preview {
+  background: var(--dashboard-canvas);
+  border-color: var(--dashboard-line);
+}
+.app-shell
+  .tool-builder-simple
+  :is(.tool-simple-actions, .tool-builder-publish-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.app-shell
+  .tool-builder-simple
+  :is(.tool-simple-actions, .tool-builder-publish-actions)
+  > button:not(.quiet):not(.secondary) {
+  color: var(--brand-on-accent, #111);
+  background: var(--brand-accent, #e1bdff);
+  border-color: var(--brand-accent, #e1bdff);
+}
+.app-shell
+  .tool-builder-simple
+  :is(.tool-simple-actions, .tool-builder-publish-actions)
+  > button:not(.quiet):not(.secondary):hover:not(:disabled) {
+  background: var(--brand-accent-hover, #e9ceff);
+  border-color: var(--brand-accent-hover, #e9ceff);
+}
+.app-shell .tool-builder-simple .tool-builder-review {
+  margin: 8px 0 0;
+  padding: 8px 0 0;
+  border-top: 0;
+}
+.app-shell .tool-builder-simple .tool-builder-change-list {
+  margin: 16px 0;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.app-shell .tool-builder-simple .tool-builder-model-notes {
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+}
+.app-shell .tool-builder-simple .tool-builder-body > .notice:empty {
+  display: none;
+}
+@media (max-width: 520px) {
+  .app-shell .tool-builder-simple .tool-builder-body {
+    padding: 8px 16px 20px;
+  }
+  .app-shell
+    .tool-builder-simple
+    :is(
+      .tool-builder-add-field,
+      .tool-builder-check-grid,
+      .tool-builder-status-grid
+    ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-shell .tool-builder-simple .tool-builder-field-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .app-shell
+    .tool-builder-simple
+    :is(.tool-simple-actions, .tool-builder-publish-actions) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .app-shell
+    .tool-builder-simple
+    :is(.tool-simple-actions, .tool-builder-publish-actions)
+    > button {
+    width: 100%;
+    flex: auto;
+  }
+  .app-shell .tool-builder-simple .tool-builder-add-field > button {
+    width: 100%;
+  }
+}

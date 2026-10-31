@@ -413,11 +413,11 @@ export function WorkspaceSetup({
               ? "Company brand and agents"
               : "Make this workspace yours"}
           </strong>
-          <span>
-            {settings.setupCompletedAt
-              ? "Update your brand, manage agent access, or revisit setup."
-              : "Your company’s look. Your team’s agent. One place to work."}
-          </span>
+          {settings.setupCompletedAt && (
+            <span>
+              Update your brand, manage agent access, or revisit setup.
+            </span>
+          )}
         </span>
         <span className="setup-entry-status">
           {settings.setupCompletedAt ? "Manage setup" : "Start company setup"}

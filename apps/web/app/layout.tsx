@@ -12,6 +12,7 @@ import "./company-entry.css";
 import "./insights.css";
 import "./provider.css";
 import "./dashboard.css";
+import "./tool-customization.css";
 
 const body = localFont({
   src: "./fonts/manrope-variable.ttf",

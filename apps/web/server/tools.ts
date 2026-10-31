@@ -235,8 +235,7 @@ async function configuration(
       configured: true,
       model: modelIdentity(value),
       freeOnly: value.freeOnly,
-      message:
-        "Describe a tool or refine the current draft. Generation creates a draft for review.",
+      message: "",
     };
   } catch (error) {
     return {

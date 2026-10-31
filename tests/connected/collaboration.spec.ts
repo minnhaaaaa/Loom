@@ -186,24 +186,19 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
 
     const builder = owner.locator(".tool-builder");
     await builder.locator(":scope > summary").click();
+    await builder.getByText("Advanced settings", { exact: true }).click();
     await builder
       .getByRole("button", { name: "IT requests", exact: true })
       .click();
     const toolTitle = `Team requests ${suffix}`;
     await builder
-      .getByRole("textbox", { name: "Tool title", exact: true })
+      .getByRole("textbox", { name: "Desk name", exact: true })
       .fill(toolTitle);
     await builder
-      .getByRole("button", { name: "Save draft for review", exact: true })
+      .getByRole("button", { name: "Review changes", exact: true })
       .click();
     await builder
-      .getByRole("checkbox", {
-        name: "I reviewed this saved draft and its exact changes.",
-        exact: true,
-      })
-      .check();
-    await builder
-      .getByRole("button", { name: "Publish reviewed tool", exact: true })
+      .getByRole("button", { name: "Apply changes", exact: true })
       .click();
     await expect(owner.locator(".current-tool-label")).toContainText(toolTitle);
     await expect(colleague.locator(".current-tool-label")).toContainText(

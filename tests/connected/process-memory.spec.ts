@@ -31,24 +31,20 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
   await page.goto("/app?view=settings");
   const builder = page.locator(".tool-builder");
   await builder.getByText("Customize this desk", { exact: true }).click();
+  await builder.getByText("Advanced settings", { exact: true }).click();
   await builder
     .getByRole("button", { name: "Employee onboarding", exact: true })
     .click();
   await builder
-    .getByRole("button", { name: "Save draft for review", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
   await builder
-    .getByRole("checkbox", {
-      name: "I reviewed this saved draft and its exact changes.",
-      exact: true,
-    })
-    .check();
-  await builder
-    .getByRole("button", { name: "Publish reviewed tool", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true })
     .click();
   await expect(page.locator(".current-tool-label")).toContainText(
     "Employee onboarding",
   );
+  await page.locator("#workspace-access > summary").click();
   await page.locator(".workspace-access-share > summary").click();
   await expect(page.locator(".workspace-access-share")).toHaveAttribute(
     "open",
@@ -131,7 +127,10 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
     ).toBeVisible();
 
     await page.reload();
-    await page.locator(".advanced-administration > summary").click();
+    await page
+      .getByRole("navigation", { name: "Main", exact: true })
+      .getByRole("link", { name: "Knowledge", exact: true })
+      .click();
     await page.locator("#team-memory > summary").click();
     const memory = page.locator("#team-memory");
     await memory
@@ -172,6 +171,9 @@ test("a team publishes an onboarding tool, shares it with a requester, and explo
       path: "test-results-connected/onboarding-team-memory.png",
       fullPage: true,
     });
+    await page
+      .getByText("Manage knowledge and review activity", { exact: true })
+      .click();
     await page.locator(".agent-run-details > summary").click();
     await expect(page.locator(".agent-run-details")).toHaveAttribute(
       "open",

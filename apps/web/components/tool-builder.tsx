@@ -3,7 +3,6 @@ import { workspaceFetch } from "./workspace-fetch";
 
 import { useEffect, useRef, useState } from "react";
 import { ToolFields, ToolTable } from "./tool-renderer";
-import { ConsoleChrome } from "./ui/civitas";
 import {
   processTemplates,
   processTemplateDraft,
@@ -107,7 +106,6 @@ export function ToolBuilder({
   const [instructions, setInstructions] = useState("");
   const [workspace, setWorkspace] = useState<ToolWorkspace | null>(null);
   const [savedDraft, setSavedDraft] = useState<ToolDraft | null>(null);
-  const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -117,6 +115,8 @@ export function ToolBuilder({
   const [fieldType, setFieldType] = useState<"text" | "textarea">("text");
   const [previewing, setPreviewing] = useState(false);
   const [open, setOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const failureRef = useRef<BuilderError | null>(null);
   const pending = useRef<{ payload: string; id: string } | null>(null);
   const pendingGeneration = useRef<{ payload: string; id: string } | null>(
     null,
@@ -182,17 +182,56 @@ export function ToolBuilder({
   );
 
   useEffect(() => {
+    failureRef.current = generationFailure;
+  }, [generationFailure]);
+  useEffect(() => {
     if (preview || !owner) return;
     const controller = new AbortController();
-    void api<ToolWorkspace>("/api/tool", { signal: controller.signal })
-      .then((result) => {
-        if (!controller.signal.aborted) setWorkspace(result);
-      })
-      .catch((reason) => {
-        if (!controller.signal.aborted) setError(reason.message);
-      });
-    return () => controller.abort();
-  }, [preview, owner, membership?.userId]);
+    let running = false;
+    const load = async () => {
+      if (running) return;
+      running = true;
+      try {
+        const result = await api<ToolWorkspace>("/api/tool", {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        setWorkspace(result);
+        const failure = failureRef.current;
+        if (
+          aiOpen &&
+          result.configuration.configured &&
+          failure?.retryable === false &&
+          !["GENERATION_RETRY_LIMIT", "MODEL_CONFIGURATION_CHANGED"].includes(
+            failure.code,
+          )
+        ) {
+          setGenerationFailure(null);
+          setError((currentError) =>
+            currentError === failure.message ? "" : currentError,
+          );
+        }
+      } catch (reason) {
+        if (!controller.signal.aborted)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Could not load desk settings.",
+          );
+      } finally {
+        running = false;
+      }
+    };
+    void load();
+    const onFocus = () => {
+      if (aiOpen) void load();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [preview, owner, membership?.userId, aiOpen]);
 
   const retryUntil = generationRetry?.until;
   useEffect(() => {
@@ -210,7 +249,6 @@ export function ToolBuilder({
   function edit(next: ToolSpec) {
     setSpec(next);
     setSavedDraft(null);
-    setReviewed(false);
     setMessage("");
     setGenerationFailure(null);
     if (previewing) {
@@ -316,9 +354,7 @@ export function ToolBuilder({
                 0,
               );
         setGenerationFailure(failure);
-        const delay =
-          failure.retryAfterSeconds ??
-          (failure.status === 429 ? 60 : undefined);
+        const delay = failure.retryAfterSeconds;
         if (delay)
           setGenerationRetry({
             until: new Date().getTime() + delay * 1000,
@@ -331,7 +367,6 @@ export function ToolBuilder({
       ) {
         setWorkspace(null);
         setSavedDraft(null);
-        setReviewed(false);
       }
       setError(
         reason instanceof Error
@@ -349,25 +384,6 @@ export function ToolBuilder({
     return next;
   }
 
-  async function refreshModelAvailability() {
-    await work(async () => {
-      const next = await refresh();
-      if (!next.configuration.configured) {
-        setMessage(next.configuration.message);
-        return;
-      }
-      if (generationFailure?.retryable === false && !terminalGeneration)
-        setGenerationFailure(null);
-      setMessage(
-        terminalGeneration
-          ? "Model settings refreshed. Start a new generation when you are ready; your instructions and draft are preserved."
-          : generationFailure
-            ? "Model settings refreshed. Retry when you are ready; your instructions and draft are preserved."
-            : "Model settings refreshed. Generation is available.",
-      );
-    });
-  }
-
   function loadDraft(draft: ToolDraft) {
     edit(copy(draft.spec));
     setBaseRevision(draft.baseRevision);
@@ -375,7 +391,7 @@ export function ToolBuilder({
     setAssumptions(draft.assumptions);
     setUnsupported(draft.unsupported);
     setSavedDraft(draft);
-    setMessage("Saved draft loaded. Review its changes before publishing.");
+    setMessage("Review your changes below.");
   }
 
   async function save() {
@@ -410,14 +426,12 @@ export function ToolBuilder({
       });
       loadDraft(draft);
       await refresh();
-      setMessage(
-        "Model draft saved. Check its assumptions, preview, and exact changes before publishing.",
-      );
+      setMessage("Review the suggested changes below.");
     }, true);
   }
 
   async function publish() {
-    if (!savedDraft || !reviewed || !canSave || errors.length || stale) return;
+    if (!savedDraft || !canSave || errors.length || stale) return;
     await work(async () => {
       const next = await command<PublishedTool>("/api/tool/publish", {
         draftId: savedDraft.id,
@@ -427,14 +441,11 @@ export function ToolBuilder({
       setSpec(copy(next.spec));
       setBaseRevision(next.revision);
       setSavedDraft(null);
-      setReviewed(false);
       setPreviewing(false);
       onPreview?.(null);
       onPublished(next);
       await refresh();
-      setMessage(
-        `Revision ${next.revision} published. The workspace now uses this tool.`,
-      );
+      setMessage("Desk updated.");
     });
   }
 
@@ -443,74 +454,353 @@ export function ToolBuilder({
   return (
     <details
       id="tool-builder"
-      className="tool-builder"
+      className="tool-builder tool-builder-simple"
       onToggle={(event) => {
-        if (event.target === event.currentTarget)
+        if (event.target === event.currentTarget) {
           setOpen(event.currentTarget.open);
+          if (!event.currentTarget.open) setAiOpen(false);
+        }
       }}
     >
       <summary className="tool-builder-entry">
-        <span>
-          <strong>
-            {preview ? "Explore the tool builder" : "Customize this desk"}
-          </strong>
-          <span>Describe it, shape it, review it.</span>
-        </span>
-        <span className="tool-builder-revision">
-          Published r{current.revision}
-        </span>
+        <strong>Customize this desk</strong>
       </summary>
       {open && (
         <div className="tool-builder-body">
-          <div className="tool-builder-intro">
-            <div>
-              <p className="eyebrow">Your team’s way of working</p>
-              <h2>Shape your analytics request desk.</h2>
-              <p>
-                Describe the request fields your analytics team needs. Preview
-                the result, then publish a reviewed revision for your team.
-              </p>
-            </div>
-            <div className="tool-builder-baseline">
-              <span>Editing from</span>
-              <strong>Revision {baseRevision}</strong>
-              <small>
-                {preview
-                  ? "Unsaved sample exploration"
-                  : formatDate(current.publishedAt)}
-              </small>
-            </div>
-          </div>
-
           {preview && (
-            <p className="banner compact">
-              Unsaved preview · Explore templates and controls here. Connect
-              Exasol and sign in as an owner to save, generate, or publish a
-              tool.
-            </p>
+            <p className="hint">Preview only. Changes aren’t saved.</p>
           )}
           {error && (
             <p className="alert" role="alert">
               {error}
             </p>
           )}
-          <p className="notice" role="status" aria-live="polite">
-            {busy ? "Working…" : message}
-          </p>
-
-          <div className="tool-builder-console">
-            <ConsoleChrome
-              label="Loom / tool designer"
-              status={
-                preview
-                  ? "Unsaved preview"
-                  : busy
-                    ? "Working…"
-                    : savedDraft
-                      ? "Saved for review"
-                      : "Draft"
-              }
+          {(busy || message) && (
+            <p className="notice" role="status" aria-live="polite">
+              {busy ? "Working…" : message}
+            </p>
+          )}
+          <label>
+            Desk name
+            <input
+              maxLength={100}
+              value={spec.title}
+              disabled={busy}
+              onChange={(event) => edit({ ...spec, title: event.target.value })}
             />
+          </label>
+
+          <section className="tool-simple-fields" aria-label="Desk fields">
+            <h3>Fields</h3>
+            {spec.fields.map((field) => (
+              <details className="tool-simple-field" key={field.id}>
+                <summary>
+                  <span>{field.label || "Unnamed field"}</span>
+                  <small>
+                    {field.type === "textarea" ? "Long text" : "Short text"}
+                  </small>
+                </summary>
+                <div className="tool-simple-field-editor">
+                  <label>
+                    Field name
+                    <input
+                      aria-label={`Field label: ${field.id}`}
+                      value={field.label}
+                      maxLength={80}
+                      disabled={busy}
+                      onChange={(event) =>
+                        editField(field.id, { label: event.target.value })
+                      }
+                    />
+                  </label>
+                  {field.id.startsWith("custom_") ? (
+                    <div className="tool-builder-field-options">
+                      <label className="tool-builder-check">
+                        <input
+                          type="checkbox"
+                          checked={field.visible}
+                          disabled={busy}
+                          onChange={(event) =>
+                            editField(field.id, {
+                              visible: event.target.checked,
+                            })
+                          }
+                        />
+                        Show field
+                      </label>
+                      <label>
+                        Required
+                        <select
+                          aria-label={`Requirement: ${field.label}`}
+                          value={field.requiredAt}
+                          disabled={busy}
+                          onChange={(event) =>
+                            editField(field.id, {
+                              requiredAt: event.target
+                                .value as ToolField["requiredAt"],
+                            })
+                          }
+                        >
+                          <option value="optional">Optional</option>
+                          <option value="ready">Before Ready</option>
+                          {field.requiredAt === "intake" && (
+                            <option value="intake">On new requests</option>
+                          )}
+                        </select>
+                      </label>
+                      {!current.spec.fields.some(
+                        (item) => item.id === field.id,
+                      ) && (
+                        <button
+                          className="quiet"
+                          disabled={busy}
+                          onClick={() =>
+                            edit({
+                              ...spec,
+                              fields: spec.fields.filter(
+                                (item) => item.id !== field.id,
+                              ),
+                              views: spec.views.map((view) =>
+                                view.component === "request-table"
+                                  ? {
+                                      ...view,
+                                      columns: view.columns.filter(
+                                        (column) => column !== field.id,
+                                      ),
+                                    }
+                                  : view,
+                              ),
+                            })
+                          }
+                        >
+                          Remove field
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="hint">
+                      {field.requiredAt === "intake"
+                        ? "Required on new requests."
+                        : "Required before Ready."}
+                    </p>
+                  )}
+                </div>
+              </details>
+            ))}
+            <details className="tool-simple-add">
+              <summary>Add a field</summary>
+              <div className="tool-builder-add-field">
+                <label>
+                  New field label
+                  <input
+                    value={fieldName}
+                    maxLength={80}
+                    disabled={busy}
+                    onChange={(event) => setFieldName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Answer format
+                  <select
+                    value={fieldType}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setFieldType(event.target.value as "text" | "textarea")
+                    }
+                  >
+                    <option value="text">Short text</option>
+                    <option value="textarea">Long text</option>
+                  </select>
+                </label>
+                <button
+                  className="secondary"
+                  disabled={
+                    busy ||
+                    !fieldName.trim() ||
+                    spec.fields.filter((field) =>
+                      field.id.startsWith("custom_"),
+                    ).length >= 8
+                  }
+                  onClick={addField}
+                >
+                  Add field
+                </button>
+                {spec.fields.filter((field) => field.id.startsWith("custom_"))
+                  .length >= 8 && (
+                  <small>All eight additional fields are in use.</small>
+                )}
+              </div>
+            </details>
+          </section>
+
+          <details className="tool-simple-section">
+            <summary>Table columns</summary>
+            <fieldset>
+              <legend>Queue columns</legend>
+              <div className="tool-builder-check-grid">
+                {columns.map((column) => (
+                  <label className="tool-builder-check" key={column}>
+                    <input
+                      type="checkbox"
+                      disabled={busy || column === "title"}
+                      checked={Boolean(queue?.columns.includes(column))}
+                      onChange={(event) =>
+                        edit({
+                          ...spec,
+                          views: spec.views.map((view) =>
+                            view.component === "request-table"
+                              ? {
+                                  ...view,
+                                  columns: event.target.checked
+                                    ? [...view.columns, column]
+                                    : view.columns.filter(
+                                        (value) => value !== column,
+                                      ),
+                                }
+                              : view,
+                          ),
+                        })
+                      }
+                    />
+                    {labelFor(column)}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </details>
+          <details className="tool-simple-section">
+            <summary>Advanced settings</summary>
+            <label>
+              Tool description
+              <textarea
+                rows={2}
+                maxLength={1000}
+                value={spec.description}
+                disabled={busy}
+                onChange={(event) =>
+                  edit({ ...spec, description: event.target.value })
+                }
+              />
+            </label>
+            <div className="tool-builder-template-bar">
+              <span>Start from a process</span>
+              {processTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  className="secondary"
+                  disabled={busy}
+                  title={template.description}
+                  aria-pressed={sampleTemplate?.id === template.id}
+                  onClick={() => chooseTemplate(template.id)}
+                >
+                  {template.label}
+                </button>
+              ))}
+              <button
+                className="quiet"
+                disabled={busy}
+                onClick={() => {
+                  adoptSpec(current.spec, "Published revision");
+                }}
+              >
+                Use latest published
+              </button>
+            </div>
+            <fieldset>
+              <legend>Queue filters</legend>
+              {(["search", "status"] as const).map((key) => (
+                <label className="tool-builder-check" key={key}>
+                  <input
+                    type="checkbox"
+                    disabled={busy}
+                    checked={Boolean(filters?.[key])}
+                    onChange={(event) =>
+                      edit({
+                        ...spec,
+                        views: spec.views.map((view) =>
+                          view.component === "request-filters"
+                            ? { ...view, [key]: event.target.checked }
+                            : view,
+                        ),
+                      })
+                    }
+                  />
+                  {key === "search" ? "Search requests" : "Filter by status"}
+                </label>
+              ))}
+            </fieldset>
+            <fieldset>
+              <legend>Summary cards</legend>
+              <div className="tool-builder-check-grid">
+                {(
+                  Object.keys(metricLabels) as (keyof typeof metricLabels)[]
+                ).map((metric) => (
+                  <label className="tool-builder-check" key={metric}>
+                    <input
+                      type="checkbox"
+                      disabled={busy}
+                      checked={Boolean(summary?.metrics.includes(metric))}
+                      onChange={(event) =>
+                        edit({
+                          ...spec,
+                          views: spec.views.map((view) =>
+                            view.component === "request-summary"
+                              ? {
+                                  ...view,
+                                  metrics: event.target.checked
+                                    ? [...view.metrics, metric]
+                                    : view.metrics.filter(
+                                        (value) => value !== metric,
+                                      ),
+                                }
+                              : view,
+                          ),
+                        })
+                      }
+                    />
+                    {metricLabels[metric]}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <details className="tool-builder-control-group">
+              <summary>Status labels</summary>
+              <p className="hint">
+                Rename how statuses appear. The request workflow stays
+                consistent for existing records.
+              </p>
+              <div className="tool-builder-status-grid">
+                {statuses.map((status) => (
+                  <label key={status}>
+                    {status.replaceAll("_", " ")}
+                    <input
+                      aria-label={`Status label: ${status}`}
+                      maxLength={40}
+                      value={spec.statusLabels[status]}
+                      disabled={busy}
+                      onChange={(event) =>
+                        edit({
+                          ...spec,
+                          statusLabels: {
+                            ...spec.statusLabels,
+                            [status]: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            </details>
+          </details>
+          <details
+            className="tool-simple-section"
+            onToggle={(event) => {
+              if (event.target === event.currentTarget)
+                setAiOpen(event.currentTarget.open);
+            }}
+          >
+            <summary>Ask AI</summary>
             <div className="tool-builder-describe">
               <label>
                 Describe your tool or the changes you want
@@ -520,11 +810,10 @@ export function ToolBuilder({
                   maxLength={4000}
                   value={instructions}
                   disabled={busy}
-                  placeholder="Add a decision deadline, metric definition, and business impact to our analytics request form. Show requests missing context…"
+                  placeholder="Add an optional Business impact field."
                   onChange={(event) => {
                     setInstructions(event.target.value);
                     setSavedDraft(null);
-                    setReviewed(false);
                     setGenerationFailure(null);
                   }}
                 />
@@ -567,12 +856,15 @@ export function ToolBuilder({
                     Start new generation
                   </button>
                 )}
-                <small>
-                  {preview
-                    ? "Model generation requires a connected owner session."
-                    : workspace?.configuration.message ||
-                      "Checking model configuration…"}
-                </small>
+                {(preview || !workspace || workspace.configuration.message) && (
+                  <small>
+                    {preview
+                      ? "Connect an AI account to use this option."
+                      : !workspace
+                        ? "Checking connection…"
+                        : workspace.configuration.message}
+                  </small>
+                )}
               </div>
               {workspace?.configuration.model?.startsWith(
                 "openai-chatgpt:",
@@ -598,337 +890,10 @@ export function ToolBuilder({
                   generation with these instructions when you are ready.
                 </p>
               )}
-              {!preview && canSave && (
-                <button
-                  className="quiet"
-                  disabled={busy}
-                  onClick={() => void refreshModelAvailability()}
-                >
-                  Refresh model availability
-                </button>
-              )}
             </div>
-          </div>
-          <div className="tool-builder-template-bar">
-            <span>Start from a process</span>
-            {processTemplates.map((template) => (
-              <button
-                key={template.id}
-                className="secondary"
-                disabled={busy}
-                title={template.description}
-                aria-pressed={sampleTemplate?.id === template.id}
-                onClick={() => chooseTemplate(template.id)}
-              >
-                {template.label}
-              </button>
-            ))}
-            <button
-              className="quiet"
-              disabled={busy}
-              onClick={() => {
-                adoptSpec(current.spec, "Published revision");
-              }}
-            >
-              Use latest published
-            </button>
-          </div>
-          <p className="hint">
-            Each workspace has one shared tool. Templates adapt that tool and
-            preserve saved fields and records. Use a separate workspace for an
-            independent process. Buddy names, dates, and checklists are text
-            fields.
-          </p>
-
-          <div className="tool-builder-split">
-            <div className="tool-builder-controls">
-              <div className="tool-builder-section-heading">
-                <span className="eyebrow">Shape the desk</span>
-                <small>Changes stay in your draft</small>
-              </div>
-              <label>
-                Tool title
-                <input
-                  maxLength={100}
-                  value={spec.title}
-                  disabled={busy}
-                  onChange={(event) =>
-                    edit({ ...spec, title: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Tool description
-                <textarea
-                  rows={2}
-                  maxLength={1000}
-                  value={spec.description}
-                  disabled={busy}
-                  onChange={(event) =>
-                    edit({ ...spec, description: event.target.value })
-                  }
-                />
-              </label>
-
-              <details open className="tool-builder-control-group">
-                <summary>
-                  Intake and detail fields{" "}
-                  <small>{spec.fields.length} fields</small>
-                </summary>
-                {spec.fields.map((field) => (
-                  <div className="tool-builder-field" key={field.id}>
-                    <label>
-                      Label for{" "}
-                      {field.id.startsWith("custom_")
-                        ? "additional field"
-                        : columnLabels[field.id] || field.id}
-                      <input
-                        aria-label={`Field label: ${field.id}`}
-                        value={field.label}
-                        maxLength={80}
-                        disabled={busy}
-                        onChange={(event) =>
-                          editField(field.id, { label: event.target.value })
-                        }
-                      />
-                    </label>
-                    <div className="tool-builder-field-options">
-                      <label className="tool-builder-check">
-                        <input
-                          type="checkbox"
-                          checked={field.visible}
-                          disabled={busy || !field.id.startsWith("custom_")}
-                          onChange={(event) =>
-                            editField(field.id, {
-                              visible: event.target.checked,
-                            })
-                          }
-                        />
-                        Visible
-                      </label>
-                      <label>
-                        Required
-                        <select
-                          aria-label={`Requirement: ${field.label}`}
-                          value={field.requiredAt}
-                          disabled={busy || !field.id.startsWith("custom_")}
-                          onChange={(event) =>
-                            editField(field.id, {
-                              requiredAt: event.target
-                                .value as ToolField["requiredAt"],
-                            })
-                          }
-                        >
-                          {field.id.startsWith("custom_") && (
-                            <option value="optional">Optional</option>
-                          )}
-                          {!field.id.startsWith("custom_") && (
-                            <option value="intake">At intake</option>
-                          )}
-                          <option value="ready">Before Ready</option>
-                        </select>
-                      </label>
-                      {field.id.startsWith("custom_") &&
-                        !current.spec.fields.some(
-                          (item) => item.id === field.id,
-                        ) && (
-                          <button
-                            className="quiet"
-                            disabled={busy}
-                            onClick={() =>
-                              edit({
-                                ...spec,
-                                fields: spec.fields.filter(
-                                  (item) => item.id !== field.id,
-                                ),
-                                views: spec.views.map((view) =>
-                                  view.component === "request-table"
-                                    ? {
-                                        ...view,
-                                        columns: view.columns.filter(
-                                          (column) => column !== field.id,
-                                        ),
-                                      }
-                                    : view,
-                                ),
-                              })
-                            }
-                          >
-                            Remove field
-                          </button>
-                        )}
-                    </div>
-                  </div>
-                ))}
-                <div className="tool-builder-add-field">
-                  <label>
-                    New field label
-                    <input
-                      value={fieldName}
-                      maxLength={80}
-                      disabled={busy}
-                      onChange={(event) => setFieldName(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Answer format
-                    <select
-                      value={fieldType}
-                      disabled={busy}
-                      onChange={(event) =>
-                        setFieldType(event.target.value as "text" | "textarea")
-                      }
-                    >
-                      <option value="text">Short text</option>
-                      <option value="textarea">Long text</option>
-                    </select>
-                  </label>
-                  <button
-                    className="secondary"
-                    disabled={
-                      busy ||
-                      !fieldName.trim() ||
-                      spec.fields.filter((field) =>
-                        field.id.startsWith("custom_"),
-                      ).length >= 8
-                    }
-                    onClick={addField}
-                  >
-                    Add field
-                  </button>
-                  <small>
-                    Up to eight additional fields. Published fields stay
-                    available in saved requests.
-                  </small>
-                </div>
-              </details>
-
-              <details className="tool-builder-control-group">
-                <summary>Queue columns, filters, and summary</summary>
-                <fieldset>
-                  <legend>Queue columns</legend>
-                  <div className="tool-builder-check-grid">
-                    {columns.map((column) => (
-                      <label className="tool-builder-check" key={column}>
-                        <input
-                          type="checkbox"
-                          disabled={busy || column === "title"}
-                          checked={Boolean(queue?.columns.includes(column))}
-                          onChange={(event) =>
-                            edit({
-                              ...spec,
-                              views: spec.views.map((view) =>
-                                view.component === "request-table"
-                                  ? {
-                                      ...view,
-                                      columns: event.target.checked
-                                        ? [...view.columns, column]
-                                        : view.columns.filter(
-                                            (value) => value !== column,
-                                          ),
-                                    }
-                                  : view,
-                              ),
-                            })
-                          }
-                        />
-                        {labelFor(column)}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <fieldset>
-                  <legend>Queue filters</legend>
-                  {(["search", "status"] as const).map((key) => (
-                    <label className="tool-builder-check" key={key}>
-                      <input
-                        type="checkbox"
-                        disabled={busy}
-                        checked={Boolean(filters?.[key])}
-                        onChange={(event) =>
-                          edit({
-                            ...spec,
-                            views: spec.views.map((view) =>
-                              view.component === "request-filters"
-                                ? { ...view, [key]: event.target.checked }
-                                : view,
-                            ),
-                          })
-                        }
-                      />
-                      {key === "search"
-                        ? "Search requests"
-                        : "Filter by status"}
-                    </label>
-                  ))}
-                </fieldset>
-                <fieldset>
-                  <legend>Summary cards</legend>
-                  <div className="tool-builder-check-grid">
-                    {(
-                      Object.keys(metricLabels) as (keyof typeof metricLabels)[]
-                    ).map((metric) => (
-                      <label className="tool-builder-check" key={metric}>
-                        <input
-                          type="checkbox"
-                          disabled={busy}
-                          checked={Boolean(summary?.metrics.includes(metric))}
-                          onChange={(event) =>
-                            edit({
-                              ...spec,
-                              views: spec.views.map((view) =>
-                                view.component === "request-summary"
-                                  ? {
-                                      ...view,
-                                      metrics: event.target.checked
-                                        ? [...view.metrics, metric]
-                                        : view.metrics.filter(
-                                            (value) => value !== metric,
-                                          ),
-                                    }
-                                  : view,
-                              ),
-                            })
-                          }
-                        />
-                        {metricLabels[metric]}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              </details>
-
-              <details className="tool-builder-control-group">
-                <summary>Status labels</summary>
-                <p className="hint">
-                  Rename how statuses appear. The request workflow stays
-                  consistent for existing records.
-                </p>
-                <div className="tool-builder-status-grid">
-                  {statuses.map((status) => (
-                    <label key={status}>
-                      {status.replaceAll("_", " ")}
-                      <input
-                        aria-label={`Status label: ${status}`}
-                        maxLength={40}
-                        value={spec.statusLabels[status]}
-                        disabled={busy}
-                        onChange={(event) =>
-                          edit({
-                            ...spec,
-                            statusLabels: {
-                              ...spec.statusLabels,
-                              [status]: event.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </label>
-                  ))}
-                </div>
-              </details>
-            </div>
-
+          </details>
+          <details className="tool-simple-section">
+            <summary>Preview</summary>
             <div className="tool-builder-preview-column">
               <div className="tool-builder-preview-heading">
                 <span className="eyebrow">Draft preview</span>
@@ -987,10 +952,59 @@ export function ToolBuilder({
                     : "Preview this draft in the workspace"}
                 </button>
               )}
-              <p className="hint">
-                This preview shows the layout without records. Publishing
-                updates the team’s tool; existing requests keep their data.
-              </p>
+            </div>
+          </details>
+          {stale && (
+            <p className="alert" role="alert">
+              A newer revision is published. Your draft is preserved. Review it
+              against the latest revision before saving or publishing.{" "}
+              <button
+                className="quiet"
+                disabled={busy}
+                onClick={() => {
+                  setBaseRevision(current.revision);
+                  setSavedDraft(null);
+                  setMessage(
+                    "Your edits are preserved. Review all differences from the latest published tool, then save a new draft.",
+                  );
+                }}
+              >
+                Review draft against latest revision
+              </button>
+            </p>
+          )}
+          {errors.length > 0 && (
+            <div className="alert" role="alert">
+              <strong>Resolve these changes first</strong>
+              <ul>
+                {errors.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {compatibility.warnings.length > 0 && (
+            <div className="tool-builder-warning">
+              <strong>Check existing requests</strong>
+              <ul>
+                {compatibility.warnings.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {savedDraft ? (
+            <section
+              className="tool-builder-review"
+              aria-label="Review tool changes"
+            >
+              <h3>Review changes</h3>
+              <ul className="tool-builder-change-list">
+                {changes.map((change, index) => (
+                  <li key={index}>{change}</li>
+                ))}
+              </ul>
               {(assumptions.length > 0 ||
                 unsupported.length > 0 ||
                 savedDraft?.inference) && (
@@ -1057,75 +1071,34 @@ export function ToolBuilder({
                   )}
                 </div>
               )}
-            </div>
-          </div>
-
-          <section
-            className="tool-builder-review"
-            aria-label="Review tool changes"
-          >
-            <div className="tool-builder-section-heading">
-              <div>
-                <p className="eyebrow">Review before publishing</p>
-                <h3>Changes from revision {current.revision}</h3>
-              </div>
-              <span>{savedDraft ? "Saved draft" : "Unsaved draft"}</span>
-            </div>
-            {stale && (
-              <p className="alert" role="alert">
-                A newer revision is published. Your draft is preserved. Review
-                it against the latest revision before saving or publishing.{" "}
+              <div className="tool-builder-publish-actions">
                 <button
                   className="quiet"
                   disabled={busy}
                   onClick={() => {
-                    setBaseRevision(current.revision);
                     setSavedDraft(null);
-                    setReviewed(false);
-                    setMessage(
-                      "Your edits are preserved. Review all differences from the latest published tool, then save a new draft.",
-                    );
+                    setMessage("");
                   }}
                 >
-                  Review draft against latest revision
+                  Back to editing
                 </button>
-              </p>
-            )}
-            {errors.length > 0 && (
-              <div className="alert" role="alert">
-                <strong>Resolve these changes first</strong>
-                <ul>
-                  {errors.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
+                <button
+                  disabled={
+                    busy ||
+                    !canSave ||
+                    errors.length > 0 ||
+                    stale ||
+                    !changes.length
+                  }
+                  onClick={() => void publish()}
+                >
+                  Apply changes
+                </button>
               </div>
-            )}
-            {compatibility.warnings.length > 0 && (
-              <div className="tool-builder-warning">
-                <strong>Check existing requests</strong>
-                <ul>
-                  {compatibility.warnings.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {changes.length ? (
-              <ul className="tool-builder-change-list">
-                {changes.map((change, index) => (
-                  <li key={index}>{change}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted">
-                No changes from the published tool. Choose a template or edit
-                the controls above.
-              </p>
-            )}
-            <div className="tool-builder-publish-actions">
+            </section>
+          ) : (
+            <div className="tool-simple-actions">
               <button
-                className="secondary"
                 disabled={
                   busy ||
                   !canSave ||
@@ -1135,46 +1108,23 @@ export function ToolBuilder({
                 }
                 onClick={() => void save()}
               >
-                Save draft for review
+                Review changes
               </button>
-              {savedDraft && (
-                <div className="tool-builder-exact-review">
-                  <p>
-                    Saved {formatDate(savedDraft.createdAt)} · draft{" "}
-                    {savedDraft.id.slice(0, 8)}
-                    <br />
-                    <small>
-                      Any edit requires a new saved draft and fresh review.
-                    </small>
-                  </p>
-                  <label className="tool-builder-check">
-                    <input
-                      type="checkbox"
-                      checked={reviewed}
-                      disabled={busy || stale || errors.length > 0}
-                      onChange={(event) => setReviewed(event.target.checked)}
-                    />
-                    I reviewed this saved draft and its exact changes.
-                  </label>
-                </div>
-              )}
               <button
-                disabled={
-                  busy ||
-                  !canSave ||
-                  !savedDraft ||
-                  !reviewed ||
-                  errors.length > 0 ||
-                  stale ||
-                  !changes.length
-                }
-                onClick={() => void publish()}
+                className="quiet"
+                disabled={busy || (!changes.length && !stale && !instructions)}
+                onClick={() => {
+                  adoptSpec(current.spec, "Saved desk");
+                  setInstructions("");
+                  setMessage("");
+                  setPreviewing(false);
+                  onPreview?.(null);
+                }}
               >
-                Publish reviewed tool
+                Reset changes
               </button>
             </div>
-          </section>
-
+          )}
           {canSave && (
             <details className="tool-builder-saved">
               <summary>Saved drafts and publication history</summary>

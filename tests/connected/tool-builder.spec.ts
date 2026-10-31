@@ -28,31 +28,53 @@ test("an owner publishes a reviewed tool and a requester opens the same definiti
       .selectOption(personas[0].id);
     const builder = page.locator(".tool-builder");
     await builder.getByText("Customize this desk", { exact: true }).click();
+    await builder.getByText("Advanced settings", { exact: true }).click();
     await builder
       .getByRole("button", { name: "IT requests", exact: true })
       .click();
-    await builder.getByLabel("Tool title", { exact: true }).fill(title);
+    await builder
+      .getByLabel("Desk name", { exact: true })
+      .fill(`${title} draft`);
     await expect(page.locator(".current-tool-label")).toContainText(
       original.spec.title,
     );
-    await builder
-      .getByRole("button", { name: "Save draft for review", exact: true })
-      .click();
-    const review = builder.getByRole("checkbox", {
-      name: "I reviewed this saved draft and its exact changes.",
+    const apply = builder.getByRole("button", {
+      name: "Apply changes",
       exact: true,
     });
-    await expect(review).toBeVisible();
-    await expect(
-      builder.getByRole("button", {
-        name: "Publish reviewed tool",
-        exact: true,
-      }),
-    ).toBeDisabled();
-    await review.check();
+    await expect(apply).toHaveCount(0);
     await builder
-      .getByRole("button", { name: "Publish reviewed tool", exact: true })
+      .getByRole("button", { name: "Review changes", exact: true })
       .click();
+    await expect(apply).toBeEnabled();
+    await expect(
+      builder.getByRole("region", { name: "Review tool changes", exact: true }),
+    ).toBeVisible();
+    // Any further edit invalidates the exact draft that was just reviewed.
+    await builder.getByLabel("Desk name", { exact: true }).fill(title);
+    await expect(apply).toHaveCount(0);
+    await expect(page.locator(".current-tool-label")).toContainText(
+      original.spec.title,
+    );
+    expect(
+      ((await (await request.get("/api/tool")).json()) as ToolWorkspace)
+        .published,
+    ).toEqual(original);
+    await builder
+      .getByRole("button", { name: "Review changes", exact: true })
+      .click();
+    await expect(apply).toBeEnabled();
+    await builder
+      .getByRole("button", { name: "Back to editing", exact: true })
+      .click();
+    await expect(apply).toHaveCount(0);
+    await expect(builder.getByLabel("Desk name", { exact: true })).toHaveValue(
+      title,
+    );
+    await builder
+      .getByRole("button", { name: "Review changes", exact: true })
+      .click();
+    await apply.click();
     await expect(page.locator(".current-tool-label")).toContainText(title);
     await page.reload();
     await expect(page.locator(".current-tool-label")).toContainText(title);
