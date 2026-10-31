@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { LocalOrigin } from "@/components/local-origin";
 import "@cloudflare/kumo/styles/standalone";
 import "./globals.css";
 import "./civitas.css";
@@ -51,7 +52,14 @@ export default function RootLayout({
       lang="en"
       className={`${body.variable} ${display.variable} ${mono.variable} ${editorial.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <LocalOrigin
+          canonicalLoopback={/^http:\/\/127\.0\.0\.1(?::\d+)?\/?$/.test(
+            process.env.APP_ORIGIN || "",
+          )}
+        />
+        {children}
+      </body>
     </html>
   );
 }

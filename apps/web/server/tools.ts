@@ -1,6 +1,14 @@
 import "server-only";
 import { workspaceProvider, assertProviderCurrent } from "./provider-config";
 import { modelIdentity } from "./provider-transport";
+import {
+  assertOpenAiPlanCurrent,
+  readOpenAiPlanStatus,
+  invalidateOpenAiPlanCredential,
+  type OpenAiPlanStatus,
+} from "./openai-oauth-store";
+import { personalPlanModel, personalPlanRuntime } from "./personal-plan";
+import { settingsFor } from "./settings";
 import { randomUUID } from "node:crypto";
 import {
   toolSpecSchema,
@@ -209,6 +217,18 @@ async function configuration(
   actor: Actor,
 ): Promise<ToolWorkspace["configuration"]> {
   try {
+    if ((await settingsFor(sql, actor)).preferredAgent === "codex") {
+      const plan = await readOpenAiPlanStatus(sql, actor);
+      return {
+        configured: Boolean(plan?.planEnabled && plan.model),
+        model: plan ? personalPlanModel(plan) : null,
+        freeOnly: false,
+        message:
+          plan?.planEnabled && plan.model
+            ? "Using ChatGPT plan. Generated drafts need your review before publication."
+            : "Connect your ChatGPT account and choose a model in Company setup. Manual editing remains available.",
+      };
+    }
     const value =
       (await workspaceProvider(sql, actor)) || toolModelConfiguration();
     return {
@@ -379,6 +399,7 @@ export async function generateToolDraft(
   expectedRevision: number,
   instructions: string,
   input: ToolSpec,
+  personalPlan?: OpenAiPlanStatus,
 ): Promise<ToolDraft> {
   const baseSpec = toolSpecSchema.parse(input),
     hash = digest({
@@ -406,8 +427,31 @@ export async function generateToolDraft(
         baseErrors.join(" "),
         422,
       );
-    const runtimeConfig = await workspaceProvider(sql, actor);
-    const config = runtimeConfig || toolModelConfiguration();
+    if (
+      !personalPlan &&
+      (await settingsFor(sql, actor)).preferredAgent === "codex"
+    ) {
+      personalPlan = (await readOpenAiPlanStatus(sql, actor)) || undefined;
+      if (!personalPlan?.planEnabled || !personalPlan.model)
+        throw new DomainError(
+          "OPENAI_PLAN_NOT_AUTHORIZED",
+          "Connect your ChatGPT account and choose a model in Company setup. No API provider was used.",
+          409,
+        );
+    }
+    if (personalPlan) await assertOpenAiPlanCurrent(sql, actor, personalPlan);
+    const runtimeConfig = personalPlan
+      ? null
+      : await workspaceProvider(sql, actor);
+    const configuredModel = personalPlan
+      ? personalPlanModel(personalPlan)
+      : modelIdentity(runtimeConfig || toolModelConfiguration());
+    if (!configuredModel)
+      throw new DomainError(
+        "MODEL_CONFIGURATION",
+        "Choose a ChatGPT model in Company setup before generating a draft.",
+        503,
+      );
     const [existing] = await sql.query(
       "SELECT * FROM TOOL_GENERATIONS WHERE WORKSPACE_ID = ? AND COMMAND_ID = ?",
       [actor.workspaceId, commandId],
@@ -460,7 +504,7 @@ export async function generateToolDraft(
           })
         : {};
       if (
-        pinned.requestedModel !== modelIdentity(config) ||
+        pinned.requestedModel !== configuredModel ||
         pinned.promptVersion !== toolGenerationPromptVersion
       )
         throw new DomainError(
@@ -484,25 +528,29 @@ export async function generateToolDraft(
           leaseId,
           sqlTimestamp(leaseUntil),
           JSON.stringify({
-            requestedModel: modelIdentity(config),
+            requestedModel: configuredModel,
             promptVersion: toolGenerationPromptVersion,
           }),
           sqlTimestamp(now),
         ],
       );
     }
-    return { leaseId, model: modelIdentity(config), runtimeConfig };
+    return { leaseId, model: configuredModel, runtimeConfig };
   });
   if (reservation.draft) return reservation.draft;
   try {
+    const runtimeConfig = personalPlan
+      ? await personalPlanRuntime(actor, personalPlan)
+      : reservation.runtimeConfig;
     const result = await generateDefinition(
       instructions,
       baseSpec,
       reservation.model,
-      reservation.runtimeConfig || undefined,
+      runtimeConfig || undefined,
     );
     return await writeDatabase(async (sql) => {
-      await assertProviderCurrent(sql, actor, reservation.runtimeConfig);
+      if (personalPlan) await assertOpenAiPlanCurrent(sql, actor, personalPlan);
+      else await assertProviderCurrent(sql, actor, reservation.runtimeConfig);
       await owner(sql, actor);
       const current = await publishedTool(sql, actor);
       assertRevision(current.revision, expectedRevision);
@@ -556,6 +604,12 @@ export async function generateToolDraft(
   } catch (error) {
     // Never retain model output after permission/revision changes. Failed attempts
     // still count: a lost provider acknowledgement may have been billable.
+    if (
+      personalPlan &&
+      error instanceof DomainError &&
+      error.code === "OPENAI_RECONNECT_REQUIRED"
+    )
+      await invalidateOpenAiPlanCredential(actor, personalPlan);
     const retryDelay =
       error instanceof DomainError
         ? error.details?.retryAfterSeconds

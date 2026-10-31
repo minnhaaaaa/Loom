@@ -7,9 +7,11 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @loom/web dev",
+    "dev": "node --env-file-if-exists=.env apps/web/node_modules/next/dist/bin/next dev apps/web --hostname 127.0.0.1",
     "build": "pnpm --filter @loom/web build",
     "start": "node --env-file-if-exists=.env apps/web/node_modules/next/dist/bin/next start apps/web --hostname 127.0.0.1",
+    "check:local": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/check-local.ts",
+    "start:local": "node --env-file-if-exists=.env scripts/start-local.mjs",
     "typecheck": "tsc --noEmit && pnpm --filter @loom/web typecheck",
     "lint": "eslint .",
     "test": "vitest run",

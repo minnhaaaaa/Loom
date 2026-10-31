@@ -245,7 +245,8 @@ export async function generateDefinition(
   unsupported: string[];
   inference: ModelInference;
 }> {
-  const config = runtimeConfig || toolModelConfiguration(),
+  const config: ProviderRuntimeConfig =
+      runtimeConfig || toolModelConfiguration(),
     input = JSON.stringify({
       instructions,
       currentSpec: toolSpecSchema.parse(baseSpec),
@@ -275,7 +276,9 @@ export async function generateDefinition(
   } catch {
     throw new DomainError(
       "MODEL_NETWORK",
-      "Tool generation was interrupted or timed out. No draft was saved. Retrying may incur another provider charge.",
+      config.provider === "openai-chatgpt"
+        ? "Tool generation was interrupted or timed out. No draft was saved. Retrying may use more of your ChatGPT plan allowance."
+        : "Tool generation was interrupted or timed out. No draft was saved. Retrying may incur another provider charge.",
       502,
     );
   }
@@ -283,14 +286,14 @@ export async function generateDefinition(
   try {
     body = await boundedBody(response, response.ok ? 512_000 : 8192);
   } catch {
-    if (!response.ok) throw modelResponseError(response, {})!;
+    if (!response.ok) throw modelResponseError(response, {}, config.provider)!;
     throw new DomainError(
       "MODEL_RESPONSE",
       "The provider returned an unreadable, interrupted, or oversized response. No draft was saved.",
       502,
     );
   }
-  const providerError = modelResponseError(response, body);
+  const providerError = modelResponseError(response, body, config.provider);
   if (providerError) throw providerError;
   const envelope = z
     .object({

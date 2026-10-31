@@ -78,7 +78,7 @@ export async function inferConversation(
   signal?: AbortSignal,
   runtimeConfig?: ProviderRuntimeConfig,
 ): Promise<{ decision: ConversationDecision; inference: ModelInference }> {
-  const config = runtimeConfig || modelConfiguration();
+  const config: ProviderRuntimeConfig = runtimeConfig || modelConfiguration();
   if (modelIdentity(config) !== expectedModel)
     throw new DomainError(
       "MODEL_CONFIGURATION_CHANGED",
@@ -135,14 +135,14 @@ export async function inferConversation(
     }
     body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
-    if (!response.ok) throw modelResponseError(response, {})!;
+    if (!response.ok) throw modelResponseError(response, {}, config.provider)!;
     throw new DomainError(
       "MODEL_RESPONSE",
       "The agent returned an unreadable or interrupted reply. No changes were proposed.",
       502,
     );
   }
-  const error = modelResponseError(response, body);
+  const error = modelResponseError(response, body, config.provider);
   if (error) throw error;
   const envelope = z
     .object({

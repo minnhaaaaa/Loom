@@ -1,86 +1,92 @@
-# Deploying Loom for colleagues
+# Running Loom locally
 
-Loom runs as one persistent Node process with Exasol as the canonical store. Workspace accounts and invitation links work on the same shared application URL. The browser never connects to Exasol directly.
+Loom is currently intended to run on this computer. No online deployment, cloud resources, or paid hosting are configured. The application and Exasol remain separate processes; the browser only connects to Loom.
 
-## Prototype and company routes
+Exasol Personal is documented for [single-user use](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm). One operator can exercise the account and company workflows locally. Inviting additional real users requires the appropriate Exasol permission or edition; multiple application accounts do not change the database license.
 
-The challenge build uses Exasol Personal with synthetic companies and role personas under one operator. [Personal documentation](https://docs.exasol.com/db/latest/get_started/exasol_personal.htm) describes individual/single-user use. Multi-workspace code does not establish permission to offer a multi-company production service on Personal. Resolve the edition/permission and database-hosting choice before a real organizational rollout; the shared-host instructions below describe application mechanics.
+## Local configuration
 
-The public page is `/`; administrators register at `/register`, staff sign in at `/login`, and authenticated work is under `/app`. `/app?demo=1` opens unsaved samples. `/app?view=insights` shows internal Exasol analytics; requesters/viewers cannot fetch those aggregates. Invitation links use `/join`, and stable workspace links use `/w/<id>`.
+Use the existing private `.env` at the repository root. Do not overwrite it with a template. A fresh clone can copy `.env.example` and fill its private values locally.
 
-Set `LOOM_ALLOW_WORKSPACE_SIGNUP=true` when company self-registration is intended. With it disabled, existing companies and owner-issued invitations continue to work. Each company is currently a workspace with individual memberships; there is no verified-domain auto-join or organization hierarchy. Staff require an invitation or existing membership, not merely knowledge of a company name.
+For real local account access:
 
-## Company AI credential setup
+- Set `APP_ORIGIN=http://127.0.0.1:3000` (or `http://localhost:3000`) to match the address you open.
+- Set `LOOM_AUTH_MODE=workspace`. Leave `LOOM_ALLOW_DEMO_PRODUCTION` and `LOOM_ALLOW_SEED_FIXTURES` false or unset.
+- Explicitly set `LOOM_ALLOW_WORKSPACE_SIGNUP=true` when you want to register a company. Set it to `false` to retain only existing accounts and owner invitations.
+- Keep `LOOM_SESSION_SECRET` private, stable, and at least 32 random characters. Generate a new secret for a fresh setup with `openssl rand -hex 32`; do not rotate an existing secret casually.
+- Configure `EXASOL_HOST`, `EXASOL_USER`, `EXASOL_PASSWORD`, `EXASOL_PORT`, and the intended `EXASOL_SCHEMA`. A private database CA belongs in a readable `EXASOL_CA_FILE`. Certificate and hostname verification remain enabled.
 
-1. Apply all migrations with `pnpm db:migrate`, including `009_provider_connections.sql`.
-2. Generate a separate deployment key with `openssl rand -hex 32` and save its 64 hex characters as `LOOM_PROVIDER_ENCRYPTION_KEY` in the server's secret environment. Keep it stable and back it up separately from Exasol. Never put it in client configuration or commit it.
-3. As a company owner, open `/app?view=settings` and **Bring your AI provider**. Choose OpenAI API, Claude API, Kimi API, or DeepSeek API; enter an API key and model ID permitted by that account and set the output-token limit.
-4. Review the charge acknowledgement and use **Test and save**. This deliberately sends a small provider request; a failed structured test leaves the existing connection unchanged. A successful test establishes that connection check, not broad answer quality.
-5. Choose **Loom’s agent** in Company setup to use the saved API configuration inside Loom. Staff use their own Loom accounts and receive only their authorized context.
+Use one persistent application server. The database write coordinator and authentication limiter are process-local; do not run multiple application writers or migrate while another instance writes. Local account mode uses the real Exasol store. Missing configuration produces an explicit unavailable state, never a sample replacement for your records.
 
-Provider credentials are encrypted with AES-256-GCM and associated with the company, version, provider, and model. Settings responses contain metadata, never the saved key. Changing the deployment key without a credential migration makes existing credentials unreadable; owners must reconnect them. Disconnect removes the active saved credential. The application has a per-reply token limit; organization spend limits must also be configured with the provider.
+## Check and run
 
-This is bring-your-own **API billing**, not ChatGPT/Claude/Kimi/DeepSeek subscription OAuth. Account OAuth is not implemented. Real provider credentials were not assumed during development; see RUNBOOK for the exact live checks actually performed. Fixed provider endpoints and JSON validation constrain the transport, but model availability and structured-output behavior still require a live check for the selected model.
-
-The existing server `OPENROUTER_*` configuration can serve workspaces that have no company provider configured. A configured but disconnected/failed company provider does not silently fall back to a different billing account. The separate Codex/Claude Code MCP mode continues to run in the customer's external client; setup grants Loom access and does not start a background runner or authenticate the client with its vendor.
-
-## Free online testing: Cloudflare Quick Tunnel
-
-A [Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) gives the local web app a temporary HTTPS address. Your machine must keep Loom, Exasol, and `cloudflared` running. This is a free testing path, not permanent cloud hosting: the address can change, there is no uptime guarantee, and Quick Tunnels have a 200 in-flight request limit and no SSE. Loom currently uses authorized polling.
-
-1. Apply migrations and build with `pnpm db:migrate` and `pnpm build`.
-2. Create a real password account locally. Start an account-enabled bootstrap server:
-
-   ```sh
-   APP_ORIGIN=http://127.0.0.1:3000 \
-   LOOM_AUTH_MODE=workspace \
-   LOOM_ALLOW_WORKSPACE_SIGNUP=true \
-   pnpm start
-   ```
-
-   Open `http://127.0.0.1:3000/register` and register the synthetic company, then stop this server before starting the shared server below. If port 3000 is occupied, choose another port with `pnpm start --port 3001` and use that port consistently in `APP_ORIGIN`, your browser, and the tunnel command. Each workspace has its own generated tool and records. To keep an existing demo workspace, invite the password account from the local demo owner, promote it to owner, and then remove demo owner access from that workspace. Do not use synthetic test credentials for a public workspace.
-
-3. Use `LOOM_AUTH_MODE=workspace` for the shared server. It disables synthetic persona sign-in. Set `LOOM_ALLOW_WORKSPACE_SIGNUP=false` after creating the intended owner; colleagues can still register through owner-issued invitations. Keep `LOOM_SESSION_SECRET` private and at least 32 random characters.
-4. Install `cloudflared` using Cloudflare's platform instructions, then start the tunnel:
-
-   ```sh
-   cloudflared tunnel --url http://127.0.0.1:3000
-   ```
-
-5. Copy the HTTPS address it reports. Start or restart the application with that exact origin:
-
-   ```sh
-   APP_ORIGIN=https://your-temporary-address.trycloudflare.com \
-   LOOM_AUTH_MODE=workspace \
-   LOOM_ALLOW_WORKSPACE_SIGNUP=false \
-   LOOM_ALLOW_DEMO_PRODUCTION=false \
-   pnpm start
-   ```
-
-6. Sign in at `/login` on the HTTPS address. Open **Share workspace**, create the intended role's invitation, and send that link yourself. A colleague creates their own account or signs in and accepts. Invitation tokens are carried in URL fragments and sent only in POST bodies, not query strings.
-
-Changing the tunnel address requires updating `APP_ORIGIN`, restarting Loom, and issuing links for the new address. A named Cloudflare Tunnel can provide a stable hostname when you already control an appropriate domain. Neither path requires exposing the database port.
-
-## Free web hosting: Render
-
-[Render free web services](https://render.com/docs/free) can host the Node app, with managed HTTPS and a generated application hostname. Free services sleep after 15 minutes without inbound traffic, and local files are ephemeral. Sessions, accounts, tools, and records are in Exasol, so application restarts do not erase them.
-
-This hosts only the web application. Exasol must be reachable from the Render service over verified TLS; a database bound to your laptop's loopback interface is not reachable from a cloud web service. Hosting the whole current stack for free is therefore a separate database/edition decision.
-
-A Node web service can use:
+The ordinary development commands remain available:
 
 ```sh
-# Build command
-corepack enable && pnpm install --frozen-lockfile && pnpm build
-
-# Start command; Render supplies PORT
-pnpm --filter @loom/web exec next start --hostname 0.0.0.0 --port "$PORT"
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-Use one service instance. Configure `APP_ORIGIN` to its HTTPS hostname, `LOOM_AUTH_MODE=workspace`, `LOOM_ALLOW_DEMO_PRODUCTION=false`, `LOOM_ALLOW_WORKSPACE_SIGNUP=false` after owner bootstrap, and the required private Exasol/model/session settings from `.env.example`. Provide a trusted database CA through the host's private file facility when required; do not disable certificate validation. Keep credentials and private certificates out of the repository.
+For a built local application with explicit checks:
 
-## Current operating scope
+```sh
+pnpm build
+pnpm check:local
+pnpm start:local
+```
 
-Workspace passwords use salted scrypt; opaque sessions expire after eight hours and are stored only as hashes. Invitations expire after 24 hours, are single-use, and can be revoked. Permission changes apply on subsequent authorized reads/mutations and polling clears inaccessible local state. Email addresses identify accounts but are not verified. Email delivery, password reset, SSO, automated retention, distributed coordination, and multiple application replicas are not implemented.
+`check:local` loads the existing `.env`, validates account-mode configuration, checks Exasol with a read-only query, and verifies every migration version/checksum against the files in this checkout. It prints field names and generic failures, never secret values. It does not mutate the database or call any AI provider.
 
-The connected browser suite creates isolated synthetic accounts/workspaces with random passwords and leaves their records for inspection. Database integration fixtures create and clean their own UUID-scoped state. Use deliberate owner accounts and workspace membership when moving from testing to shared hosting.
+`start:local` validates configuration and a completed build, then binds one Next server to **127.0.0.1**, using `PORT` or 3000. It forwards shutdown signals. It does not migrate, seed, create accounts, or test providers. Use the normal `pnpm start` when that additional account-mode preflight is not intended.
+
+Apply migrations separately, only after checking the intended database/schema and stopping application writers:
+
+```sh
+pnpm db:migrate
+```
+
+A missing or changed migration makes readiness fail. The exact checksum check also rejects a newer schema than this checkout; it is not a rolling-upgrade protocol. Do not change applied migration files or run two migration processes concurrently. Back up important data and rehearse restoration before relying on it. Do not seed or delete existing records just to make a check pass.
+
+## Accounts and AI
+
+Open `/register` to create a company when signup is enabled. Staff access uses existing membership or an owner-issued invitation; choosing a company name alone grants no access. `/login` signs in, `/app` opens the workspace, `/join` accepts an invitation, and `/w/<id>` is a stable workspace link.
+
+Manual work does not need an AI provider. Company API connections require `LOOM_PROVIDER_ENCRYPTION_KEY`, containing 32 random bytes encoded as 64 hexadecimal characters. Keep it stable and back it up separately from Exasol. Without it, saving company credentials is unavailable. Changing or losing it makes saved credentials unreadable.
+
+Owners can select OpenAI API, Claude API, Kimi API, or DeepSeek API in Settings and use **Test and save**. That action sends a real provider request and can incur a charge. API billing is separate from a ChatGPT/Claude subscription. Configure provider spending limits separately; per-reply token limits are not an organization spending cap. A disconnected company provider does not silently switch billing accounts.
+
+The optional server-wide OpenRouter configuration requires both `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`. Leave both blank if it is not intended. Company credentials and external MCP clients do not require a global OpenRouter key. Provider failure is shown explicitly, with no generated sample response.
+
+A customer-run Codex, Claude Code, or other MCP client can connect to `/api/mcp` using a Loom token. These tokens grant access to Loom, expire after 30 days, are stored as hashes, and are revocable. Each connection acts as its issuing owner and can read internal workspace context. Loom does not launch the external client or host its polling loop. Account identity connection and permission to perform inference are separate capabilities.
+
+## Continue with ChatGPT locally
+
+Loom implements OpenAI's [local open-source registration flow](https://developers.openai.com/siwc/token-sharing-open-source/sign-in). It uses dynamic registration and a callback on `127.0.0.1`; this local flow does not require a hosted partner client ID, client secret, or partner API key. The user signs in and grants permissions in OpenAI's browser flow. A verified identity alone does not authorize use of the ChatGPT plan.
+
+1. Apply `010_openai_identity` with the other migrations after stopping application writers.
+2. In the private `.env`, set `LOOM_OPENAI_LOCAL_ENABLED=true`, `APP_ORIGIN=http://127.0.0.1:3000` (or the actual local port), and a valid `LOOM_PROVIDER_ENCRYPTION_KEY`. Retain an existing encryption key; do not replace it when reconnecting an account.
+3. Restart Loom and open the exact `127.0.0.1` address. Sign in to the owner account there; a session opened on `localhost` is a different browser origin.
+4. In Company setup, choose Codex and **Continue with ChatGPT**. Review and complete OpenAI's consent yourself. Loom returns to `/api/oauth/openai/callback` on the same local origin and verifies the callback before saving credentials.
+5. Choose a model available to the connected account. `LOOM_CHATGPT_MODEL` may provide an initial model, but it does not prove the account can use it. Identity-only or model-less connections cannot run the assistant.
+
+The server keeps a stable host identifier in its private `.local/openai-host-id` file, or uses a valid `LOOM_OPENAI_HOST_ID` override. Preserve that identifier for this computer. Issued client registrations and encrypted credentials are scoped to the Loom owner, company, host, and verified ChatGPT identity. The connected owner's assistant and direct tool designer use that personal plan; another owner or staff member does not inherit it. A changed model, disconnect, or lost permission invalidates pending inference before its answer, proposals, or draft can be saved. This path does not silently fall back to a company or server API key. Advanced triage requires explicitly selecting Company AI with an API account; it does not use the personal ChatGPT connection.
+
+Local SQL integration checks cover one-use concurrent callbacks, cancelled attempts, owner/session rechecks, encrypted/scoped credentials, refresh leases, and disconnect during inference. Provider calls were mocked in those tests. **A real browser authorization, account consent, token renewal, and live ChatGPT model response have not yet been verified.**
+
+The isolated integration suite refuses the default database schema. To repeat it deliberately:
+
+```sh
+EXASOL_SCHEMA=LOOM_TEST_LOCAL_OAUTH pnpm db:migrate
+EXASOL_SCHEMA=LOOM_TEST_LOCAL_OAUTH node --env-file-if-exists=.env node_modules/vitest/vitest.mjs run --config vitest.oauth-database.config.ts
+```
+
+This creates the dedicated test schema if needed and cleans only the suite's UUID-scoped fixtures. Run it with no other application writers. It never signs in to OpenAI or calls a live model.
+
+## Local health checks
+
+- `GET /api/health/live` returns `200 {"status":"ok"}` when the web process can handle the request, independently of Exasol.
+- `GET /api/health/ready` returns `200 {"status":"ready"}` after valid local account configuration, a successful read-only `SELECT 1`, and exact migration matches. Otherwise it returns `503 {"status":"unavailable"}`. No hostnames, users, SQL errors, or secrets appear in the response.
+
+Readiness shares one in-flight probe and caches the result for 30 seconds. Each response waits at most five seconds; the existing driver terminates a still-running connection at its twenty-second deadline. Probes do not write records, apply migrations, or call models. A green probe does not establish backup recovery, model quality, or multi-user licensing.
+
+Passwords use salted scrypt; sessions are opaque, stored as hashes, and expire after eight hours. Cookies are HTTP-only and same-site, with exact-origin JSON mutation checks. Email verification/delivery, password recovery, SSO, automated retention, and distributed operation remain unfinished. Keep local secrets private and retain a recovery plan for data you care about.

@@ -1,6 +1,12 @@
 import "server-only";
 import { workspaceProvider, assertProviderCurrent } from "./provider-config";
 import { modelIdentity } from "./provider-transport";
+import {
+  readOpenAiPlanStatus,
+  assertOpenAiPlanCurrent,
+  invalidateOpenAiPlanCredential,
+} from "./openai-oauth-store";
+import { personalPlanModel, personalPlanRuntime } from "./personal-plan";
 import { randomUUID } from "node:crypto";
 import {
   conversationSendSchema,
@@ -46,6 +52,21 @@ export async function conversationConfiguration(
   const member = await membership(sql, actor),
     settings = await settingsFor(sql, actor);
   const choice = settings.preferredAgent;
+  if (choice === "codex") {
+    const plan = await readOpenAiPlanStatus(sql, actor);
+    if (plan)
+      return {
+        configured: plan.planEnabled && Boolean(plan.model),
+        mode: plan.planEnabled && plan.model ? "builtin" : "unavailable",
+        provider: "codex",
+        model: personalPlanModel(plan),
+        message: !plan.planEnabled
+          ? "Reconnect your ChatGPT account in Company setup to authorize plan usage."
+          : !plan.model
+            ? "Choose a ChatGPT model in Company setup before sending a prompt."
+            : "Eligible requests use your own ChatGPT plan. Proposed changes still need your review.",
+      };
+  }
   if (choice === "codex" || choice === "claude-code" || choice === "other") {
     const internal = ["owner", "operator"].includes(member.role);
     const active = internal
@@ -311,6 +332,16 @@ export async function sendConversation(
     const id = randomUUID(),
       now = new Date().toISOString();
     const external = configuration.mode === "external";
+    const personalPlan =
+      !external && configuration.provider === "codex"
+        ? await readOpenAiPlanStatus(sql, actor)
+        : null;
+    if (!external && configuration.provider === "codex" && !personalPlan)
+      throw new DomainError(
+        "OPENAI_CONNECTION_CHANGED",
+        "Your ChatGPT connection changed. Send a new request.",
+        409,
+      );
     const leaseUntil = external
       ? null
       : new Date(Date.now() + 5 * 60_000).toISOString();
@@ -345,7 +376,9 @@ export async function sendConversation(
       id,
       external,
       model: configuration.model,
-      runtimeConfig: external ? null : await workspaceProvider(sql, actor),
+      runtimeConfig:
+        external || personalPlan ? null : await workspaceProvider(sql, actor),
+      personalPlan,
       context,
       member,
     };
@@ -353,11 +386,14 @@ export async function sendConversation(
   if (reservation.existing || reservation.external)
     return readConversation(actor);
   try {
+    const runtimeConfig = reservation.personalPlan
+      ? await personalPlanRuntime(actor, reservation.personalPlan)
+      : reservation.runtimeConfig;
     const result = await inferConversation(
       reservation.context,
       reservation.model!,
       signal,
-      reservation.runtimeConfig || undefined,
+      runtimeConfig || undefined,
     );
     const available = new Set(
       reservation.context.knowledge.map((entry) => entry.id),
@@ -390,10 +426,13 @@ export async function sendConversation(
           reservation.context.tool.revision,
           result.decision.toolInstructions,
           reservation.context.tool.spec,
+          reservation.personalPlan || undefined,
         )
       : undefined;
     await writeDatabase(async (sql) => {
-      await assertProviderCurrent(sql, actor, reservation.runtimeConfig);
+      if (reservation.personalPlan)
+        await assertOpenAiPlanCurrent(sql, actor, reservation.personalPlan);
+      else await assertProviderCurrent(sql, actor, reservation.runtimeConfig);
       await assertConversationContext(sql, actor, reservation.context);
       const turn = await getConversationTurn(sql, actor, reservation.id);
       if (
@@ -447,6 +486,12 @@ export async function sendConversation(
       await agentEvent(sql, actor, turn.id, "conversation_answered", 2);
     });
   } catch (error) {
+    if (
+      reservation.personalPlan &&
+      error instanceof DomainError &&
+      error.code === "OPENAI_RECONNECT_REQUIRED"
+    )
+      await invalidateOpenAiPlanCredential(actor, reservation.personalPlan);
     const safe =
       error instanceof DomainError
         ? error.message

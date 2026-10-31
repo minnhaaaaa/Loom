@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** A studio-lit glass monolith, generated locally without external assets. */
+/** A rotating box-shaped loom, generated locally without external assets. */
 export function LoomSculpture({
   onReady,
   active = true,
@@ -11,7 +11,6 @@ export function LoomSculpture({
   active?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const controlRef = useRef<((paused: boolean) => void) | null>(null);
   const readyCallback = useRef(onReady);
   const readyReported = useRef(false);
   const activeRef = useRef(active);
@@ -24,7 +23,6 @@ export function LoomSculpture({
     activeRef.current = active;
     syncRef.current?.();
   }, [active]);
-  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     const host = mountRef.current;
@@ -48,6 +46,7 @@ export function LoomSculpture({
         { OutputPass },
         { ShaderPass },
         { RoundedBoxGeometry },
+        { mergeGeometries },
       ] = await Promise.all([
         import("three"),
         import("three/addons/postprocessing/EffectComposer.js"),
@@ -55,6 +54,7 @@ export function LoomSculpture({
         import("three/addons/postprocessing/OutputPass.js"),
         import("three/addons/postprocessing/ShaderPass.js"),
         import("three/addons/geometries/RoundedBoxGeometry.js"),
+        import("three/addons/utils/BufferGeometryUtils.js"),
       ]);
       if (disposed || !host) return;
       const renderer = new THREE.WebGLRenderer({
@@ -80,7 +80,7 @@ export function LoomSculpture({
       camera.position.set(7.7, 5.6, 10.3);
       camera.lookAt(0, 0, 0);
       const sculpture = new THREE.Group();
-      sculpture.rotation.set(0.07, -0.35, -0.035);
+      sculpture.rotation.set(0.12, -0.48, 0);
       scene.add(sculpture);
       function makeEnvironment() {
         const generator = new THREE.PMREMGenerator(renderer);
@@ -126,26 +126,113 @@ export function LoomSculpture({
       scene.environment = environment.texture;
 
       const glass = new THREE.MeshPhysicalMaterial({
-        color: "#51495e",
+        color: "#40334e",
         metalness: 0,
-        roughness: 0.13,
+        roughness: 0.12,
         transmission: 0.72,
-        thickness: 0.9,
+        thickness: 0.28,
         ior: 1.52,
         attenuationColor: new THREE.Color("#43314f"),
-        attenuationDistance: 0.65,
+        attenuationDistance: 0.7,
         clearcoat: 1,
         clearcoatRoughness: 0.08,
         envMapIntensity: 1.1,
         specularIntensity: 1,
       });
-      const geometry = new RoundedBoxGeometry(1.9, 3.6, 0.9, 6, 0.16);
-      const monolith = new THREE.Mesh(geometry, glass);
-      sculpture.add(monolith);
+      const geometries = new Set<import("three").BufferGeometry>();
+      const materials = new Set<import("three").Material>([glass]);
       cleanup.push(() => {
-        geometry.dispose();
-        glass.dispose();
+        geometries.forEach((geometry) => geometry.dispose());
+        materials.forEach((material) => material.dispose());
       });
+      function addMesh(
+        geometry: import("three").BufferGeometry,
+        material: import("three").Material,
+      ) {
+        geometries.add(geometry);
+        materials.add(material);
+        const mesh = new THREE.Mesh(geometry, material);
+        sculpture.add(mesh);
+        return mesh;
+      }
+
+      // Twelve smoked-glass rails keep a clear cubic silhouette while leaving
+      // the interior open. Rounded edges catch the studio's violet reflections.
+      const rails: import("three").BufferGeometry[] = [];
+      for (const a of [-1.31, 1.31]) {
+        for (const b of [-1.31, 1.31]) {
+          rails.push(
+            new RoundedBoxGeometry(0.18, 2.8, 0.18, 4, 0.06).translate(a, 0, b),
+            new RoundedBoxGeometry(2.62, 0.18, 0.18, 4, 0.06).translate(
+              0,
+              a,
+              b,
+            ),
+            new RoundedBoxGeometry(0.18, 0.18, 2.62, 4, 0.06).translate(
+              a,
+              b,
+              0,
+            ),
+          );
+        }
+      }
+      addMesh(mergeGeometries(rails), glass);
+      rails.forEach((rail) => rail.dispose());
+
+      const warpMaterial = new THREE.MeshStandardMaterial({
+        color: "#bba2d2",
+        emissive: "#8953b5",
+        emissiveIntensity: 0.28,
+        metalness: 0.25,
+        roughness: 0.4,
+      });
+      const weftMaterial = new THREE.MeshStandardMaterial({
+        color: "#9875b3",
+        emissive: "#67358e",
+        emissiveIntensity: 0.18,
+        metalness: 0.12,
+        roughness: 0.55,
+      });
+      const warpThreads: import("three").BufferGeometry[] = [];
+      const weftThreads: import("three").BufferGeometry[] = [];
+      const warpCount = 25;
+      const rowCount = 29;
+      for (let face = 0; face < 4; face++) {
+        const angle = (face * Math.PI) / 2;
+        for (let column = 0; column < warpCount; column++) {
+          warpThreads.push(
+            new THREE.CylinderGeometry(0.008, 0.008, 2.44, 6)
+              .translate(-1.17 + (column / (warpCount - 1)) * 2.34, 0, 1.31)
+              .rotateY(angle),
+          );
+        }
+        // Alternating over-and-under geometry forms a partly woven panel on
+        // each side. The open upper warp makes the box recognizably a loom.
+        for (let row = 0; row < rowCount; row++) {
+          const points = Array.from({ length: 97 }, (_, index) => {
+            const t = index / 96;
+            return new THREE.Vector3(
+              -1.17 + t * 2.34,
+              -1.18 + (row / (rowCount - 1)) * 1.45,
+              1.31 + Math.cos((t * (warpCount - 1) + row) * Math.PI) * 0.019,
+            );
+          });
+          weftThreads.push(
+            new THREE.TubeGeometry(
+              new THREE.CatmullRomCurve3(points),
+              96,
+              0.011,
+              5,
+              false,
+            ).rotateY(angle),
+          );
+        }
+      }
+      addMesh(mergeGeometries(warpThreads), warpMaterial);
+      addMesh(mergeGeometries(weftThreads), weftMaterial);
+      warpThreads.forEach((thread) => thread.dispose());
+      weftThreads.forEach((thread) => thread.dispose());
+
       const key = new THREE.DirectionalLight("#eee4fa", 1.4);
       key.position.set(-3, 5, 5);
       scene.add(key);
@@ -187,10 +274,10 @@ export function LoomSculpture({
         }),
       );
 
-      // Keep the whole slab and its gentle float inside a generous studio crop.
-      const bounds = new THREE.Box3().setFromObject(sculpture);
-      const focalPoint = bounds.getCenter(new THREE.Vector3());
-      const viewDirection = new THREE.Vector3(0, 0.25, 9).normalize();
+      // A rotation-independent envelope prevents clipping at any point in a
+      // full turn, including the narrow mobile crop.
+      const focalPoint = new THREE.Vector3();
+      const viewDirection = new THREE.Vector3(0, 0.22, 1).normalize();
       const cameraRight = new THREE.Vector3()
         .crossVectors(new THREE.Vector3(0, 1, 0), viewDirection)
         .normalize();
@@ -198,42 +285,30 @@ export function LoomSculpture({
         .crossVectors(viewDirection, cameraRight)
         .normalize();
       const framingPoints: import("three").Vector3[] = [];
-      for (const x of [bounds.min.x, bounds.max.x])
-        for (const y of [bounds.min.y, bounds.max.y])
-          for (const z of [bounds.min.z, bounds.max.z])
-            framingPoints.push(new THREE.Vector3(x, y, z).sub(focalPoint));
+      for (const x of [-2, 2])
+        for (const y of [-1.63, 1.63])
+          for (const z of [-2.16, 2.16])
+            framingPoints.push(new THREE.Vector3(x, y, z));
 
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
       let frameId = 0,
         visible = true,
-        userPaused = false,
         lost = false;
-      let elapsed = 3.2,
-        lastTime = 0;
-      let pointerX = 0,
-        pointerY = 0;
+      let lastTime = 0;
       const canAnimate = () =>
         !disposed &&
         activeRef.current &&
         !lost &&
         visible &&
         !document.hidden &&
-        !reduced.matches &&
-        !userPaused;
+        !reduced.matches;
       function draw(time: number, animate: boolean) {
         if (disposed || lost) return;
         if (animate) {
-          elapsed += lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
+          const delta = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
           lastTime = time;
-          sculpture.rotation.y +=
-            (-0.35 +
-              pointerX * 0.06 +
-              Math.sin(elapsed * 0.22) * 0.055 -
-              sculpture.rotation.y) *
-            0.035;
-          sculpture.rotation.x +=
-            (0.07 + pointerY * 0.035 - sculpture.rotation.x) * 0.035;
-          sculpture.position.y = Math.sin(elapsed * 0.55) * 0.035;
+          sculpture.rotation.y =
+            (sculpture.rotation.y + delta * 0.28) % (Math.PI * 2);
         }
         composer.render();
         if (!readyReported.current) {
@@ -275,7 +350,7 @@ export function LoomSculpture({
                   Math.abs(point.dot(cameraUp)) / verticalTangent,
                 ),
             ),
-          ) * 1.28;
+          ) * 1.08;
         camera.position
           .copy(focalPoint)
           .addScaledVector(viewDirection, distance);
@@ -293,16 +368,6 @@ export function LoomSculpture({
         { rootMargin: "80px" },
       );
       intersection.observe(host);
-      const pointer = (event: PointerEvent) => {
-        if (reduced.matches || event.pointerType === "touch") return;
-        const bounds = host.getBoundingClientRect();
-        pointerX = ((event.clientX - bounds.left) / bounds.width - 0.5) * 2;
-        pointerY = ((event.clientY - bounds.top) / bounds.height - 0.5) * 2;
-      };
-      const pointerLeave = () => {
-        pointerX = 0;
-        pointerY = 0;
-      };
       const contextLost = (event: Event) => {
         event.preventDefault();
         lost = true;
@@ -329,12 +394,6 @@ export function LoomSculpture({
         }
       };
       syncRef.current = syncAnimation;
-      controlRef.current = (value) => {
-        userPaused = value;
-        syncAnimation();
-      };
-      host.addEventListener("pointermove", pointer);
-      host.addEventListener("pointerleave", pointerLeave);
       renderer.domElement.addEventListener("webglcontextlost", contextLost);
       renderer.domElement.addEventListener(
         "webglcontextrestored",
@@ -346,8 +405,6 @@ export function LoomSculpture({
         cancelAnimationFrame(frameId);
         observer.disconnect();
         intersection.disconnect();
-        host.removeEventListener("pointermove", pointer);
-        host.removeEventListener("pointerleave", pointerLeave);
         renderer.domElement.removeEventListener(
           "webglcontextlost",
           contextLost,
@@ -358,7 +415,6 @@ export function LoomSculpture({
         );
         document.removeEventListener("visibilitychange", syncAnimation);
         reduced.removeEventListener("change", syncAnimation);
-        controlRef.current = null;
         syncRef.current = null;
       });
       resize();
@@ -381,7 +437,7 @@ export function LoomSculpture({
   return (
     <figure
       className={`loom-sculpture ${ready ? "is-ready" : ""}`}
-      aria-label="A dark glass monolith with softly illuminated violet edges."
+      aria-label="A box-shaped dark glass loom with violet threads woven across its faces."
     >
       <div className="loom-sculpture-stage" ref={mountRef} />
       <svg
@@ -392,100 +448,38 @@ export function LoomSculpture({
       >
         <defs>
           <linearGradient
-            id="loom-glass-face"
-            x1="300"
-            y1="120"
-            x2="480"
-            y2="440"
+            id="loom-box-rail"
+            x1="270"
+            y1="160"
+            x2="520"
+            y2="420"
             gradientUnits="userSpaceOnUse"
           >
-            <stop stopColor="#71667d" />
-            <stop offset="0.2" stopColor="#26212e" />
-            <stop offset="0.7" stopColor="#141119" />
-            <stop offset="1" stopColor="#352440" />
-          </linearGradient>
-          <linearGradient
-            id="loom-glass-edge"
-            x1="470"
-            y1="120"
-            x2="500"
-            y2="440"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop stopColor="#b99acd" />
-            <stop offset="0.4" stopColor="#503367" />
-            <stop offset="0.82" stopColor="#a268cb" />
-            <stop offset="1" stopColor="#3c274d" />
-          </linearGradient>
-          <linearGradient
-            id="loom-glass-reflection"
-            x1="335"
-            y1="100"
-            x2="410"
-            y2="300"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop stopColor="#f4e8ff" stopOpacity="0.45" />
-            <stop offset="1" stopColor="#f4e8ff" stopOpacity="0" />
+            <stop stopColor="#8e7aa0" />
+            <stop offset="0.45" stopColor="#332a3e" />
+            <stop offset="1" stopColor="#a06eca" />
           </linearGradient>
         </defs>
-        <g transform="rotate(-2 400 280)">
-          <path
-            d="M324 105 473 119Q487 121 488 137L489 432Q488 447 475 450L447 456 323 422Q312 419 312 405V121Q312 105 324 105Z"
-            fill="url(#loom-glass-edge)"
-          />
-          <path
-            d="M324 105 450 133Q460 135 460 149V440Q460 455 447 453L323 422Q312 419 312 405V121Q312 105 324 105Z"
-            fill="url(#loom-glass-face)"
-            stroke="#8d779d"
-            strokeWidth="0.8"
-          />
-          <path
-            d="M326 112 386 125 386 427 325 413Q319 411 319 401V123Q319 111 326 112Z"
-            fill="url(#loom-glass-reflection)"
-          />
-          <path
-            d="M470 129 478 132Q482 134 482 142V430Q482 438 475 440"
-            stroke="#cb9ced"
-            strokeWidth="1"
-            strokeOpacity="0.6"
-          />
+        <g stroke="#ae89cb" strokeWidth="0.85" opacity="0.65">
+          {Array.from({ length: 23 }, (_, index) => {
+            const t = (index + 1) / 24;
+            return (
+              <g key={index}>
+                <path d={`M${275 + 159 * t} ${206 + 58 * t}v160`} />
+                <path d={`M${434 + 91 * t} ${264 - 59 * t}v160`} />
+                <path
+                  d={`M275 ${366 - 98 * t} 434 ${424 - 98 * t} 525 ${365 - 98 * t}`}
+                />
+              </g>
+            );
+          })}
+        </g>
+        <g stroke="url(#loom-box-rail)" strokeWidth="9" strokeLinejoin="round">
+          <path d="M275 206 372 151 525 205 434 264Z" />
+          <path d="M275 206V366L434 424 525 365V205M434 264V424" />
+          <path d="M372 151V311L275 366M372 311 525 365" opacity="0.4" />
         </g>
       </svg>
-      {ready && (
-        <button
-          className="loom-motion-control"
-          type="button"
-          aria-label={paused ? "Play loom animation" : "Pause loom animation"}
-          aria-pressed={paused}
-          onClick={() => {
-            const next = !paused;
-            setPaused(next);
-            controlRef.current?.(next);
-          }}
-        >
-          {paused ? <PlayIcon /> : <PauseIcon />}
-        </button>
-      )}
     </figure>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M5.5 4v8m5-8v8" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="m6 3.5 6 4.5-6 4.5v-9Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

@@ -659,6 +659,16 @@ export function PromptWorkspace({
             Request saved. Waiting for a response.
           </p>
         )}
+        {message.state === "failed" &&
+          snapshot?.configuration.provider === "codex" && (
+            <a
+              href="https://chatgpt.com/settings/usage"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Manage usage
+            </a>
+          )}
         {message.citations && message.citations.length > 0 && (
           <div className="prompt-source-list">
             <span>Referenced sources</span>
@@ -841,6 +851,19 @@ export function PromptWorkspace({
         </div>
       </form>
       <div className="prompt-composer-note">
+        {snapshot?.configuration.mode === "builtin" &&
+          snapshot.configuration.provider === "codex" && (
+            <p>
+              Using ChatGPT plan ·{" "}
+              <a
+                href="https://chatgpt.com/settings/usage"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Manage usage
+              </a>
+            </p>
+          )}
         <p>
           {preview || !membership
             ? "Sign in to a connected workspace to ask your agent."

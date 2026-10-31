@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 import { loadEnvConfig } from "@next/env";
-import path from "node:path";
-loadEnvConfig(path.resolve(process.cwd(), "../.."));
+import { fileURLToPath } from "node:url";
+// Next may already have cached an empty apps/web environment. Load the shared
+// repository configuration explicitly, independent of the invocation directory.
+loadEnvConfig(
+  fileURLToPath(new URL("../..", import.meta.url)),
+  process.env.NODE_ENV !== "production",
+  console,
+  true,
+);
 // Use ws's supported JS masking path; optional native stubs can break Next bundles.
 process.env.WS_NO_BUFFER_UTIL = "1";
 const config: NextConfig = {

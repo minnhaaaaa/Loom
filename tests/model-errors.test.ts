@@ -79,3 +79,117 @@ it("returns a private API error with the same Retry-After delay the builder rece
     retryable: true,
   });
 });
+
+it("explains ChatGPT plan limits without inventing a reset time or exposing diagnostics", () => {
+  const error = modelResponseError(
+    new Response(null, { status: 429 }),
+    {
+      error: {
+        code: "subscription_sharing_usage_limit_exceeded",
+        type: "invalid_request_error",
+        message: "Private plan diagnostic",
+      },
+    },
+    "openai-chatgpt",
+  )!;
+  expect(error.code).toBe("MODEL_HTTP_429");
+  expect(error.message).toContain("ChatGPT settings → Usage");
+  expect(error.message).not.toMatch(/Private|API key|entire plan|reset/i);
+  expect(error.details).toEqual({ retryable: false });
+});
+
+it.each([
+  ["subscription_sharing_user_not_eligible", 403, false, "eligibility"],
+  ["subscription_sharing_usage_unavailable", 503, true, "Keep this connection"],
+  [
+    "subscription_sharing_unsupported_capability",
+    400,
+    false,
+    "supported model",
+  ],
+  ["subscription_sharing_route_not_supported", 403, false, "inference route"],
+  ["subscription_sharing_invalid_user", 401, false, "Reconnect your ChatGPT"],
+  ["chatpass_v2_scope_not_authorized", 403, false, "permission configuration"],
+  [
+    "chatpass_v2_invalid_authorization_context",
+    403,
+    false,
+    "permission configuration",
+  ],
+  ["subscription_sharing_user_unavailable", 503, true, "Keep this connection"],
+] as const)(
+  "handles %s with its documented recovery and no billing fallback",
+  (code, status, retryable, message) => {
+    const error = modelResponseError(new Response(null, { status }), {
+      error: { code, message: "Private diagnostic" },
+    })!;
+    expect(error.code).toBe(`MODEL_HTTP_${status}`);
+    expect(error.message).toContain(message);
+    expect(error.message).not.toMatch(/Private|API key|paid API/i);
+    expect(error.details).toEqual({ retryable });
+  },
+);
+
+it("uses ChatGPT recovery for admission failures without a structured error object", () => {
+  for (const body of [{ detail: "Private admission diagnostic" }, {}]) {
+    const error = modelResponseError(
+      new Response(null, { status: 401 }),
+      body,
+      "openai-chatgpt",
+    )!;
+    expect(error.code).toBe("OPENAI_RECONNECT_REQUIRED");
+    expect(error.message).toContain("Reconnect your ChatGPT account");
+    expect(error.message).not.toMatch(/Private|API key/);
+  }
+  const unavailable = modelResponseError(
+    new Response(null, { status: 503 }),
+    { detail: "Private" },
+    "openai-chatgpt",
+  )!;
+  expect(unavailable.message).toContain("Keep this connection");
+  expect(unavailable.details?.retryable).toBe(true);
+});
+
+it("marks only a confirmed personal ChatGPT authorization rejection for reconnection", () => {
+  for (const status of [200, 401, 403]) {
+    const body = { error: { code: "subscription_sharing_invalid_user" } };
+    expect(
+      modelResponseError(new Response(null, { status }), body, "openai-chatgpt")
+        ?.code,
+    ).toBe("OPENAI_RECONNECT_REQUIRED");
+    expect(
+      modelResponseError(new Response(null, { status }), body, "openai")?.code,
+    ).not.toBe("OPENAI_RECONNECT_REQUIRED");
+  }
+  for (const status of [400, 403, 429, 500, 503]) {
+    expect(
+      modelResponseError(new Response(null, { status }), {}, "openai-chatgpt")
+        ?.code,
+    ).not.toBe("OPENAI_RECONNECT_REQUIRED");
+  }
+});
+
+it("uses only explicit retry headers for ChatGPT and keeps actual HTTP status", () => {
+  const response = new Response(null, {
+    status: 429,
+    headers: { "Retry-After": "45" },
+  });
+  expect(modelResponseError(response, {}, "openai-chatgpt")?.details).toEqual({
+    retryable: true,
+    retryAfterSeconds: 45,
+  });
+  expect(
+    modelResponseError(
+      new Response(null, { status: 429 }),
+      {},
+      "openai-chatgpt",
+    )?.details,
+  ).toEqual({ retryable: true });
+  expect(
+    modelResponseError(
+      new Response(null, { status: 403 }),
+      { error: { code: "subscription_sharing_usage_limit_exceeded" } },
+      "openai-chatgpt",
+    )?.code,
+  ).toBe("MODEL_HTTP_403");
+});

@@ -1,5 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test("localhost entry redirects once to the canonical OAuth origin", async ({
+  page,
+  baseURL,
+}) => {
+  const alias = new URL("/login?from=landing", baseURL);
+  alias.hostname = "localhost";
+  await page.goto(alias.href);
+  await expect(page).toHaveURL(`${baseURL}/login?from=landing`);
+  await expect(page.getByLabel("Email address", { exact: true })).toBeVisible();
+});
+
 async function openLanding(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Skip intro", exact: true }).click();
@@ -9,7 +20,7 @@ async function openLanding(page: Page) {
   );
 }
 
-test("landing explains the analytics workflow and opens the explicit sample desk", async ({
+test("landing explains the analytics workflow and offers account entry without sample links", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -29,36 +40,33 @@ test("landing explains the analytics workflow and opens the explicit sample desk
       .getByRole("link", { name: "Create your company", exact: true })
       .first(),
   ).toHaveAttribute("href", "/register");
+  await expect(page.getByRole("link", { name: /sample/i })).toHaveCount(0);
+  await expect(page.locator('a[href*="demo="]')).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /pause|play|stop/i }),
+  ).toHaveCount(0);
   await page
     .getByRole("link", { name: "Sign in", exact: true })
     .first()
     .click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByLabel("Email address", { exact: true })).toBeVisible();
-  await openLanding(page);
-  await page.getByRole("link", { name: "Explore sample", exact: true }).click();
-  await expect(page).toHaveURL(/\/app\?demo=1$/);
-  await expect(
-    page.getByText("Read-only sample preview", { exact: true }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "Insights", exact: true }).click();
-  await expect(page).toHaveURL(/demo=1&view=insights/);
-  await expect(
-    page.getByText("There is no live history in this sample workspace.", {
-      exact: true,
-    }),
-  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test("landing stays minimal and works after returning from the sample", async ({
+test("landing stays minimal and works after returning from sign-in", async ({
   page,
 }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
   await openLanding(page);
   await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0);
   await expect(page.locator("#product")).toHaveCount(0);
-  await page.getByRole("link", { name: "Explore sample", exact: true }).click();
-  await expect(page).toHaveURL(/\/app\?demo=1$/);
+  await page
+    .locator(".loom-hero-actions")
+    .getByRole("link", { name: "Sign in", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/login$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
   const skip = page.getByRole("button", { name: "Skip intro", exact: true });
@@ -68,6 +76,7 @@ test("landing stays minimal and works after returning from the sample", async ({
     .click();
   await expect(page).toHaveURL(/\/register$/);
   await expect(page.getByLabel("Company name", { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test("landing and company entry fit a phone with reduced motion", async ({
@@ -78,14 +87,18 @@ test("landing and company entry fit a phone with reduced motion", async ({
   for (const route of ["/", "/register", "/login"]) {
     await page.goto(route);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: /sample/i })).toHaveCount(0);
+    await expect(page.locator('a[href*="demo="]')).toHaveCount(0);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
     if (route === "/") {
-      for (const name of ["Create your company", "Explore sample"]) {
-        const link = page.getByRole("link", { name, exact: true });
+      for (const name of ["Create your company", "Sign in"]) {
+        const link = page
+          .locator(".loom-hero-actions")
+          .getByRole("link", { name, exact: true });
         await link.scrollIntoViewIfNeeded();
         await expect(link).toBeVisible();
         await expect(link).toBeInViewport();
@@ -145,7 +158,9 @@ test("opening loads, types LOOM, shows only the headline, then reveals the page"
     Math.abs(heading!.x + heading!.width / 2 - page.viewportSize()!.width / 2),
   ).toBeLessThan(2);
   await expect(
-    page.getByRole("link", { name: "Explore sample", exact: true }),
+    page
+      .locator(".loom-hero-actions")
+      .getByRole("link", { name: "Sign in", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".loom-site")).not.toHaveAttribute("inert");
 });

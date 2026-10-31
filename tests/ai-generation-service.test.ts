@@ -142,6 +142,7 @@ beforeEach(() => {
             ]
           : [];
       }
+      if (sql.includes("FROM WORKSPACE_SETTINGS")) return [];
       throw new Error(`Unexpected test query: ${sql}`);
     });
   boundary.execute

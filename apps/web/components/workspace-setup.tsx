@@ -1,4 +1,5 @@
 "use client";
+import { CodexConnection } from "./codex-connection";
 
 import {
   useCallback,
@@ -17,7 +18,6 @@ import {
   type CreatedAgentConnection,
 } from "@loom/contracts";
 import { AccessError, accessRequest } from "./account-access";
-import { CompanyMark } from "./ui/civitas";
 
 const steps = ["Your company", "Look and feel", "Your agent", "Ready to work"];
 const palettes = [
@@ -36,7 +36,7 @@ const agentOptions: {
   {
     id: "codex",
     label: "Codex",
-    description: "Bring the agent you use in Codex.",
+    description: "Connect with your ChatGPT account.",
   },
   {
     id: "claude-code",
@@ -171,10 +171,20 @@ export function WorkspaceSetup({
     [],
   );
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const followHash = () => {
       if (window.location.hash === "#company-setup") setOpen(true);
-    }, 0);
-    return () => clearTimeout(timer);
+      if (window.location.hash === "#codex-connection") {
+        setOpen(true);
+        setStep(2);
+        setAgent("codex");
+      }
+    };
+    const timer = setTimeout(followHash, 0);
+    window.addEventListener("hashchange", followHash);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("hashchange", followHash);
+    };
   }, []);
 
   const refreshConnections = useCallback(async (signal?: AbortSignal) => {
@@ -679,8 +689,22 @@ export function WorkspaceSetup({
                       </button>
                     ))}
                   </div>
+                  {agent === "codex" && (
+                    <CodexConnection
+                      preview={preview}
+                      workspaceId={workspaceId}
+                    />
+                  )}
                   {external(agent) && (
-                    <div className="setup-agent-connect">
+                    <details
+                      className="setup-agent-connect"
+                      open={agent !== "codex"}
+                    >
+                      <summary>
+                        {agent === "codex"
+                          ? "Local Codex connection"
+                          : "Local agent connection"}
+                      </summary>
                       <label>
                         Connection name
                         <input
@@ -833,7 +857,7 @@ export function WorkspaceSetup({
                           automatically. Changes still require approval in Loom.
                         </p>
                       </div>
-                    </div>
+                    </details>
                   )}
                   {agent === "loom" && (
                     <p className="setup-callout">
@@ -987,46 +1011,6 @@ export function WorkspaceSetup({
                 </section>
               )}
             </div>
-            <aside className="setup-preview" aria-label="Company brand preview">
-              <div className="setup-preview-label">
-                Your company’s workspace <span>Preview</span>
-              </div>
-              <div className="setup-preview-shell">
-                <div className="setup-preview-sidebar">
-                  <CompanyMark branding={draft} compact />
-                  <span className="setup-preview-nav">Your team’s work</span>
-                  <span>Team brain</span>
-                  <span>Agent workspace</span>
-                </div>
-                <div className="setup-preview-main">
-                  <p className="eyebrow">A little tool. Your way.</p>
-                  <h3>{draft.companyName || "Your company"}</h3>
-                  <p>Your tools, your people, and an agent beside you.</p>
-                  <span className="setup-preview-cta">Create a tool</span>
-                  <div className="setup-preview-metrics">
-                    <div>
-                      <small>In progress</small>
-                      <strong>08</strong>
-                    </div>
-                    <div>
-                      <small>Ready for review</small>
-                      <strong>03</strong>
-                    </div>
-                  </div>
-                  <div className="setup-preview-record">
-                    <div>
-                      <strong>A clearer way to work</strong>
-                      <small>Shared with your team</small>
-                    </div>
-                    <span className="setup-preview-badge">Ready</span>
-                  </div>
-                </div>
-              </div>
-              <p className="hint">
-                Illustrative preview. Colors also update the workspace around
-                you while you edit. Colleagues see your saved settings.
-              </p>
-            </aside>
           </div>
           <div className="setup-footer">
             <span>

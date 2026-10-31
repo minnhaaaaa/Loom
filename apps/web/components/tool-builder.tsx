@@ -574,6 +574,17 @@ export function ToolBuilder({
                       "Checking model configuration…"}
                 </small>
               </div>
+              {workspace?.configuration.model?.startsWith(
+                "openai-chatgpt:",
+              ) && (
+                <a
+                  href="https://chatgpt.com/settings/usage"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Manage ChatGPT usage
+                </a>
+              )}
               {generationRetry && (
                 <p className="hint">
                   Retry available in {retryDelay(generationRetry.remaining)}.

@@ -21,34 +21,34 @@ This is a working prototype. Customer demand, reduced coordination time, and wil
 | `/app?view=records`  | Request intake and saved work                                              |
 | `/app?view=insights` | Exasol flow insights for owners and analysts                               |
 | `/app?view=settings` | Company setup, access, AI provider, and advanced desk configuration        |
-| `/app?demo=1`        | Unsaved sample exploration                                                 |
+| `/app?demo=1`        | Test-only sample; disabled in normal account mode                          |
 | `/join`              | Accept an owner-issued invitation                                          |
 
 1. An administrator registers the company, sets its name and appearance, and invites colleagues.
 2. Each colleague uses an individual account. Membership determines access: owners administer, operators/analysts manage the queue, requesters submit and track their own work, and viewers have read-only access.
-3. The team imports a synthetic backlog or submits requests, then adds approved metric definitions and routing procedures.
+3. The workspace starts empty. The team submits requests or imports its own CSV, then adds approved metric definitions and routing procedures.
 4. The assistant can explain visible work and propose supported changes. A teammate reviews exact changes before they are applied.
 5. Flow insights show waiting time, weekly movement, and current owner workload. A useful decision can become reusable guidance after separate owner approval.
 
 A company currently maps to one workspace and one shared request-family tool. Company-name selection alone grants no access. Domain discovery, verified-domain joining, and an organization hierarchy are not implemented.
 
-The workspace uses Cloudflare Kumo controls with text-only navigation: Requests, Assistant, Insights, Knowledge, and Settings. Company setup, people/access, and AI connections are grouped in Settings. The public page has one hero, a dark glass monolith, and bold Inter display typography (the supplied reference's Halyard substitute). Its skippable GSAP opening types LOOM, then the centered headline, before revealing the page. Sound is opt-in; reduced-motion visitors bypass the opening animation.
+The dark workspace uses Cloudflare Kumo controls with text-only navigation: Requests, Assistant, Insights, Knowledge, and Settings. Company setup, people/access, and AI connections are grouped in Settings. The public page has one hero, a rotating box-shaped loom with a dark frame and illuminated violet warp and weft, and bold Inter display typography (the supplied reference's Halyard substitute). Its skippable GSAP opening types LOOM, then the centered headline, before revealing the page. Sound is opt-in; reduced-motion visitors bypass the opening animation.
 
 ## Completed and pending features
 
 “Implemented” describes code and exercised system behavior; live provider quality and production readiness are separate gates. See [RUNBOOK.md](RUNBOOK.md) for dated verification results.
 
-| Area               | Implemented                                                                                                         | Pending or limited                                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Request desk       | Forms, assignment, statuses, comments, due dates, CSV import/export, activity, and version conflicts                | Slack/Teams/email ingestion and notifications                                                                       |
-| Company access     | Owner registration, individual password accounts, invitation links, roles, revocation, branding                     | Email verification/delivery, password recovery, SSO, and company-domain joining                                     |
-| Exasol insights    | Stage median/p90, weekly arrivals and closure/reopening transitions, backlog, owner aging, bounded request evidence | Outcome evaluation, richer filters, capacity estimates, and predictive SLA models                                   |
-| Assistant          | Saved conversation, scoped context, validated proposals, explicit human approval                                    | Reliable live provider coverage and broad quality/cost evaluation                                                   |
-| Company AI         | Owner-managed OpenAI, Claude, Kimi, and DeepSeek API adapters; test-and-save, encrypted credentials, disconnect     | Subscription-account OAuth; verification with each real company credential/model                                    |
-| External agents    | MCP context, queued tasks, replies, proposals, tool drafts, expiring/revocable Loom tokens                          | Hosted agent runner and interactive vendor-client verification                                                      |
-| Team guidance      | Approved definitions/procedures, lexical retrieval, citations, reviewed decision reuse                              | External ingestion, semantic retrieval, automatic policy creation                                                   |
-| Desk configuration | Templates, manual editing, validated AI drafts, reviewed publication, compatible revisions                          | Arbitrary application/code generation and multiple independent tools per company                                    |
-| Deployment         | Next.js Node application, Exasol migrations, local setup and deployment instructions                                | Production edition/hosting decision, operational hardening, backup/restore rehearsal, and multi-instance deployment |
+| Area               | Implemented                                                                                                         | Pending or limited                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Request desk       | Forms, assignment, statuses, comments, due dates, CSV import/export, activity, and version conflicts                | Slack/Teams/email ingestion and notifications                                     |
+| Company access     | Owner registration, individual password accounts, invitation links, roles, revocation, branding                     | Email verification/delivery, password recovery, SSO, and company-domain joining   |
+| Exasol insights    | Stage median/p90, weekly arrivals and closure/reopening transitions, backlog, owner aging, bounded request evidence | Outcome evaluation, richer filters, capacity estimates, and predictive SLA models |
+| Assistant          | Saved conversation, scoped context, validated proposals, explicit human approval                                    | Reliable live provider coverage and broad quality/cost evaluation                 |
+| Company AI         | API adapters plus local ChatGPT OAuth, encrypted per-owner tokens, renewal and disconnect                           | Real-user ChatGPT consent/inference verification; other subscription OAuth        |
+| External agents    | MCP context, queued tasks, replies, proposals, tool drafts, expiring/revocable Loom tokens                          | Hosted agent runner and interactive vendor-client verification                    |
+| Team guidance      | Approved definitions/procedures, lexical retrieval, citations, reviewed decision reuse                              | External ingestion, semantic retrieval, automatic policy creation                 |
+| Desk configuration | Templates, manual editing, validated AI drafts, reviewed publication, compatible revisions                          | Arbitrary application/code generation and multiple independent tools per company  |
+| Local operation    | Loopback-only start, account mode, migration readiness checks and explicit test-fixture guards                      | Backup/restore rehearsal; hosted deployment is outside the current scope          |
 
 Legacy IT, onboarding, and project-review templates remain available in advanced configuration, but the product and demonstration now focus on analytics requests.
 
@@ -71,7 +71,7 @@ Owners can configure an **API account** for OpenAI, Claude, Kimi, or DeepSeek in
 
 Set `LOOM_PROVIDER_ENCRYPTION_KEY` on the server before enabling this feature. Credentials are encrypted with AES-256-GCM, bound to the workspace/provider/model/revision, and never returned by the settings API. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup and key handling. Available models and structured-output compatibility depend on the provider; adapter tests do not establish that every model works.
 
-A ChatGPT/Claude/Kimi/DeepSeek chat subscription is not a connected API account in this implementation. Subscription-account OAuth is not implemented. The separate Codex/Claude Code MCP option gives an externally running client a Loom token; company setup does not launch, host, or log that client into its vendor account. External connections currently serve owners/operators.
+For local use, **Codex → Continue with ChatGPT** starts OpenAI’s documented OAuth flow with dynamic client registration. Each owner authorizes their own plan; it is never shared with other staff. Choose an eligible model, then save company setup. The assistant and its requested tool drafts use that plan, with no automatic switch to API billing. The tool designer also uses the selected ChatGPT plan; advanced triage requires explicitly choosing Company AI. Live consent and inference must be verified with the user’s actual account. Claude/Kimi/DeepSeek subscription OAuth is not implemented. The separate manual MCP connection supports externally running Codex/Claude Code clients; Loom does not launch or host those clients.
 
 ## Run the current build
 
@@ -80,11 +80,11 @@ pnpm install --frozen-lockfile
 # On a fresh checkout only, copy .env.example to .env; preserve existing secrets.
 # Configure Exasol, session settings, and optional company AI encryption in .env.
 pnpm db:migrate
-pnpm db:seed
+pnpm check:local
 pnpm dev
 ```
 
-Open http://localhost:3000 for the landing page or http://localhost:3000/app?demo=1 for an unsaved sample. Company registration requires `LOOM_ALLOW_WORKSPACE_SIGNUP=true`; real saves and conversations require Exasol. Manual request work does not require a model. Follow [RUNBOOK.md](RUNBOOK.md) for installing/starting Exasol Personal, verifying the connection, and choosing the correct authentication mode. There is no substitute persistence backend.
+Open http://127.0.0.1:3000. Normal account mode has no sample entry points or fake-record fallback; missing Exasol makes the workspace unavailable. Company registration requires `LOOM_ALLOW_WORKSPACE_SIGNUP=true`; real saves and conversations require Exasol. Manual request work does not require a model. Follow [RUNBOOK.md](RUNBOOK.md) for installing/starting Exasol Personal, verifying the connection, and choosing the correct authentication mode. There is no substitute persistence backend.
 
 ## Competition and deployment scope
 
@@ -96,7 +96,7 @@ The [ExaThon India 2026 rules](https://www.exasol.com/events/exathon-india-2026/
 
 - [RUNBOOK.md](RUNBOOK.md): setup, operating behavior, dated checks, and verification limits.
 - [PLAN.md](PLAN.md): narrowed priorities, acceptance gates, evaluation, and submission work.
-- [DEPLOYMENT.md](DEPLOYMENT.md): company access, AI credential setup, shared-host configuration, and deployment limits.
+- [DEPLOYMENT.md](DEPLOYMENT.md): local setup, ChatGPT connection, credentials, and startup checks.
 - [ARCHITECTURE.md](ARCHITECTURE.md) and [TECH_STACK.md](TECH_STACK.md): system design and technology decisions; consult the current checkpoints for implemented scope.
 
 Compare matched synthetic request batches using the existing workflow, Loom's manual desk, and Loom with an agent. Measure clarification rounds, time to readiness/assignment, review effort, errors, and repeat explanations; report actual fulfillment time separately. Numerical targets are evaluation goals, not achieved savings.

@@ -130,8 +130,8 @@ export function LandingPage() {
               <Link href="/register" className="loom-button">
                 Create your company <Arrow diagonal />
               </Link>
-              <Link href="/app?demo=1" className="loom-text-link">
-                Explore sample <Arrow diagonal />
+              <Link href="/login" className="loom-text-link">
+                Sign in <Arrow diagonal />
               </Link>
             </div>
           </section>

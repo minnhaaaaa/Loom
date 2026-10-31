@@ -31,6 +31,7 @@ import {
   type ProviderRuntimeConfig,
 } from "./provider-transport";
 import { modelResponseError } from "./model-errors";
+import { settingsFor } from "./settings";
 
 function encryptionKey() {
   const value = process.env.LOOM_PROVIDER_ENCRYPTION_KEY;
@@ -145,6 +146,12 @@ export async function workspaceProvider(
   sql: SqlSession,
   actor: Actor,
 ): Promise<ProviderRuntimeConfig | null> {
+  if ((await settingsFor(sql, actor)).preferredAgent === "codex")
+    throw new DomainError(
+      "PERSONAL_PLAN_REQUIRED",
+      "Codex is selected. Use the assistant or tool designer with your ChatGPT connection. Choose Company AI explicitly to run advanced triage with an API account.",
+      409,
+    );
   const row = await connectionRow(sql, actor);
   if (!row) return null;
   if (row.ACTIVE !== true || !row.CREDENTIAL)

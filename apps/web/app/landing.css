@@ -281,32 +281,6 @@
   opacity: 0;
   pointer-events: none;
 }
-.loom-landing .loom-motion-control {
-  position: absolute;
-  bottom: 16px;
-  right: 9%;
-  width: 36px;
-  height: 36px;
-  padding: 9px;
-  background: transparent;
-  border: 1px solid #ffedd733;
-  border-radius: 50%;
-  color: var(--loom-muted);
-  cursor: pointer;
-}
-.loom-motion-control svg {
-  width: 100%;
-  height: 100%;
-}
-.loom-landing .loom-motion-control:hover {
-  border-color: #e1bdff;
-  color: #e1bdff;
-}
-.loom-landing .loom-motion-control[aria-pressed="true"] {
-  background: #1b1521;
-  border-color: #a28ab5;
-  color: #e1bdff;
-}
 .loom-hero-actions {
   position: absolute;
   z-index: 3;
@@ -452,10 +426,6 @@
   }
   .loom-button {
     width: auto;
-  }
-  .loom-landing .loom-motion-control {
-    right: 24px;
-    bottom: 8px;
   }
   .loom-footer {
     padding: 28px 24px;

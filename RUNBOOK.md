@@ -1,5 +1,15 @@
 # Run Loom locally
 
+## Current local setup — 2026-10-31
+
+Use [DEPLOYMENT.md](DEPLOYMENT.md) for the current local-only startup procedure. `pnpm check:local` checks real account mode, configuration, and all migration checksums; `pnpm build` then `pnpm start:local` runs a checked loopback server. Open http://127.0.0.1:3000. No online deployment is configured.
+
+Normal use starts with an empty company and never substitutes sample records for missing Exasol. Demo personas and seed fixtures require explicit local test opt-ins. The dark dashboard and layout-only tool preview contain no synthetic counts or records. Older dated entries below describe historical test/demo behavior, not the normal startup path.
+
+Local Codex setup now opens ChatGPT OAuth. Migration `010_openai_identity` stores issued client registrations, owner-scoped encrypted tokens and single-use callback transactions. Connect in Settings → Company setup → Codex, choose a model available to the account, then save setup. The assistant and tool drafts requested through it use that owner’s authorized plan; other users do not inherit the plan. API-key Company AI and the manual MCP connection remain separate explicit choices. Real-user provider consent and inference are not established by mocked provider tests.
+
+Validation for this local checkpoint: 247 unit tests, 12 real-Exasol OAuth/personal-plan tests in the isolated `LOOM_TEST_LOCAL_OAUTH` schema, and 21 production-browser tests passed. TypeScript, ESLint, formatting, and the production build passed. The local server reports ready (HTTP 200); normal account mode rejects `/app?demo=1` (HTTP 404). Desktop/mobile WebGL screenshots verify the rotating woven box and removal of animation controls. Tests use mocked OpenAI responses; no live ChatGPT authorization or inference was performed. Migration 010 was applied without adding sample records to the local workspace.
+
 ## Single-prompt workspace — 2026-10-28
 
 The normal entry point (`/` or `/?view=assistant`) has one conversation composer. `/?view=records` opens saved work; `/?view=settings` holds company setup, teammates, the optional manual tool builder, and advanced source/run administration. A new company owner sees onboarding first until setup is complete. End users do not need to select requests, create triage runs, or fill a knowledge form to ask a question.
@@ -23,7 +33,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open http://localhost:3000. With no database credentials, Loom shows a **read-only sample preview** with a disabled assistant composer. Saved work and settings expose synthetic records and the manual tool preview. Preview saves are disabled. It does not use localStorage, SQLite, or an in-memory database to simulate persistence.
+Open http://127.0.0.1:3000. With missing database credentials the workspace is unavailable. Synthetic preview requires explicit loopback test configuration and `/app?demo=1`; it is disabled in real account mode. Loom does not substitute another persistence backend.
 
 The frontend is basic semantic React and plain CSS. Edit `apps/web/components/desk.tsx` and `apps/web/app/globals.css` for the later redesign. The working desk and builder preview use the validated definitions in `packages/contracts/src/tools.ts` through `apps/web/components/tool-renderer.tsx`. Apply migration `005_tool_definitions` before opening a configured database-backed build.
 
@@ -56,13 +66,11 @@ Run from the root after the database is available:
 
 ```sh
 pnpm db:migrate
-pnpm db:check
-pnpm db:seed
-pnpm test:db
+pnpm check:local
 pnpm dev
 ```
 
-`db:migrate` creates the schema and records a migration checksum. It does not reset an existing database or accept changed applied migrations. `db:seed` inserts public synthetic fixtures and two isolation workspaces; if the primary fixture workspace already exists, it leaves it untouched. Do not run migrations concurrently or against an unrelated populated schema. Rehearse against the installed Exasol release before trusting the SQL.
+`db:migrate` creates the schema and records a migration checksum. It does not reset an existing database or accept changed applied migrations. For isolated tests only, `LOOM_ALLOW_SEED_FIXTURES=true pnpm db:seed` inserts public synthetic fixtures and two isolation workspaces; if the primary fixture workspace already exists, it leaves it untouched. Do not run migrations concurrently or against an unrelated populated schema. Rehearse against the installed Exasol release before trusting the SQL.
 
 `db:check` exercises TLS, prepared bindings, prepare-error recovery, primary-key rejection, rollback, scalar mappings, and UTC timestamp round trips. It reports the actual database version. `test:db` uses the actual configured Exasol connection and creates fresh UUID-scoped fixtures; cleanup deletes only those fixture workspaces. It checks request isolation, internal-comment filtering, command replay/conflicts, concurrent versions, history counts, and rollback. It deliberately fails when no database is configured. These checks passed against the current local deployment. The separate production-browser suite verifies the application/server boundary.
 

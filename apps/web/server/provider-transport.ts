@@ -2,9 +2,10 @@ import "server-only";
 import { z } from "zod";
 import { DomainError } from "@loom/domain";
 import type { CompanyProvider } from "@loom/contracts";
+import { chatgptFetch } from "./chatgpt-transport";
 
 export type ProviderRuntimeConfig = {
-  provider?: CompanyProvider | "openrouter";
+  provider?: CompanyProvider | "openrouter" | "openai-chatgpt";
   key: string;
   model: string;
   maxTokens: number;
@@ -12,6 +13,13 @@ export type ProviderRuntimeConfig = {
   freeOnly: boolean;
   reasoningEnabled?: boolean;
   revision?: number;
+};
+export type ProviderRequest = {
+  model?: string;
+  system: string;
+  input: string;
+  schemaName: string;
+  schema: unknown;
 };
 const endpoints = {
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
@@ -51,17 +59,13 @@ export async function boundedProviderBody(
 }
 export async function providerFetch(
   config: ProviderRuntimeConfig,
-  request: {
-    model?: string;
-    system: string;
-    input: string;
-    schemaName: string;
-    schema: unknown;
-  },
+  request: ProviderRequest,
   signal?: AbortSignal,
 ): Promise<Response> {
   const provider = config.provider || "openrouter",
     model = request.model || config.model;
+  if (provider === "openai-chatgpt")
+    return chatgptFetch(config, request, signal);
   if (!Object.hasOwn(endpoints, provider))
     throw new DomainError(
       "MODEL_CONFIGURATION",

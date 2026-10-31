@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("company setup previews brand colors, typography and identity without saving sample state", async ({
   page,
 }) => {
-  await page.goto("/app");
+  await page.goto("/app?demo=1");
   await page
     .getByRole("navigation", { name: "Main", exact: true })
     .getByRole("link", { name: "Settings", exact: true })
@@ -11,6 +11,8 @@ test("company setup previews brand colors, typography and identity without savin
   const setup = page.locator("#company-setup");
   await expect(setup).not.toHaveAttribute("open", "");
   await setup.locator(":scope > summary").click();
+  await expect(setup.getByText("08", { exact: true })).toHaveCount(0);
+  await expect(setup.getByText("03", { exact: true })).toHaveCount(0);
   await setup.getByLabel("Company name", { exact: true }).fill("Nimbus");
   await expect(
     page.getByRole("link", { name: "Nimbus home", exact: true }),
@@ -53,7 +55,19 @@ test("company setup previews brand colors, typography and identity without savin
     "#19161e",
   );
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
-  await setup.getByRole("button", { name: /Codex Bring the agent/ }).click();
+  await setup
+    .getByRole("button", { name: /Codex Connect with your ChatGPT account/ })
+    .click();
+  await expect(
+    setup.getByRole("button", { name: "Continue with ChatGPT", exact: true }),
+  ).toBeVisible();
+  await expect(
+    setup.getByRole("button", { name: "Continue with ChatGPT", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    setup.getByLabel("Agent connection configuration", { exact: true }),
+  ).toBeHidden();
+  await setup.getByText("Local Codex connection", { exact: true }).click();
   await expect(
     setup.getByRole("button", { name: "Create agent connection", exact: true }),
   ).toBeDisabled();
@@ -66,7 +80,7 @@ test("company onboarding and agent configuration fit a phone", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app?view=settings");
+  await page.goto("/app?demo=1&view=settings");
   // The sidebar collapses on small screens; setup also has a visible entry in the page.
   await page.locator("#company-setup > summary").click();
   const setup = page.locator("#company-setup");

@@ -62,6 +62,7 @@ beforeEach(() => {
   boundary.infer.mockReset();
   boundary.query.mockReset().mockImplementation(async (sql: string) => {
     if (sql.includes("FROM PROVIDER_CONNECTIONS")) return [];
+    if (sql.includes("FROM WORKSPACE_SETTINGS")) return [];
     if (sql.includes("FROM TOOL_GENERATIONS"))
       return boundary.generation ? [{ ...boundary.generation }] : [];
     throw new Error("Unexpected scripted SQL query");
