@@ -13,6 +13,7 @@ import {
   selectSessionWorkspace,
 } from "./accounts";
 import type { SessionGrant } from "@loom/contracts";
+import { localDemoEnabled } from "./demo-mode";
 const cookieName = "loom_demo_session";
 const accountCookieName = "loom_session";
 const ttl = 8 * 60 * 60;
@@ -37,13 +38,7 @@ function sessionSecret() {
   return secret;
 }
 function demoEnabled() {
-  const origin = new URL(process.env.APP_ORIGIN || "http://localhost:3000");
-  return (
-    process.env.LOOM_AUTH_MODE === "local-demo" &&
-    ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) &&
-    (process.env.NODE_ENV !== "production" ||
-      process.env.LOOM_ALLOW_DEMO_PRODUCTION === "true")
-  );
+  return localDemoEnabled();
 }
 function sign(payload: string) {
   return createHmac("sha256", sessionSecret())
@@ -51,7 +46,7 @@ function sign(payload: string) {
     .digest("base64url");
 }
 export function assertCredentialAuth() {
-  const mode = process.env.LOOM_AUTH_MODE || "local-demo";
+  const mode = process.env.LOOM_AUTH_MODE || "workspace";
   if (mode !== "workspace" && !(mode === "local-demo" && demoEnabled()))
     throw new DomainError(
       "AUTH_DISABLED",
@@ -116,11 +111,7 @@ export async function actorFromCookie(): Promise<Actor | null> {
 export async function requireActor() {
   const actor = await actorFromCookie();
   if (!actor)
-    throw new DomainError(
-      "UNAUTHENTICATED",
-      "Sign in or choose a local demo persona to continue.",
-      401,
-    );
+    throw new DomainError("UNAUTHENTICATED", "Sign in to continue.", 401);
   const expectedWorkspace = requestWorkspace.getStore();
   if (expectedWorkspace && expectedWorkspace !== actor.workspaceId)
     throw new DomainError(

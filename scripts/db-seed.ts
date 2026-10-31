@@ -2,6 +2,16 @@ import { personas, workspaceId, secondWorkspaceId } from "@loom/contracts";
 import { sampleRequests } from "../packages/contracts/src/fixtures";
 import { sqlTimestamp, writeDatabase } from "@loom/db-exasol";
 try {
+  const origin = new URL(process.env.APP_ORIGIN || "https://invalid.example");
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.LOOM_ALLOW_SEED_FIXTURES !== "true" ||
+    !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)
+  ) {
+    throw new Error(
+      "Fixture seeding is disabled. Use an isolated local database with LOOM_ALLOW_SEED_FIXTURES=true; never seed a deployment database.",
+    );
+  }
   await writeDatabase(async (sql) => {
     const rows = await sql.query("SELECT ID FROM WORKSPACES WHERE ID = ?", [
       workspaceId,

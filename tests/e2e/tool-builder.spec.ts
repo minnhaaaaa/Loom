@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("workspace settings opens an onboarding draft and preserves its fields across templates", async ({
   page,
 }) => {
-  await page.goto("/app");
+  await page.goto("/app?demo=1");
   await page
     .getByRole("navigation", { name: "Main", exact: true })
     .getByRole("link", { name: "Settings", exact: true })
@@ -24,7 +24,17 @@ test("workspace settings opens an onboarding draft and preserves its fields acro
       exact: true,
     }),
   ).toHaveValue(/onboarding/i);
-  await expect(builder.getByRole("table")).toContainText("Aarav Shah");
+  const table = builder.getByRole("table");
+  await expect(
+    table.getByRole("columnheader", { name: "Employee name", exact: true }),
+  ).toBeVisible();
+  await expect(table.getByRole("row")).toHaveCount(1);
+  await expect(table.locator("tbody tr")).toHaveCount(0);
+  await expect(builder.getByText("Aarav Shah", { exact: true })).toHaveCount(0);
+  await expect(
+    builder.getByRole("region", { name: "Queue summary", exact: true }),
+  ).toHaveCount(0);
+  await expect(builder.getByText("Layout only", { exact: true })).toBeVisible();
   await builder
     .getByRole("button", { name: "Project reviews", exact: true })
     .click();
@@ -47,7 +57,7 @@ test("sample builder previews an IT template and an optional field without chang
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/app?view=settings");
+  await page.goto("/app?demo=1&view=settings");
   const builder = page.locator(".tool-builder");
   await builder.getByText("Explore the tool builder", { exact: true }).click();
   await builder
@@ -108,7 +118,7 @@ test("sample builder previews an IT template and an optional field without chang
 
 test("expanded sample builder fits a narrow viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app?view=settings");
+  await page.goto("/app?demo=1&view=settings");
   const builder = page.locator(".tool-builder");
   await builder.getByText("Explore the tool builder", { exact: true }).click();
   await builder

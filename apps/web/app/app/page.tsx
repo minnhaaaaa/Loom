@@ -3,6 +3,8 @@ import { actorFromCookie } from "@/server/http";
 import { accountContext } from "@/server/accounts";
 import { sampleSnapshot, snapshot } from "@/server/desk";
 import type { DeskSnapshot } from "@loom/contracts";
+import { notFound } from "next/navigation";
+import { localDemoEnabled } from "@/server/demo-mode";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export default async function Home({
@@ -13,6 +15,7 @@ export default async function Home({
   const params = await searchParams;
   const requestedView = params.view;
   const demo = params.demo === "1";
+  if (demo && !localDemoEnabled()) notFound();
   const initialView =
     requestedView === "records" ||
     requestedView === "settings" ||
@@ -40,7 +43,7 @@ export default async function Home({
       initial = await snapshot(account.currentWorkspaceId ? actor : null);
     } catch {
       initialError =
-        "The desk could not connect. Check Exasol and the local session configuration, then refresh.";
+        "Your workspace is temporarily unavailable. Please try again shortly.";
     }
   return (
     <WorkspaceApp

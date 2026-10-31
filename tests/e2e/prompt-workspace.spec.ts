@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("the assistant view is one prompt instead of knowledge and triage forms", async ({
   page,
 }) => {
-  await page.goto("/app?view=assistant");
+  await page.goto("/app?demo=1&view=assistant");
   const assistant = page.getByRole("region", {
     name: "Workspace assistant",
     exact: true,
@@ -36,7 +36,7 @@ test("the single prompt fits a narrow screen without exposing administrative con
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app?view=assistant");
+  await page.goto("/app?demo=1&view=assistant");
   await expect(
     page.getByRole("textbox", { name: "Ask your workspace", exact: true }),
   ).toBeVisible();
@@ -67,7 +67,7 @@ test("the single prompt fits a narrow screen without exposing administrative con
 test("navigation keeps the prompt, saved work, and settings in separate views", async ({
   page,
 }) => {
-  await page.goto("/app?view=assistant");
+  await page.goto("/app?demo=1&view=assistant");
   await page
     .getByRole("navigation", { name: "Main", exact: true })
     .getByRole("link", { name: "Settings", exact: true })

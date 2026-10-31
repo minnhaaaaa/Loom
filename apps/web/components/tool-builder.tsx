@@ -2,8 +2,7 @@
 import { workspaceFetch } from "./workspace-fetch";
 
 import { useEffect, useRef, useState } from "react";
-import { sampleRequests } from "@loom/contracts/fixtures";
-import { ToolFields, ToolSummary, ToolTable } from "./tool-renderer";
+import { ToolFields, ToolTable } from "./tool-renderer";
 import { ConsoleChrome } from "./ui/civitas";
 import {
   processTemplates,
@@ -181,16 +180,6 @@ export function ToolBuilder({
           field.label,
       ),
   );
-  const previewRequests = sampleRequests.slice(0, 3).map((request, index) => ({
-    ...request,
-    ...(sampleTemplate?.sampleValues[index] || {
-      title: `Example ${index + 1}`,
-      businessQuestion: "Illustrative record for this tool’s preview.",
-      reportingPeriod: index === 1 ? "" : "Example context",
-      dataset: index === 1 ? "" : "Example team",
-    }),
-    customValues: sampleTemplate?.sampleValues[index]?.customValues || {},
-  }));
 
   useEffect(() => {
     if (preview || !owner) return;
@@ -932,9 +921,7 @@ export function ToolBuilder({
             <div className="tool-builder-preview-column">
               <div className="tool-builder-preview-heading">
                 <span className="eyebrow">Draft preview</span>
-                <span className="tool-builder-preview-badge">
-                  Sample · no saves
-                </span>
+                <span className="tool-builder-preview-badge">Layout only</span>
               </div>
               <div
                 className="tool-builder-preview"
@@ -946,22 +933,13 @@ export function ToolBuilder({
                     <p>{spec.description}</p>
                   </div>
                 </div>
-                <ToolSummary
-                  spec={spec}
-                  requests={previewRequests}
-                  analytics={null}
-                />
                 {(filters?.search || filters?.status) && (
                   <div className="tool-builder-preview-filters">
                     {filters.search && <span>Search requests…</span>}
                     {filters.status && <span>All statuses</span>}
                   </div>
                 )}
-                <ToolTable
-                  spec={spec}
-                  requests={previewRequests.slice(0, 2)}
-                  own={false}
-                />
+                <ToolTable spec={spec} requests={[]} own={false} />
                 <div className="tool-builder-preview-intake">
                   <h4>New request</h4>
                   <fieldset disabled aria-label="Draft intake preview">
@@ -999,8 +977,8 @@ export function ToolBuilder({
                 </button>
               )}
               <p className="hint">
-                The draft preview uses sample records. Publishing updates the
-                team’s tool; existing requests keep their data.
+                This preview shows the layout without records. Publishing
+                updates the team’s tool; existing requests keep their data.
               </p>
               {(assumptions.length > 0 ||
                 unsupported.length > 0 ||

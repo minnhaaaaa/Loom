@@ -30,9 +30,6 @@ export function CompanyEntry({ mode }: { mode: "login" | "register" }) {
           );
         }}
       />
-      <footer>
-        <Link href="/app?demo=1">Explore sample ↗</Link>
-      </footer>
     </main>
   );
 }

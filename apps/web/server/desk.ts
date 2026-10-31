@@ -39,6 +39,7 @@ import {
 import { queueSummary } from "@loom/analytics";
 import { publishedTool } from "./tool-definitions";
 import { settingsFor } from "./settings";
+import { localDemoEnabled } from "./demo-mode";
 
 function mapMembership(row: Row): Membership {
   return {
@@ -130,6 +131,12 @@ export function requestFilter(member: Membership, query: DeskQuery) {
   return filter;
 }
 export function sampleSnapshot(): DeskSnapshot {
+  if (!localDemoEnabled())
+    throw new DomainError(
+      "DEMO_DISABLED",
+      "Sample workspaces are disabled.",
+      404,
+    );
   return {
     mode: "preview",
     refreshIntervalMs: 3000,
@@ -150,6 +157,7 @@ export async function snapshot(
   const query = deskQuerySchema.parse(input);
   if (!isConfigured()) {
     if (
+      !localDemoEnabled() ||
       process.env.EXASOL_HOST ||
       process.env.EXASOL_USER ||
       process.env.EXASOL_PASSWORD

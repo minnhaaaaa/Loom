@@ -223,9 +223,9 @@ export async function accountContext(
 ): Promise<AccountContext> {
   const configuration = {
     authMode:
-      process.env.LOOM_AUTH_MODE === "workspace"
-        ? ("workspace" as const)
-        : ("local-demo" as const),
+      process.env.LOOM_AUTH_MODE === "local-demo"
+        ? ("local-demo" as const)
+        : ("workspace" as const),
     registrationEnabled: process.env.LOOM_ALLOW_WORKSPACE_SIGNUP === "true",
   };
   if (!actor)

@@ -5,7 +5,7 @@ test("preview is explicitly read-only and supports queue inspection", async ({
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/app?view=records");
+  await page.goto("/app?demo=1&view=records");
   await expect(
     page.getByText("Read-only sample preview", { exact: true }),
   ).toBeVisible();
@@ -40,10 +40,24 @@ test("preview is explicitly read-only and supports queue inspection", async ({
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
+test("isolated local fixture insights does not claim to show live company history", async ({
+  page,
+}) => {
+  await page.goto("/app?demo=1&view=insights");
+  await expect(
+    page.getByText("Read-only sample preview", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("There is no live history in this sample workspace.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByRole("table")).toHaveCount(0);
+});
 test("intake renders the supported field specification without pretending to save", async ({
   page,
 }) => {
-  await page.goto("/app?view=records");
+  await page.goto("/app?demo=1&view=records");
   await page.getByRole("button", { name: "New request", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByLabel("Request title").fill("Example request");
@@ -56,7 +70,7 @@ test("intake renders the supported field specification without pretending to sav
 });
 test("mobile preview keeps the page within the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app?view=records");
+  await page.goto("/app?demo=1&view=records");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
