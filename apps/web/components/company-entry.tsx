@@ -12,23 +12,17 @@ export function CompanyEntry({ mode }: { mode: "login" | "register" }) {
           href="/"
           aria-label="Loom home"
         >
-          loom<span>↗</span>
+          LOOM
         </Link>
         <Link href={mode === "login" ? "/register" : "/login"}>
-          {mode === "login"
-            ? "Register your company"
-            : "Already a member? Sign in"}
+          {mode === "login" ? "Create your company" : "Sign in"}
         </Link>
       </nav>
       <div className="company-entry-heading">
-        <p>THE WORK BEHIND THE ANSWER</p>
-        <h1>
-          {mode === "register"
-            ? "Make room for analysis."
-            : "Back to the work that matters."}
-        </h1>
+        <h1>{mode === "register" ? "Create your company" : "Sign in"}</h1>
       </div>
       <AccountAccess
+        minimalPublic
         initialMode={mode}
         onAuthenticated={async () => {
           window.location.assign(
@@ -37,8 +31,7 @@ export function CompanyEntry({ mode }: { mode: "login" | "register" }) {
         }}
       />
       <footer>
-        <span>One company. Individual accounts. Clear ownership.</span>
-        <Link href="/app?demo=1">Explore a sample workspace ↗</Link>
+        <Link href="/app?demo=1">Explore sample ↗</Link>
       </footer>
     </main>
   );

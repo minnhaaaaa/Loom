@@ -1,10 +1,10 @@
 .company-provider {
-  border: 1px solid var(--border, #cbd5c8);
+  border: 1px solid var(--border, #d4cedb);
   border-radius: 14px;
   padding: 24px;
   margin: 20px 0;
   background: var(--surface, #fff);
-  color: var(--ink, #163d27);
+  color: var(--ink, #19161e);
 }
 .company-provider-heading {
   display: flex;
@@ -28,7 +28,8 @@
   white-space: nowrap;
 }
 .provider-state.connected {
-  background: #e6f4d7;
+  color: var(--brand-link, #19161e);
+  background: var(--soft, #f1edf5);
 }
 .provider-fields {
   display: grid;
@@ -47,11 +48,11 @@
 .provider-fields select {
   width: 100%;
   min-height: 44px;
-  border: 1px solid #bbc9b9;
-  background: #fff;
+  border: 1px solid var(--line, #d4cedb);
+  background: var(--surface, #fff);
   border-radius: 7px;
   padding: 10px;
-  color: #142a1d;
+  color: var(--ink, #19161e);
 }
 .provider-fields small {
   font-weight: 400;
@@ -81,10 +82,10 @@
 .provider-error button {
   min-height: 44px;
   padding: 10px 16px;
-  border: 1px solid #163d27;
+  border: 1px solid var(--brand-primary, #19161e);
   border-radius: 7px;
-  background: #163d27;
-  color: white;
+  background: var(--brand-primary, #19161e);
+  color: var(--brand-on-primary, #ffedd7);
   font-weight: 600;
   cursor: pointer;
 }
@@ -99,7 +100,7 @@
 .provider-note,
 .provider-current {
   padding: 12px 14px;
-  background: #f0f4ed;
+  background: var(--soft, #f1edf5);
   border-radius: 8px;
 }
 .provider-error {
@@ -114,15 +115,15 @@
   margin-top: 10px;
 }
 .provider-notice {
-  color: #244e2e;
-  background: #edf8e7;
+  color: var(--brand-link, #19161e);
+  background: var(--soft, #f1edf5);
   padding: 12px;
   border-radius: 8px;
 }
 .company-provider input:focus-visible,
 .company-provider select:focus-visible,
 .company-provider button:focus-visible {
-  outline: 3px solid #8ab36d;
+  outline: 3px solid var(--brand-link, #19161e);
   outline-offset: 3px;
 }
 @media (max-width: 640px) {

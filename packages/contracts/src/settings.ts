@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const color = z
   .string()
-  .regex(/^#[0-9a-fA-F]{6}$/, "Use a six-digit hex color, such as #163d27.")
+  .regex(/^#[0-9a-fA-F]{6}$/, "Use a six-digit hex color, such as #19161e.")
   .transform((value) => value.toLowerCase());
 export const workspaceBrandingSchema = z
   .object({
@@ -45,8 +45,8 @@ export const defaultWorkspaceSettings: WorkspaceSettings = {
   branding: {
     companyName: "",
     logoDataUrl: null,
-    primaryColor: "#163d27",
-    accentColor: "#c9f36b",
+    primaryColor: "#19161e",
+    accentColor: "#e1bdff",
     font: "modern",
     corners: "rounded",
   },

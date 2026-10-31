@@ -28,6 +28,12 @@ const mono = localFont({
   display: "swap",
   weight: "400",
 });
+const editorial = localFont({
+  src: "./fonts/inter-variable.woff2",
+  variable: "--font-editorial",
+  display: "swap",
+  weight: "100 900",
+});
 export const metadata: Metadata = {
   title: "Loom · Less chasing. More analysis.",
   description:
@@ -41,7 +47,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${body.variable} ${display.variable} ${mono.variable}`}
+      className={`${body.variable} ${display.variable} ${mono.variable} ${editorial.variable}`}
     >
       <body>{children}</body>
     </html>

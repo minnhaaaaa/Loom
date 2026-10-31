@@ -36,9 +36,11 @@ export async function accessRequest<T>(
 export function AccountAccess({
   onAuthenticated,
   initialMode = "login",
+  minimalPublic = false,
 }: {
   onAuthenticated: () => Promise<void>;
   initialMode?: "login" | "register";
+  minimalPublic?: boolean;
 }) {
   const id = useId();
   const [context, setContext] = useState<AccountContext | null>(null);
@@ -101,66 +103,77 @@ export function AccountAccess({
 
   return (
     <section className="account-access" aria-label="Account access">
-      <div className="account-access-intro">
-        <span className="brand-mark" aria-hidden="true">
-          L
-        </span>
-        <div>
-          <p className="eyebrow">Your analytics team, connected</p>
-          <h2>
-            {mode === "register"
-              ? "Give your data requests a home."
-              : "Welcome back to your company."}
-          </h2>
-          <p>
-            {mode === "register"
-              ? "Create your company’s analytics workspace, then invite your analysts and colleagues."
-              : "Use your own work account. Your company memberships determine the requests and knowledge you can access."}
-          </p>
+      {!minimalPublic && (
+        <div className="account-access-intro">
+          <span className="brand-mark" aria-hidden="true">
+            L
+          </span>
+          <div>
+            <p className="eyebrow">Your analytics team, connected</p>
+            <h2>
+              {mode === "register"
+                ? "Give your data requests a home."
+                : "Welcome back to your company."}
+            </h2>
+            <p>
+              {mode === "register"
+                ? "Create your company’s analytics workspace, then invite your analysts and colleagues."
+                : "Use your own work account. Your company memberships determine the requests and knowledge you can access."}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
       <div className="account-access-form">
-        <div
-          className="account-access-tabs"
-          role="tablist"
-          aria-label="Account options"
-        >
-          <button
-            type="button"
-            role="tab"
-            id={`${id}-login`}
-            aria-controls={`${id}-panel`}
-            aria-selected={mode === "login"}
-            disabled={busy}
-            onClick={() => {
-              setMode("login");
-              setError("");
-            }}
+        {!minimalPublic && (
+          <div
+            className="account-access-tabs"
+            role="tablist"
+            aria-label="Account options"
           >
-            Sign in
-          </button>
-          {context?.registrationEnabled && (
             <button
               type="button"
               role="tab"
-              id={`${id}-register`}
+              id={`${id}-login`}
               aria-controls={`${id}-panel`}
-              aria-selected={mode === "register"}
+              aria-selected={mode === "login"}
               disabled={busy}
               onClick={() => {
-                setMode("register");
+                setMode("login");
                 setError("");
               }}
             >
-              Create a company
+              Sign in
             </button>
-          )}
-        </div>
+            {context?.registrationEnabled && (
+              <button
+                type="button"
+                role="tab"
+                id={`${id}-register`}
+                aria-controls={`${id}-panel`}
+                aria-selected={mode === "register"}
+                disabled={busy}
+                onClick={() => {
+                  setMode("register");
+                  setError("");
+                }}
+              >
+                Create a company
+              </button>
+            )}
+          </div>
+        )}
         <form
           onSubmit={(event) => void authenticate(event)}
-          role="tabpanel"
+          role={minimalPublic ? undefined : "tabpanel"}
           id={`${id}-panel`}
-          aria-labelledby={`${id}-${mode}`}
+          aria-labelledby={minimalPublic ? undefined : `${id}-${mode}`}
+          aria-label={
+            minimalPublic
+              ? mode === "register"
+                ? "Company registration"
+                : "Company sign in"
+              : undefined
+          }
         >
           {mode === "register" && (
             <>
@@ -218,8 +231,9 @@ export function AccountAccess({
           </label>
           {mode === "register" && (
             <p className="hint">
-              Use at least 12 characters. You’ll be the company admin and can
-              invite analysts and requesters after registration.
+              {minimalPublic
+                ? "At least 12 characters. You’ll be the company admin."
+                : "Use at least 12 characters. You’ll be the company admin and can invite analysts and requesters after registration."}
             </p>
           )}
           {error && (

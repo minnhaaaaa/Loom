@@ -60,8 +60,8 @@ function readable(color: string, background: string, minimum = 4.5) {
 
 /** Fixed CSS roles only: no user-supplied CSS, fonts, or expressions are emitted. */
 export function brandTheme(branding: BrandThemeInput): Record<string, string> {
-  const primary = safeColor(branding.primaryColor, "#163d27");
-  const accent = safeColor(branding.accentColor, "#c9f36b");
+  const primary = safeColor(branding.primaryColor, "#19161e");
+  const accent = safeColor(branding.accentColor, "#e1bdff");
   const onPrimary = foreground(primary),
     onAccent = foreground(accent);
   const paper = mix(primary, white, 0.965);

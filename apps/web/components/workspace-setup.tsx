@@ -21,6 +21,7 @@ import { CompanyMark } from "./ui/civitas";
 
 const steps = ["Your company", "Look and feel", "Your agent", "Ready to work"];
 const palettes = [
+  { name: "Violet", primary: "#19161e", accent: "#e1bdff" },
   { name: "Forest", primary: "#163d27", accent: "#c9f36b" },
   { name: "Indigo", primary: "#3832a0", accent: "#d9c9ff" },
   { name: "Ocean", primary: "#064a76", accent: "#78e2df" },

@@ -41,7 +41,7 @@ test("company setup previews brand colors, typography and identity without savin
   ).toBeVisible();
   await expect(page.locator(".app-shell")).toHaveCSS(
     "--brand-primary",
-    "#163d27",
+    "#19161e",
   );
   await setup.getByRole("button", { name: "Continue", exact: true }).click();
   await setup.getByRole("button", { name: /Codex Bring the agent/ }).click();

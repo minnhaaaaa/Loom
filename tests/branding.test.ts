@@ -63,8 +63,8 @@ describe("company brand theme", () => {
       accentColor: "#fff",
       font: "__proto__",
     } as unknown as BrandThemeInput);
-    expect(invalid["--brand-primary"]).toBe("#163d27");
-    expect(invalid["--brand-accent"]).toBe("#c9f36b");
+    expect(invalid["--brand-primary"]).toBe("#19161e");
+    expect(invalid["--brand-accent"]).toBe("#e1bdff");
     expect(invalid["--brand-font-body"]).toBe("var(--font-body), sans-serif");
     expect(
       Object.values(invalid).every(
