@@ -44,6 +44,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@gsap/react':
+        specifier: ^2.1.2
+        version: 2.1.2(gsap@3.15.0)(react@19.3.1)
       '@loom/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
@@ -65,6 +68,9 @@ importers:
       csv-parse:
         specifier: ^7.0.3
         version: 7.0.3
+      gsap:
+        specifier: ^3.15.0
+        version: 3.15.0
       next:
         specifier: 16.4.2
         version: 16.4.2(@babel/core@7.29.7)(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -413,6 +419,12 @@ packages:
 
   '@exasol/exasol-driver-ts@0.8.1':
     resolution: {integrity: sha512-MGYwE5oz+z3fn92kcmXnQWU69EzZZqf0ecl3r/49q8AoHJRmAJUwpplMqo2zRF35Rxba5CJj5sfbzjuMgXUz+A==}
+
+  '@gsap/react@2.1.2':
+    resolution: {integrity: sha512-JqliybO1837UcgH2hVOM4VO+38APk3ECNrsuSM4MuXp+rbf+/2IG2K1YJiqfTcXQHH7XlA0m3ykniFYstfq0Iw==}
+    peerDependencies:
+      gsap: ^3.12.5
+      react: '>=17'
 
   '@hono/node-server@2.1.5':
     resolution: {integrity: sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q==}
@@ -1674,6 +1686,9 @@ packages:
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
+
+  gsap@3.15.0:
+    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
 
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
@@ -2989,6 +3004,11 @@ snapshots:
       generic-pool: 3.9.0
       node-forge: 1.4.0
       pako: 3.0.2
+
+  '@gsap/react@2.1.2(gsap@3.15.0)(react@19.3.1)':
+    dependencies:
+      gsap: 3.15.0
+      react: 19.3.1
 
   '@hono/node-server@2.1.5(hono@4.13.14)':
     dependencies:
@@ -4324,6 +4344,8 @@ snapshots:
       gopd: 1.2.0
 
   gopd@1.2.0: {}
+
+  gsap@3.15.0: {}
 
   has-bigints@1.1.0: {}
 

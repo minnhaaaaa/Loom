@@ -25,6 +25,7 @@ export function LoomSculpture() {
         { RenderPass },
         { UnrealBloomPass },
         { OutputPass },
+        { ShaderPass },
         { RoomEnvironment },
       ] = await Promise.all([
         import("three"),
@@ -32,6 +33,7 @@ export function LoomSculpture() {
         import("three/addons/postprocessing/RenderPass.js"),
         import("three/addons/postprocessing/UnrealBloomPass.js"),
         import("three/addons/postprocessing/OutputPass.js"),
+        import("three/addons/postprocessing/ShaderPass.js"),
         import("three/addons/environments/RoomEnvironment.js"),
       ]);
       if (disposed || !host) return;
@@ -42,7 +44,7 @@ export function LoomSculpture() {
       });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 0.95;
+      renderer.toneMappingExposure = 0.9;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.domElement.setAttribute("aria-hidden", "true");
       renderer.domElement.dataset.loomRenderer = "webgl";
@@ -53,7 +55,7 @@ export function LoomSculpture() {
       });
 
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color("#080e0d");
+      scene.background = new THREE.Color("#090909");
       const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 60);
       camera.position.set(7.7, 5.6, 10.3);
       camera.lookAt(0, 0, 0);
@@ -75,23 +77,23 @@ export function LoomSculpture() {
       scene.environment = environment.texture;
 
       const metal = new THREE.MeshStandardMaterial({
-        color: "#233b2e",
+        color: "#29282e",
         metalness: 0.86,
         roughness: 0.38,
-        envMapIntensity: 0.65,
+        envMapIntensity: 0.55,
       });
       const graphite = new THREE.MeshStandardMaterial({
-        color: "#17221d",
+        color: "#17161a",
         metalness: 0.74,
         roughness: 0.38,
       });
       const edge = new THREE.MeshStandardMaterial({
-        color: "#89967b",
+        color: "#89838f",
         metalness: 0.9,
         roughness: 0.23,
       });
       const glass = new THREE.MeshPhysicalMaterial({
-        color: "#bbd2bc",
+        color: "#d5c9e0",
         metalness: 0.15,
         roughness: 0.14,
         transparent: true,
@@ -99,32 +101,32 @@ export function LoomSculpture() {
         depthWrite: false,
         clearcoat: 1,
       });
-      const colors = ["#d8edaa", "#bce766", "#e7c58c", "#a6d4c1"];
+      const colors = ["#e1bdff", "#af50ff", "#d2b8ec", "#ffedd7"];
       const threadMaterials = colors.map(
         (color) =>
           new THREE.MeshStandardMaterial({
             color,
             emissive: color,
-            emissiveIntensity: 1.25,
+            emissiveIntensity: 0.95,
             metalness: 0.25,
             roughness: 0.35,
           }),
       );
       const weftMaterial = new THREE.MeshStandardMaterial({
-        color: "#bcd79c",
-        emissive: "#8dac67",
-        emissiveIntensity: 0.55,
+        color: "#cbb6dd",
+        emissive: "#b18bcf",
+        emissiveIntensity: 0.35,
         metalness: 0.35,
         roughness: 0.35,
       });
-      const pulseMaterial = new THREE.MeshBasicMaterial({ color: "#f2ffd2" });
-      const light = new THREE.DirectionalLight("#eef4dd", 2.2);
+      const pulseMaterial = new THREE.MeshBasicMaterial({ color: "#ffedd7" });
+      const light = new THREE.DirectionalLight("#ffedd7", 1.9);
       light.position.set(-3, 7, 4);
       scene.add(light);
-      const rim = new THREE.DirectionalLight("#c2f189", 1.7);
+      const rim = new THREE.DirectionalLight("#af50ff", 1.35);
       rim.position.set(3, 2, -5);
       scene.add(rim);
-      const fill = new THREE.DirectionalLight("#8aa8b1", 0.8);
+      const fill = new THREE.DirectionalLight("#b4afbf", 0.65);
       fill.position.set(1, -2, 5);
       scene.add(fill);
 
@@ -249,20 +251,23 @@ export function LoomSculpture() {
         const z = (index - 8) * 0.15;
         const startY = 0.9 * Math.sin(index * 1.8) + ((index % 3) - 1) * 0.25;
         const points = [
-          new THREE.Vector3(-5.35, startY, z * 1.75),
+          new THREE.Vector3(-3.9, startY, z * 1.55),
           new THREE.Vector3(
-            -3.9,
+            -2.9,
             startY * 0.75 + 0.28 * Math.cos(index),
-            z * 1.7,
+            z * 1.5,
           ),
-          new THREE.Vector3(-2.25, 0.2 + startY * 0.3, z * 1.18),
+          new THREE.Vector3(-1.85, 0.2 + startY * 0.3, z * 1.12),
           new THREE.Vector3(-1.05, 0.07, z),
         ];
         for (let step = 0; step <= 32; step++) {
-          const x = -0.8 + step * 0.175;
+          const x = -0.8 + step * 0.13;
           const wave =
-            x > 0.45 ? Math.sin((x - 0.45) * 15 + index * Math.PI) * 0.027 : 0;
-          const fall = x > 3.6 ? Math.pow(x - 3.6, 2) * 0.21 : 0;
+            x > 0.45
+              ? Math.sin((x - 0.45) * (Math.PI / 0.13) + index * Math.PI) *
+                0.027
+              : 0;
+          const fall = x > 2.6 ? Math.pow(x - 2.6, 2) * 0.21 : 0;
           points.push(new THREE.Vector3(x, 0.07 + wave - fall, z));
         }
         const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
@@ -287,9 +292,9 @@ export function LoomSculpture() {
         );
         guide.rotation.y = Math.PI / 2;
       }
-      for (let row = 0; row < 24; row++) {
-        const x = 0.6 + row * 0.175;
-        const fall = x > 3.6 ? Math.pow(x - 3.6, 2) * 0.21 : 0;
+      for (let row = 0; row < 21; row++) {
+        const x = 0.6 + row * 0.13;
+        const fall = x > 2.6 ? Math.pow(x - 2.6, 2) * 0.21 : 0;
         const points = Array.from({ length: 49 }, (_, index) => {
           const z = -1.2 + (index / 48) * 2.4;
           return new THREE.Vector3(
@@ -335,12 +340,51 @@ export function LoomSculpture() {
       composer.addPass(new RenderPass(scene, camera));
       const bloom = new UnrealBloomPass(
         new THREE.Vector2(1, 1),
-        0.18,
-        0.28,
-        1.25,
+        0.12,
+        0.25,
+        1.3,
       );
       composer.addPass(bloom);
       composer.addPass(new OutputPass());
+      // Match the CSS canvas after tone mapping and bloom, preserving the
+      // sculpture's highlights while preventing a visible black rectangle.
+      composer.addPass(
+        new ShaderPass({
+          uniforms: {
+            tDiffuse: { value: null },
+            blackLevel: { value: 9 / 255 },
+          },
+          vertexShader: `varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+          fragmentShader: `uniform sampler2D tDiffuse;
+          uniform float blackLevel;
+          varying vec2 vUv;
+          void main() {
+            gl_FragColor = texture2D(tDiffuse, vUv);
+            gl_FragColor.rgb = max(gl_FragColor.rgb, vec3(blackLevel));
+          }`,
+        }),
+      );
+
+      // Frame the complete sculpture, including both thread ends, at any aspect.
+      // A small margin also accommodates its subtle pointer-driven rotation.
+      const bounds = new THREE.Box3().setFromObject(sculpture);
+      const focalPoint = bounds.getCenter(new THREE.Vector3());
+      const viewDirection = new THREE.Vector3(7.7, 5.6, 10.3).normalize();
+      const cameraRight = new THREE.Vector3()
+        .crossVectors(new THREE.Vector3(0, 1, 0), viewDirection)
+        .normalize();
+      const cameraUp = new THREE.Vector3()
+        .crossVectors(viewDirection, cameraRight)
+        .normalize();
+      const framingPoints: import("three").Vector3[] = [];
+      for (const x of [bounds.min.x, bounds.max.x])
+        for (const y of [bounds.min.y, bounds.max.y])
+          for (const z of [bounds.min.z, bounds.max.z])
+            framingPoints.push(new THREE.Vector3(x, y, z).sub(focalPoint));
 
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
       let frameId = 0,
@@ -407,11 +451,25 @@ export function LoomSculpture() {
         renderer.setSize(width, height);
         composer.setSize(width, height);
         camera.aspect = width / height;
-        // Keep every loose thread inside the framing on a narrow viewport.
+        const verticalTangent = Math.tan(
+          THREE.MathUtils.degToRad(camera.fov / 2),
+        );
+        const horizontalTangent = verticalTangent * camera.aspect;
+        const distance =
+          Math.max(
+            ...framingPoints.map(
+              (point) =>
+                point.dot(viewDirection) +
+                Math.max(
+                  Math.abs(point.dot(cameraRight)) / horizontalTangent,
+                  Math.abs(point.dot(cameraUp)) / verticalTangent,
+                ),
+            ),
+          ) * 1.12;
         camera.position
-          .set(7.7, 5.6, 10.3)
-          .multiplyScalar(camera.aspect < 1.2 ? 1.25 : 1);
-        camera.lookAt(0, -0.1, 0);
+          .copy(focalPoint)
+          .addScaledVector(viewDirection, distance);
+        camera.lookAt(focalPoint);
         camera.updateProjectionMatrix();
         draw(performance.now(), false);
       }
@@ -508,7 +566,7 @@ export function LoomSculpture() {
   return (
     <figure
       className={`loom-sculpture ${ready ? "is-ready" : ""}`}
-      aria-label="An illuminated loom turns loose request threads into an orderly woven ribbon."
+      aria-label="A graphite loom with illuminated violet threads."
     >
       <div className="loom-sculpture-stage" ref={mountRef} />
       <svg
@@ -526,9 +584,9 @@ export function LoomSculpture() {
             y2="430"
             gradientUnits="userSpaceOnUse"
           >
-            <stop stopColor="#718771" />
-            <stop offset="0.42" stopColor="#293c32" />
-            <stop offset="1" stopColor="#0c1913" />
+            <stop stopColor="#827a8c" />
+            <stop offset="0.42" stopColor="#302b36" />
+            <stop offset="1" stopColor="#151317" />
           </linearGradient>
           <linearGradient
             id="loom-thread"
@@ -538,10 +596,10 @@ export function LoomSculpture() {
             y2="360"
             gradientUnits="userSpaceOnUse"
           >
-            <stop stopColor="#bce766" stopOpacity="0" />
-            <stop offset="0.25" stopColor="#d8edaa" />
-            <stop offset="0.8" stopColor="#d8edaa" />
-            <stop offset="1" stopColor="#d8edaa" stopOpacity="0" />
+            <stop stopColor="#af50ff" stopOpacity="0" />
+            <stop offset="0.25" stopColor="#af50ff" />
+            <stop offset="0.8" stopColor="#e1bdff" />
+            <stop offset="1" stopColor="#e1bdff" stopOpacity="0" />
           </linearGradient>
         </defs>
         <g transform="translate(0 10) rotate(-10 400 280)">
@@ -562,7 +620,7 @@ export function LoomSculpture() {
             <path
               key={i}
               d={`M${450 + i * 9} ${271 + i * 3} L${420 + i * 9} ${348 + i * 3}`}
-              stroke="#cee2a3"
+              stroke="#d2b8ec"
               strokeOpacity="0.5"
               strokeWidth="1.2"
             />
@@ -574,14 +632,11 @@ export function LoomSculpture() {
           />
           <path
             d="M295 145 L402 108 M454 192 L560 155 M289 357 L396 320 M450 410 L556 373"
-            stroke="#6d806a"
+            stroke="#827a8c"
             strokeWidth="7"
           />
         </g>
       </svg>
-      <figcaption className="loom-sculpture-caption">
-        <span className="loom-signal" /> Many loose ends. One clear thread.
-      </figcaption>
       {ready && (
         <button
           className="loom-motion-control"

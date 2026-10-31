@@ -7,11 +7,14 @@ test("landing explains the analytics workflow and opens the explicit sample desk
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Less chasing.More analysis.",
+    /DATA REQUESTS\.\s*ONE WORKSPACE\./,
   );
   await expect(
-    page.getByText("Built for small analytics teams", { exact: true }),
+    page.getByText("For small analytics teams", { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByText(/bring the loose ends together|many loose ends/i),
+  ).toHaveCount(0);
   await expect(
     page
       .getByRole("link", { name: "Create your company", exact: true })
@@ -24,9 +27,7 @@ test("landing explains the analytics workflow and opens the explicit sample desk
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByLabel("Email address", { exact: true })).toBeVisible();
   await page.goto("/");
-  await page
-    .getByRole("link", { name: "Explore the sample desk", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Explore sample", exact: true }).click();
   await expect(page).toHaveURL(/\/app\?demo=1$/);
   await expect(
     page.getByText("Read-only sample preview", { exact: true }),
@@ -38,6 +39,40 @@ test("landing explains the analytics workflow and opens the explicit sample desk
       exact: true,
     }),
   ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("scroll reveals remain usable after leaving and returning to the landing page", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await page.getByRole("link", { name: "Product", exact: true }).click();
+  await expect(page).toHaveURL(/\/#product$/);
+  const productHeading = page.getByRole("heading", { level: 2 });
+  await expect(productHeading).toHaveText(/REQUEST\.\s*ASSIGN\.\s*DELIVER\./);
+  await expect(productHeading).toBeVisible();
+  await expect(page.getByText("Weekly revenue", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Open the desk", exact: true }).click();
+  await expect(page).toHaveURL(/\/app\?demo=1$/);
+  await expect(
+    page.getByText("Read-only sample preview", { exact: true }),
+  ).toBeVisible();
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/#product$/);
+  await expect(productHeading).toBeVisible();
+  const start = page.getByRole("link", {
+    name: "Start with your team",
+    exact: true,
+  });
+  await start.scrollIntoViewIfNeeded();
+  await expect(start).toBeVisible();
+  await expect(start).toBeInViewport();
+  await start.click();
+  await expect(page).toHaveURL(/\/register$/);
+  await expect(page.getByLabel("Company name", { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -54,6 +89,28 @@ test("landing and company entry fit a phone with reduced motion", async ({
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
+    if (route === "/") {
+      for (const name of [
+        "Create your company",
+        "Explore sample",
+        "Open the desk",
+        "Start with your team",
+      ]) {
+        const link = page.getByRole("link", { name, exact: true });
+        await link.scrollIntoViewIfNeeded();
+        await expect(link).toBeVisible();
+        await expect(link).toBeInViewport();
+      }
+      await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
+      await expect(
+        page.getByText("Retention cohorts", { exact: true }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+    }
   }
 });
 
