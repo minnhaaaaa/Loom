@@ -32,6 +32,8 @@ This is a working prototype. Customer demand, reduced coordination time, and wil
 
 A company currently maps to one workspace and one shared request-family tool. Company-name selection alone grants no access. Domain discovery, verified-domain joining, and an organization hierarchy are not implemented.
 
+The workspace uses Cloudflare Kumo controls with text-only navigation: Requests, Assistant, Insights, Knowledge, and Settings. Company setup, people/access, and AI connections are grouped in Settings. The public page has one hero, a dark glass monolith, and bold Inter display typography (the supplied reference's Halyard substitute). Its skippable GSAP opening types LOOM, then the centered headline, before revealing the page. Sound is opt-in; reduced-motion visitors bypass the opening animation.
+
 ## Completed and pending features
 
 “Implemented” describes code and exercised system behavior; live provider quality and production readiness are separate gates. See [RUNBOOK.md](RUNBOOK.md) for dated verification results.

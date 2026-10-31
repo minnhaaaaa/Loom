@@ -26,7 +26,18 @@ async function post<T>(page: Page, path: string, values: object): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function openPeopleAccess(page: Page) {
+  const access = page.locator("#workspace-access");
+  await expect(access).toBeVisible();
+  if ((await access.getAttribute("open")) === null)
+    await access.locator(":scope > summary").click();
+  const controls = access.locator(".workspace-access");
+  await expect(controls).toBeVisible();
+  return controls;
+}
+
 async function openSharing(page: Page) {
+  await openPeopleAccess(page);
   const share = page.locator(".workspace-access-share");
   await expect(share).toBeVisible();
   if ((await share.getAttribute("open")) === null)
@@ -85,7 +96,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
         exact: true,
       })
       .click();
-    await expect(owner.locator(".workspace-access")).toBeVisible();
+    await openPeopleAccess(owner);
     const ownerAccount = await read<AccountContext>(owner, "/api/account");
     expect(ownerAccount.user?.name).toBe(ownerName);
     const primaryId = ownerAccount.currentWorkspaceId!;
@@ -142,7 +153,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
       }),
     ).toBeVisible();
     await colleague.goto("/app?view=settings");
-    await expect(colleague.locator(".workspace-access")).toBeVisible();
+    await openPeopleAccess(colleague);
     const colleagueAccount = await read<AccountContext>(
       colleague,
       "/api/account",
@@ -174,7 +185,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     await colleague.goto("/app?view=settings");
 
     const builder = owner.locator(".tool-builder");
-    await builder.getByText("Customize this desk", { exact: true }).click();
+    await builder.locator(":scope > summary").click();
     await builder
       .getByRole("button", { name: "IT requests", exact: true })
       .click();
@@ -214,7 +225,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
 
     const requestTitle = `Shared request ${suffix}`;
     await colleague
-      .getByRole("button", { name: "+ New request", exact: true })
+      .getByRole("button", { name: "New request", exact: true })
       .click();
     await fillIntake(colleague, published.spec, requestTitle);
     const createdResponse = colleague.waitForResponse(
@@ -350,7 +361,7 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
     await colleague.goto("/app?view=records");
     const otherName = `Separate workspace ${suffix}`;
     await owner.goto("/app?view=settings");
-    const workspaceControls = owner.locator(".workspace-access");
+    const workspaceControls = await openPeopleAccess(owner);
     await workspaceControls
       .locator(".workspace-access-create > summary")
       .click();
@@ -366,9 +377,15 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
       .getByRole("button", { name: "Create workspace", exact: true })
       .click();
     expect((await workspaceResponse).ok()).toBe(true);
+    // Switching workspaces remounts Settings with its access section closed.
     await expect(
-      owner.getByRole("combobox", { name: "Current workspace", exact: true }),
+      owner.getByRole("combobox", {
+        name: "Current workspace",
+        exact: true,
+        includeHidden: true,
+      }),
     ).not.toHaveValue(primaryId);
+    await openPeopleAccess(owner);
     const changedAccount = await read<AccountContext>(owner, "/api/account");
     const otherWorkspace = changedAccount.workspaces.find(
       (workspace) => workspace.id === changedAccount.currentWorkspaceId,
@@ -431,12 +448,24 @@ test("separate colleague accounts share a published tool, resolve concurrent edi
 
     // A durable link returns the authorized owner to the intended workspace.
     await owner.goto(`/w/${primaryId}`);
-    await expect(owner.locator(".current-tool-label")).toContainText(toolTitle);
+    await expect(owner).toHaveURL(`${origin}/app`);
+    expect(
+      (await read<AccountContext>(owner, "/api/account")).currentWorkspaceId,
+    ).toBe(primaryId);
+    // The dashboard keeps the last view; open Requests to verify this tool.
+    await owner
+      .getByRole("navigation", { name: "Main", exact: true })
+      .getByRole("link", { name: "Requests", exact: true })
+      .click();
+    await expect(owner.getByRole("heading", { level: 1 })).toHaveText(
+      toolTitle,
+    );
+    await owner.goto("/app?view=settings");
+    await openPeopleAccess(owner);
     await expect(
       owner.getByRole("combobox", { name: "Current workspace", exact: true }),
     ).toHaveValue(primaryId);
 
-    await owner.goto("/app?view=settings");
     share = await openSharing(owner);
     await share
       .getByRole("combobox", { name: `Role for ${colleagueName}`, exact: true })

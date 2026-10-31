@@ -2,11 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** A procedural loom. No remote models, textures, or tracking requests. */
-export function LoomSculpture() {
+/** A studio-lit glass monolith, generated locally without external assets. */
+export function LoomSculpture({
+  onReady,
+  active = true,
+}: {
+  onReady?: () => void;
+  active?: boolean;
+}) {
   const mountRef = useRef<HTMLDivElement>(null);
   const controlRef = useRef<((paused: boolean) => void) | null>(null);
+  const readyCallback = useRef(onReady);
+  const readyReported = useRef(false);
+  const activeRef = useRef(active);
+  const syncRef = useRef<(() => void) | null>(null);
   const [ready, setReady] = useState(false);
+  useEffect(() => {
+    readyCallback.current = onReady;
+  }, [onReady]);
+  useEffect(() => {
+    activeRef.current = active;
+    syncRef.current?.();
+  }, [active]);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
@@ -14,6 +31,11 @@ export function LoomSculpture() {
     if (!host) return;
     let disposed = false;
     const cleanup: Array<() => void> = [];
+    const reportReady = () => {
+      if (disposed || readyReported.current) return;
+      readyReported.current = true;
+      readyCallback.current?.();
+    };
     const release = () => {
       for (const dispose of cleanup.splice(0).reverse()) dispose();
     };
@@ -23,18 +45,16 @@ export function LoomSculpture() {
         THREE,
         { EffectComposer },
         { RenderPass },
-        { UnrealBloomPass },
         { OutputPass },
         { ShaderPass },
-        { RoomEnvironment },
+        { RoundedBoxGeometry },
       ] = await Promise.all([
         import("three"),
         import("three/addons/postprocessing/EffectComposer.js"),
         import("three/addons/postprocessing/RenderPass.js"),
-        import("three/addons/postprocessing/UnrealBloomPass.js"),
         import("three/addons/postprocessing/OutputPass.js"),
         import("three/addons/postprocessing/ShaderPass.js"),
-        import("three/addons/environments/RoomEnvironment.js"),
+        import("three/addons/geometries/RoundedBoxGeometry.js"),
       ]);
       if (disposed || !host) return;
       const renderer = new THREE.WebGLRenderer({
@@ -60,15 +80,44 @@ export function LoomSculpture() {
       camera.position.set(7.7, 5.6, 10.3);
       camera.lookAt(0, 0, 0);
       const sculpture = new THREE.Group();
-      sculpture.rotation.y = -0.12;
+      sculpture.rotation.set(0.07, -0.35, -0.035);
       scene.add(sculpture);
       function makeEnvironment() {
         const generator = new THREE.PMREMGenerator(renderer);
-        const room = new RoomEnvironment();
+        const studio = new THREE.Scene();
+        studio.background = new THREE.Color("#08070b");
+        const panels: import("three").Mesh[] = [];
+        function softbox(
+          width: number,
+          height: number,
+          color: string,
+          intensity: number,
+          position: [number, number, number],
+        ) {
+          const panel = new THREE.Mesh(
+            new THREE.PlaneGeometry(width, height),
+            new THREE.MeshBasicMaterial({
+              color: new THREE.Color(color).multiplyScalar(intensity),
+            }),
+          );
+          panel.position.set(...position);
+          panel.lookAt(0, 0, 0);
+          studio.add(panel);
+          panels.push(panel);
+        }
+        // Broad studio cards form clean reflections across the glass face and
+        // rounded edges. They are environment-only, never visible in the scene.
+        softbox(2.7, 6.5, "#f4ebff", 4.2, [-4, 2.5, 5]);
+        softbox(2.6, 7, "#aa65ed", 0.65, [4, 0.5, -5]);
+        softbox(5, 1.6, "#e7dcf5", 2.8, [0, 5, 1]);
+        softbox(3.5, 5, "#645779", 0.9, [3, -1, 5]);
         try {
-          return generator.fromScene(room, 0.04);
+          return generator.fromScene(studio, 0.035, 0.1, 30);
         } finally {
-          room.dispose();
+          for (const panel of panels) {
+            panel.geometry.dispose();
+            (panel.material as import("three").Material).dispose();
+          }
           generator.dispose();
         }
       }
@@ -76,277 +125,46 @@ export function LoomSculpture() {
       cleanup.push(() => environment.dispose());
       scene.environment = environment.texture;
 
-      const metal = new THREE.MeshStandardMaterial({
-        color: "#29282e",
-        metalness: 0.86,
-        roughness: 0.38,
-        envMapIntensity: 0.55,
-      });
-      const graphite = new THREE.MeshStandardMaterial({
-        color: "#17161a",
-        metalness: 0.74,
-        roughness: 0.38,
-      });
-      const edge = new THREE.MeshStandardMaterial({
-        color: "#89838f",
-        metalness: 0.9,
-        roughness: 0.23,
-      });
       const glass = new THREE.MeshPhysicalMaterial({
-        color: "#d5c9e0",
-        metalness: 0.15,
-        roughness: 0.14,
-        transparent: true,
-        opacity: 0.42,
-        depthWrite: false,
+        color: "#51495e",
+        metalness: 0,
+        roughness: 0.13,
+        transmission: 0.72,
+        thickness: 0.9,
+        ior: 1.52,
+        attenuationColor: new THREE.Color("#43314f"),
+        attenuationDistance: 0.65,
         clearcoat: 1,
+        clearcoatRoughness: 0.08,
+        envMapIntensity: 1.1,
+        specularIntensity: 1,
       });
-      const colors = ["#e1bdff", "#af50ff", "#d2b8ec", "#ffedd7"];
-      const threadMaterials = colors.map(
-        (color) =>
-          new THREE.MeshStandardMaterial({
-            color,
-            emissive: color,
-            emissiveIntensity: 0.95,
-            metalness: 0.25,
-            roughness: 0.35,
-          }),
-      );
-      const weftMaterial = new THREE.MeshStandardMaterial({
-        color: "#cbb6dd",
-        emissive: "#b18bcf",
-        emissiveIntensity: 0.35,
-        metalness: 0.35,
-        roughness: 0.35,
-      });
-      const pulseMaterial = new THREE.MeshBasicMaterial({ color: "#ffedd7" });
-      const light = new THREE.DirectionalLight("#ffedd7", 1.9);
-      light.position.set(-3, 7, 4);
-      scene.add(light);
-      const rim = new THREE.DirectionalLight("#af50ff", 1.35);
-      rim.position.set(3, 2, -5);
-      scene.add(rim);
-      const fill = new THREE.DirectionalLight("#b4afbf", 0.65);
-      fill.position.set(1, -2, 5);
-      scene.add(fill);
-
+      const geometry = new RoundedBoxGeometry(1.9, 3.6, 0.9, 6, 0.16);
+      const monolith = new THREE.Mesh(geometry, glass);
+      sculpture.add(monolith);
       cleanup.push(() => {
-        [
-          metal,
-          graphite,
-          edge,
-          glass,
-          weftMaterial,
-          pulseMaterial,
-          ...threadMaterials,
-        ].forEach((material) => material.dispose());
+        geometry.dispose();
+        glass.dispose();
       });
-      const allGeometries = new Set<import("three").BufferGeometry>();
-      cleanup.push(() =>
-        allGeometries.forEach((geometry) => geometry.dispose()),
-      );
-      function addMesh(
-        geometry: import("three").BufferGeometry,
-        material: import("three").Material,
-        x = 0,
-        y = 0,
-        z = 0,
-      ) {
-        allGeometries.add(geometry);
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(x, y, z);
-        sculpture.add(mesh);
-        return mesh;
-      }
-      function roundedPath(
-        shape: import("three").Shape | import("three").Path,
-        width: number,
-        height: number,
-        radius: number,
-      ) {
-        const left = -width / 2,
-          bottom = -height / 2;
-        shape.moveTo(left + radius, bottom);
-        shape.lineTo(left + width - radius, bottom);
-        shape.quadraticCurveTo(
-          left + width,
-          bottom,
-          left + width,
-          bottom + radius,
-        );
-        shape.lineTo(left + width, bottom + height - radius);
-        shape.quadraticCurveTo(
-          left + width,
-          bottom + height,
-          left + width - radius,
-          bottom + height,
-        );
-        shape.lineTo(left + radius, bottom + height);
-        shape.quadraticCurveTo(
-          left,
-          bottom + height,
-          left,
-          bottom + height - radius,
-        );
-        shape.lineTo(left, bottom + radius);
-        shape.quadraticCurveTo(left, bottom, left + radius, bottom);
-      }
-      const arch = new THREE.Shape();
-      roundedPath(arch, 3.5, 2.8, 0.48);
-      const hole = new THREE.Path();
-      roundedPath(hole, 2.96, 2.28, 0.31);
-      arch.holes.push(hole);
-      const archGeometry = new THREE.ExtrudeGeometry(arch, {
-        depth: 0.2,
-        bevelEnabled: true,
-        bevelThickness: 0.065,
-        bevelSize: 0.065,
-        bevelSegments: 3,
-        curveSegments: 10,
-      });
-      archGeometry.center();
-      for (const x of [-0.95, 1.0]) {
-        const frame = addMesh(archGeometry, metal, x, 0, 0);
-        frame.rotation.y = Math.PI / 2;
-      }
-      for (const z of [-1.64, 1.64]) {
-        for (const y of [-1.23, 1.23]) {
-          const rail = addMesh(
-            new THREE.CylinderGeometry(0.07, 0.07, 1.94, 12),
-            edge,
-            0.025,
-            y,
-            z,
-          );
-          rail.rotation.z = Math.PI / 2;
-        }
-        for (const x of [-0.95, 1]) {
-          addMesh(new THREE.BoxGeometry(0.5, 0.14, 0.46), graphite, x, -1.5, z);
-        }
-      }
-      for (const x of [-1.05, 1.1]) {
-        const roller = addMesh(
-          new THREE.CylinderGeometry(0.2, 0.2, 3.05, 36),
-          graphite,
-          x,
-          -0.16,
-          0,
-        );
-        roller.rotation.x = Math.PI / 2;
-        for (const z of [-1.49, 1.49]) {
-          const cap = addMesh(
-            new THREE.CylinderGeometry(0.24, 0.24, 0.12, 32),
-            edge,
-            x,
-            -0.16,
-            z,
-          );
-          cap.rotation.x = Math.PI / 2;
-        }
-      }
-      // Individually routed warp threads meet the guide, then form a regular weave.
-      const curves: import("three").CatmullRomCurve3[] = [];
-      const pulses: import("three").Mesh[] = [];
-      for (let index = 0; index < 17; index++) {
-        const z = (index - 8) * 0.15;
-        const startY = 0.9 * Math.sin(index * 1.8) + ((index % 3) - 1) * 0.25;
-        const points = [
-          new THREE.Vector3(-3.9, startY, z * 1.55),
-          new THREE.Vector3(
-            -2.9,
-            startY * 0.75 + 0.28 * Math.cos(index),
-            z * 1.5,
-          ),
-          new THREE.Vector3(-1.85, 0.2 + startY * 0.3, z * 1.12),
-          new THREE.Vector3(-1.05, 0.07, z),
-        ];
-        for (let step = 0; step <= 32; step++) {
-          const x = -0.8 + step * 0.13;
-          const wave =
-            x > 0.45
-              ? Math.sin((x - 0.45) * (Math.PI / 0.13) + index * Math.PI) *
-                0.027
-              : 0;
-          const fall = x > 2.6 ? Math.pow(x - 2.6, 2) * 0.21 : 0;
-          points.push(new THREE.Vector3(x, 0.07 + wave - fall, z));
-        }
-        const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
-        curves.push(curve);
-        addMesh(
-          new THREE.TubeGeometry(curve, 160, 0.015, 5, false),
-          threadMaterials[index % colors.length],
-        );
-        if (index % 3 === 0) {
-          const pulse = addMesh(
-            new THREE.SphereGeometry(0.032, 8, 6),
-            pulseMaterial,
-          );
-          pulses.push(pulse);
-        }
-        const guide = addMesh(
-          new THREE.TorusGeometry(0.1, 0.025, 8, 16),
-          glass,
-          -0.65,
-          0.07,
-          z,
-        );
-        guide.rotation.y = Math.PI / 2;
-      }
-      for (let row = 0; row < 21; row++) {
-        const x = 0.6 + row * 0.13;
-        const fall = x > 2.6 ? Math.pow(x - 2.6, 2) * 0.21 : 0;
-        const points = Array.from({ length: 49 }, (_, index) => {
-          const z = -1.2 + (index / 48) * 2.4;
-          return new THREE.Vector3(
-            x,
-            0.07 +
-              Math.sin(((z + 1.2) / 0.15) * Math.PI + row * Math.PI) * 0.027 -
-              fall,
-            z,
-          );
-        });
-        addMesh(
-          new THREE.TubeGeometry(
-            new THREE.CatmullRomCurve3(points),
-            96,
-            0.009,
-            4,
-            false,
-          ),
-          weftMaterial,
-        );
-      }
-      const shuttle = addMesh(
-        new THREE.CapsuleGeometry(0.07, 0.5, 4, 12),
-        edge,
-        0.45,
-        0.2,
-        0,
-      );
-      shuttle.rotation.z = Math.PI / 2;
-      const shuttleLight = addMesh(
-        new THREE.SphereGeometry(0.045, 10, 8),
-        threadMaterials[1],
-        0.45,
-        0.3,
-        0,
-      );
+      const key = new THREE.DirectionalLight("#eee4fa", 1.4);
+      key.position.set(-3, 5, 5);
+      scene.add(key);
+      const rim = new THREE.DirectionalLight("#b777f4", 2.2);
+      rim.position.set(4, 1, -3);
+      scene.add(rim);
 
-      const composer = new EffectComposer(renderer);
+      const renderTarget = new THREE.WebGLRenderTarget(1, 1, {
+        samples: 4,
+        type: THREE.HalfFloatType,
+      });
+      const composer = new EffectComposer(renderer, renderTarget);
       cleanup.push(() => {
         composer.passes.forEach((pass) => pass.dispose());
         composer.dispose();
       });
       composer.addPass(new RenderPass(scene, camera));
-      const bloom = new UnrealBloomPass(
-        new THREE.Vector2(1, 1),
-        0.12,
-        0.25,
-        1.3,
-      );
-      composer.addPass(bloom);
       composer.addPass(new OutputPass());
-      // Match the CSS canvas after tone mapping and bloom, preserving the
+      // Match the CSS canvas after tone mapping, preserving the
       // sculpture's highlights while preventing a visible black rectangle.
       composer.addPass(
         new ShaderPass({
@@ -369,11 +187,10 @@ export function LoomSculpture() {
         }),
       );
 
-      // Frame the complete sculpture, including both thread ends, at any aspect.
-      // A small margin also accommodates its subtle pointer-driven rotation.
+      // Keep the whole slab and its gentle float inside a generous studio crop.
       const bounds = new THREE.Box3().setFromObject(sculpture);
       const focalPoint = bounds.getCenter(new THREE.Vector3());
-      const viewDirection = new THREE.Vector3(7.7, 5.6, 10.3).normalize();
+      const viewDirection = new THREE.Vector3(0, 0.25, 9).normalize();
       const cameraRight = new THREE.Vector3()
         .crossVectors(new THREE.Vector3(0, 1, 0), viewDirection)
         .normalize();
@@ -395,9 +212,9 @@ export function LoomSculpture() {
         lastTime = 0;
       let pointerX = 0,
         pointerY = 0;
-      const pulsePoint = new THREE.Vector3();
       const canAnimate = () =>
         !disposed &&
+        activeRef.current &&
         !lost &&
         visible &&
         !document.hidden &&
@@ -409,27 +226,20 @@ export function LoomSculpture() {
           elapsed += lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
           lastTime = time;
           sculpture.rotation.y +=
-            (-0.12 + pointerX * 0.08 - sculpture.rotation.y) * 0.035;
+            (-0.35 +
+              pointerX * 0.06 +
+              Math.sin(elapsed * 0.22) * 0.055 -
+              sculpture.rotation.y) *
+            0.035;
           sculpture.rotation.x +=
-            (pointerY * 0.04 - sculpture.rotation.x) * 0.035;
+            (0.07 + pointerY * 0.035 - sculpture.rotation.x) * 0.035;
+          sculpture.position.y = Math.sin(elapsed * 0.55) * 0.035;
         }
-        // Hold briefly at the review guide before continuing through the loom.
-        const cycle = (elapsed % 12) / 12;
-        const progress =
-          cycle < 0.37
-            ? cycle
-            : cycle < 0.48
-              ? 0.37
-              : 0.37 + (cycle - 0.48) * (0.63 / 0.52);
-        pulses.forEach((pulse, index) => {
-          const t = (progress + index * 0.13) % 1;
-          curves[index * 3].getPointAt(t, pulsePoint);
-          pulse.position.copy(pulsePoint);
-          pulse.scale.setScalar(0.85 + Math.sin(t * Math.PI) * 0.5);
-        });
-        shuttle.position.z = Math.sin(elapsed * 0.75) * 1.2;
-        shuttleLight.position.z = shuttle.position.z;
         composer.render();
+        if (!readyReported.current) {
+          setReady(true);
+          reportReady();
+        }
       }
       function frame(time: number) {
         frameId = 0;
@@ -465,7 +275,7 @@ export function LoomSculpture() {
                   Math.abs(point.dot(cameraUp)) / verticalTangent,
                 ),
             ),
-          ) * 1.12;
+          ) * 1.28;
         camera.position
           .copy(focalPoint)
           .addScaledVector(viewDirection, distance);
@@ -499,6 +309,7 @@ export function LoomSculpture() {
         if (frameId) cancelAnimationFrame(frameId);
         frameId = 0;
         setReady(false);
+        reportReady();
       };
       const contextRestored = () => {
         if (disposed) return;
@@ -517,6 +328,7 @@ export function LoomSculpture() {
           setReady(false);
         }
       };
+      syncRef.current = syncAnimation;
       controlRef.current = (value) => {
         userPaused = value;
         syncAnimation();
@@ -547,15 +359,18 @@ export function LoomSculpture() {
         document.removeEventListener("visibilitychange", syncAnimation);
         reduced.removeEventListener("change", syncAnimation);
         controlRef.current = null;
+        syncRef.current = null;
       });
       resize();
       syncAnimation();
-      setReady(true);
     }
     void createScene().catch(() => {
       // The static illustration preserves the meaning on devices without WebGL.
       release();
-      if (!disposed) setReady(false);
+      if (!disposed) {
+        setReady(false);
+        reportReady();
+      }
     });
     return () => {
       disposed = true;
@@ -566,7 +381,7 @@ export function LoomSculpture() {
   return (
     <figure
       className={`loom-sculpture ${ready ? "is-ready" : ""}`}
-      aria-label="A graphite loom with illuminated violet threads."
+      aria-label="A dark glass monolith with softly illuminated violet edges."
     >
       <div className="loom-sculpture-stage" ref={mountRef} />
       <svg
@@ -577,63 +392,63 @@ export function LoomSculpture() {
       >
         <defs>
           <linearGradient
-            id="loom-metal"
-            x1="240"
-            y1="140"
-            x2="550"
-            y2="430"
+            id="loom-glass-face"
+            x1="300"
+            y1="120"
+            x2="480"
+            y2="440"
             gradientUnits="userSpaceOnUse"
           >
-            <stop stopColor="#827a8c" />
-            <stop offset="0.42" stopColor="#302b36" />
-            <stop offset="1" stopColor="#151317" />
+            <stop stopColor="#71667d" />
+            <stop offset="0.2" stopColor="#26212e" />
+            <stop offset="0.7" stopColor="#141119" />
+            <stop offset="1" stopColor="#352440" />
           </linearGradient>
           <linearGradient
-            id="loom-thread"
-            x1="40"
-            y1="220"
-            x2="730"
-            y2="360"
+            id="loom-glass-edge"
+            x1="470"
+            y1="120"
+            x2="500"
+            y2="440"
             gradientUnits="userSpaceOnUse"
           >
-            <stop stopColor="#af50ff" stopOpacity="0" />
-            <stop offset="0.25" stopColor="#af50ff" />
-            <stop offset="0.8" stopColor="#e1bdff" />
-            <stop offset="1" stopColor="#e1bdff" stopOpacity="0" />
+            <stop stopColor="#b99acd" />
+            <stop offset="0.4" stopColor="#503367" />
+            <stop offset="0.82" stopColor="#a268cb" />
+            <stop offset="1" stopColor="#3c274d" />
+          </linearGradient>
+          <linearGradient
+            id="loom-glass-reflection"
+            x1="335"
+            y1="100"
+            x2="410"
+            y2="300"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#f4e8ff" stopOpacity="0.45" />
+            <stop offset="1" stopColor="#f4e8ff" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <g transform="translate(0 10) rotate(-10 400 280)">
+        <g transform="rotate(-2 400 280)">
           <path
-            d="M280 155 Q280 130 305 138 L445 180 Q465 186 465 208 L465 401 Q465 425 440 417 L301 376 Q280 370 280 345Z"
-            stroke="url(#loom-metal)"
-            strokeWidth="27"
-          />
-          {Array.from({ length: 17 }, (_, i) => (
-            <path
-              key={i}
-              d={`M20 ${125 + i * 18} C150 ${70 + i * 19}, 195 ${245 + i * 3}, 300 ${235 + i * 5} L700 ${330 + i * 5}`}
-              stroke="url(#loom-thread)"
-              strokeWidth="1.8"
-            />
-          ))}
-          {Array.from({ length: 25 }, (_, i) => (
-            <path
-              key={i}
-              d={`M${450 + i * 9} ${271 + i * 3} L${420 + i * 9} ${348 + i * 3}`}
-              stroke="#d2b8ec"
-              strokeOpacity="0.5"
-              strokeWidth="1.2"
-            />
-          ))}
-          <path
-            d="M385 118 Q385 94 410 101 L550 143 Q570 149 570 171 L570 364 Q570 388 545 380 L406 339 Q385 333 385 308Z"
-            stroke="url(#loom-metal)"
-            strokeWidth="24"
+            d="M324 105 473 119Q487 121 488 137L489 432Q488 447 475 450L447 456 323 422Q312 419 312 405V121Q312 105 324 105Z"
+            fill="url(#loom-glass-edge)"
           />
           <path
-            d="M295 145 L402 108 M454 192 L560 155 M289 357 L396 320 M450 410 L556 373"
-            stroke="#827a8c"
-            strokeWidth="7"
+            d="M324 105 450 133Q460 135 460 149V440Q460 455 447 453L323 422Q312 419 312 405V121Q312 105 324 105Z"
+            fill="url(#loom-glass-face)"
+            stroke="#8d779d"
+            strokeWidth="0.8"
+          />
+          <path
+            d="M326 112 386 125 386 427 325 413Q319 411 319 401V123Q319 111 326 112Z"
+            fill="url(#loom-glass-reflection)"
+          />
+          <path
+            d="M470 129 478 132Q482 134 482 142V430Q482 438 475 440"
+            stroke="#cb9ced"
+            strokeWidth="1"
+            strokeOpacity="0.6"
           />
         </g>
       </svg>

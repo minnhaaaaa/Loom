@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { LoomSculpture } from "./loom-sculpture";
+import { LandingIntro, type IntroPhase } from "./landing-intro";
 
 if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -23,8 +24,13 @@ function Arrow({ diagonal = false }: { diagonal?: boolean }) {
 
 export function LandingPage() {
   const root = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<IntroPhase>("loading");
+  const [sceneReady, setSceneReady] = useState(false);
+  const markSceneReady = useCallback(() => setSceneReady(true), []);
+  const introComplete = phase === "complete";
   useGSAP(
     () => {
+      if (!introComplete) return;
       const media = gsap.matchMedia();
       let active = true;
       media.add(
@@ -51,30 +57,6 @@ export function LandingPage() {
               scrub: 0.8,
             },
           });
-          gsap.from(".loom-product-reveal", {
-            autoAlpha: 0,
-            y: 32,
-            duration: 0.9,
-            stagger: 0.12,
-            ease: "power2.out",
-            scrollTrigger: {
-              trigger: ".loom-product",
-              start: "top 78%",
-              once: true,
-            },
-          });
-          gsap.from(".loom-example-row", {
-            autoAlpha: 0,
-            x: 18,
-            duration: 0.7,
-            stagger: 0.12,
-            ease: "power2.out",
-            scrollTrigger: {
-              trigger: ".loom-product-example",
-              start: "top 82%",
-              once: true,
-            },
-          });
         },
         root,
       );
@@ -86,120 +68,88 @@ export function LandingPage() {
         media.revert();
       };
     },
-    { scope: root },
+    { scope: root, dependencies: [introComplete], revertOnUpdate: true },
   );
 
   return (
-    <div className="loom-landing" ref={root}>
-      <a className="loom-skip" href="#loom-main">
-        Skip to content
-      </a>
-      <header className="loom-nav">
-        <Link href="/" className="loom-wordmark" aria-label="Loom home">
-          LOOM
-        </Link>
-        <nav className="loom-nav-links" aria-label="Main navigation">
-          <Link href="/#product" className="loom-product-link">
-            Product
-          </Link>
-          <Link href="/login">Sign in</Link>
-          <Link href="/register" className="loom-nav-action">
-            Get started <Arrow diagonal />
-          </Link>
-        </nav>
-      </header>
-
-      <main id="loom-main">
-        <section className="loom-hero" aria-labelledby="loom-hero-title">
-          <div className="loom-hero-title">
-            <p className="loom-label">For small analytics teams</p>
-            <h1 id="loom-hero-title">
-              DATA REQUESTS.
-              <br />
-              ONE WORKSPACE.
-            </h1>
-          </div>
-          <div className="loom-hero-art">
-            <LoomSculpture />
-          </div>
-          <div className="loom-hero-actions">
-            <Link href="/register" className="loom-button">
-              Create your company <Arrow diagonal />
-            </Link>
-            <Link href="/app?demo=1" className="loom-text-link">
-              Explore sample <Arrow diagonal />
-            </Link>
-          </div>
-        </section>
-
-        <section
-          className="loom-product"
-          id="product"
-          aria-labelledby="loom-product-title"
-        >
-          <div className="loom-product-copy loom-product-reveal">
-            <h2 id="loom-product-title">
-              REQUEST.
-              <br />
-              ASSIGN.
-              <br />
-              DELIVER.
-            </h2>
-            <p>
-              Clear ownership.
-              <br />
-              Shared context.
-              <br />
-              Progress you can see.
-            </p>
-            <Link href="/app?demo=1" className="loom-text-link">
-              Open the desk <Arrow diagonal />
-            </Link>
-          </div>
-          <div
-            className="loom-product-example loom-product-reveal"
-            aria-label="Illustrative request workspace"
-          >
-            <div className="loom-example-header">
-              <span>Requests</span>
-              <span>Sample data</span>
-            </div>
-            <div className="loom-example-row">
-              <span>Weekly revenue</span>
-              <span className="loom-request-state">In progress</span>
-            </div>
-            <div className="loom-example-row">
-              <span>Campaign performance</span>
-              <span className="loom-request-state">Ready</span>
-            </div>
-            <div className="loom-example-row">
-              <span>Retention cohorts</span>
-              <span className="loom-request-state">Needs context</span>
-            </div>
-            <p className="loom-exasol-credit">
-              Workflow insights, powered by Exasol.
-            </p>
-          </div>
-          <div className="loom-product-action loom-product-reveal">
-            <Link href="/register" className="loom-text-link">
-              Start with your team <Arrow diagonal />
-            </Link>
-          </div>
-        </section>
-      </main>
-
-      <footer className="loom-footer">
-        <Link href="/" aria-label="Loom home">
-          LOOM
-        </Link>
-        <a
-          href="https://github.com/minnhaaaaa/Loom"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Open source <Arrow diagonal />
+    <div className="loom-landing" ref={root} data-intro-phase={phase}>
+      <LandingIntro
+        root={root}
+        sceneReady={sceneReady}
+        phase={phase}
+        onPhaseChange={setPhase}
+      />
+      <noscript>
+        <style>{`.loom-intro{display:none!important}.loom-landing .loom-site,.loom-landing .loom-hero-title,.loom-landing .loom-headline-letter,.loom-landing [data-entrance]{visibility:visible!important;opacity:1!important}`}</style>
+      </noscript>
+      <div className="loom-site">
+        <a className="loom-skip" href="#loom-main">
+          Skip to content
         </a>
-      </footer>
+        <header className="loom-nav" data-entrance>
+          <Link href="/" className="loom-wordmark" aria-label="Loom home">
+            LOOM
+          </Link>
+          <nav className="loom-nav-links" aria-label="Main navigation">
+            <Link href="/login">Sign in</Link>
+            <Link href="/register" className="loom-nav-action">
+              Get started <Arrow diagonal />
+            </Link>
+          </nav>
+        </header>
+
+        <main id="loom-main" tabIndex={-1}>
+          <section className="loom-hero" aria-labelledby="loom-hero-title">
+            <div className="loom-hero-title">
+              <p className="loom-label" data-entrance>
+                For small analytics teams
+              </p>
+              <h1
+                id="loom-hero-title"
+                aria-label="Data requests. One workspace."
+              >
+                {["DATA REQUESTS.", "ONE WORKSPACE."].map((line) => (
+                  <span
+                    className="loom-headline-line"
+                    aria-hidden="true"
+                    key={line}
+                  >
+                    {Array.from(line).map((letter, index) => (
+                      <span className="loom-headline-letter" key={index}>
+                        {letter}
+                      </span>
+                    ))}
+                  </span>
+                ))}
+              </h1>
+            </div>
+            <div className="loom-hero-art" data-entrance>
+              <LoomSculpture onReady={markSceneReady} active={introComplete} />
+            </div>
+            <div className="loom-hero-actions" data-entrance>
+              <Link href="/register" className="loom-button">
+                Create your company <Arrow diagonal />
+              </Link>
+              <Link href="/app?demo=1" className="loom-text-link">
+                Explore sample <Arrow diagonal />
+              </Link>
+            </div>
+          </section>
+        </main>
+
+        <footer className="loom-footer" data-entrance>
+          <Link href="/" aria-label="Loom home">
+            LOOM
+          </Link>
+          <a
+            href="https://github.com/minnhaaaaa/Loom"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open source <Arrow diagonal />
+          </a>
+        </footer>
+      </div>
     </div>
   );
 }

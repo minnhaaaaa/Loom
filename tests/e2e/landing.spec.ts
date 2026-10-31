@@ -1,11 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function openLanding(page: Page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Skip intro", exact: true }).click();
+  await expect(page.locator(".loom-landing")).toHaveAttribute(
+    "data-intro-phase",
+    "complete",
+  );
+}
 
 test("landing explains the analytics workflow and opens the explicit sample desk", async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await openLanding(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     /DATA REQUESTS\.\s*ONE WORKSPACE\./,
   );
@@ -26,13 +35,13 @@ test("landing explains the analytics workflow and opens the explicit sample desk
     .click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByLabel("Email address", { exact: true })).toBeVisible();
-  await page.goto("/");
+  await openLanding(page);
   await page.getByRole("link", { name: "Explore sample", exact: true }).click();
   await expect(page).toHaveURL(/\/app\?demo=1$/);
   await expect(
     page.getByText("Read-only sample preview", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Flow insights", exact: true }).click();
+  await page.getByRole("link", { name: "Insights", exact: true }).click();
   await expect(page).toHaveURL(/demo=1&view=insights/);
   await expect(
     page.getByText("There is no live history in this sample workspace.", {
@@ -42,38 +51,23 @@ test("landing explains the analytics workflow and opens the explicit sample desk
   expect(errors).toEqual([]);
 });
 
-test("scroll reveals remain usable after leaving and returning to the landing page", async ({
+test("landing stays minimal and works after returning from the sample", async ({
   page,
 }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
-  await page.getByRole("link", { name: "Product", exact: true }).click();
-  await expect(page).toHaveURL(/\/#product$/);
-  const productHeading = page.getByRole("heading", { level: 2 });
-  await expect(productHeading).toHaveText(/REQUEST\.\s*ASSIGN\.\s*DELIVER\./);
-  await expect(productHeading).toBeVisible();
-  await expect(page.getByText("Weekly revenue", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Open the desk", exact: true }).click();
+  await openLanding(page);
+  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0);
+  await expect(page.locator("#product")).toHaveCount(0);
+  await page.getByRole("link", { name: "Explore sample", exact: true }).click();
   await expect(page).toHaveURL(/\/app\?demo=1$/);
-  await expect(
-    page.getByText("Read-only sample preview", { exact: true }),
-  ).toBeVisible();
-
   await page.goBack();
-  await expect(page).toHaveURL(/\/#product$/);
-  await expect(productHeading).toBeVisible();
-  const start = page.getByRole("link", {
-    name: "Start with your team",
-    exact: true,
-  });
-  await start.scrollIntoViewIfNeeded();
-  await expect(start).toBeVisible();
-  await expect(start).toBeInViewport();
-  await start.click();
+  await expect(page).toHaveURL(/\/$/);
+  const skip = page.getByRole("button", { name: "Skip intro", exact: true });
+  if (await skip.isVisible()) await skip.click();
+  await page
+    .getByRole("link", { name: "Create your company", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/register$/);
   await expect(page.getByLabel("Company name", { exact: true })).toBeVisible();
-  expect(errors).toEqual([]);
 });
 
 test("landing and company entry fit a phone with reduced motion", async ({
@@ -90,21 +84,13 @@ test("landing and company entry fit a phone with reduced motion", async ({
       ),
     ).toBe(true);
     if (route === "/") {
-      for (const name of [
-        "Create your company",
-        "Explore sample",
-        "Open the desk",
-        "Start with your team",
-      ]) {
+      for (const name of ["Create your company", "Explore sample"]) {
         const link = page.getByRole("link", { name, exact: true });
         await link.scrollIntoViewIfNeeded();
         await expect(link).toBeVisible();
         await expect(link).toBeInViewport();
       }
-      await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
-      await expect(
-        page.getByText("Retention cohorts", { exact: true }),
-      ).toBeVisible();
+      await expect(page.locator(".loom-intro")).toHaveCount(0);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -122,4 +108,69 @@ test("older workspace bookmarks still resolve to the workspace", async ({
   await expect(
     page.getByRole("textbox", { name: "Ask your workspace", exact: true }),
   ).toBeVisible();
+});
+
+test("opening loads, types LOOM, shows only the headline, then reveals the page", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator('[data-intro-phase="wordmark"]')).toBeAttached({
+    timeout: 10000,
+  });
+  await expect(page.locator(".loom-intro-word")).toBeVisible();
+  await expect(page.locator('[data-intro-phase="headline"]')).toBeAttached();
+  await expect(page.locator(".loom-hero-title")).toBeVisible();
+  const letters = page.locator(".loom-headline-letter");
+  await expect(letters.first()).toHaveCSS("opacity", "1");
+  await expect(letters.last()).toHaveCSS("opacity", "0");
+  const introHeading = await page.locator("h1").boundingBox();
+  expect(
+    Math.abs(
+      introHeading!.y +
+        introHeading!.height / 2 -
+        page.viewportSize()!.height / 2,
+    ),
+  ).toBeLessThan(2);
+  await expect(page.locator(".loom-hero-art")).toBeHidden();
+  await expect(page.locator(".loom-nav")).toBeHidden();
+  await expect(page.locator(".loom-hero-actions")).toBeHidden();
+  await expect(page.locator('[data-intro-phase="complete"]')).toBeAttached({
+    timeout: 10000,
+  });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(letters.last()).toHaveCSS("opacity", "1");
+  const heading = await page.getByRole("heading", { level: 1 }).boundingBox();
+  expect(heading).not.toBeNull();
+  expect(
+    Math.abs(heading!.x + heading!.width / 2 - page.viewportSize()!.width / 2),
+  ).toBeLessThan(2);
+  await expect(
+    page.getByRole("link", { name: "Explore sample", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".loom-site")).not.toHaveAttribute("inert");
+});
+
+test("Escape skips the intro and restores keyboard access", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Skip intro", exact: true }).focus();
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-intro-phase="complete"]')).toBeAttached();
+  await expect(page.locator("main")).toBeFocused();
+  await expect(page.locator(".loom-site")).not.toHaveAttribute("inert");
+  await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
+});
+
+test("landing remains available without JavaScript", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto("/");
+  await expect(page.locator(".loom-intro")).toBeHidden();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page
+    .getByRole("link", { name: "Create your company", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/register$/);
+  await context.close();
 });
