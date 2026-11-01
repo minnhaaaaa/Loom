@@ -90,26 +90,29 @@ test("owners connect Slack and explicitly choose an intake channel before automa
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/app?view=settings");
   const panel = page.locator("#connected-sources");
-  await panel.getByLabel("Slack app token").fill("xoxb-synthetic-ui-token");
   await panel
     .getByRole("button", { name: "Connect Slack", exact: true })
     .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "I already have a token" }).click();
+  await dialog.getByLabel("User OAuth token").fill("xoxb-synthetic-ui-token");
+  await dialog.getByRole("button", { name: "Verify connection" }).click();
   await expect(
-    panel.getByRole("button", { name: "Disconnect Slack", exact: true }),
+    dialog.getByRole("heading", { name: "Slack connected" }),
   ).toBeVisible();
-  await panel
-    .getByRole("button", { name: "Load channels", exact: true })
-    .click();
+  await dialog.getByRole("button", { name: "Choose source" }).click();
   await selectOption(
-    panel.getByRole("combobox", { name: "Channel", exact: true }),
+    dialog.getByRole("combobox", { name: "Channel", exact: true }),
     "CINTAKE",
   );
+  await dialog.getByRole("button", { name: "Review import" }).click();
   await expect(
-    panel.getByRole("button", { name: "Start automatic import" }),
+    dialog.getByRole("button", { name: "Start automatic import" }),
   ).toBeDisabled();
   expect(selected).toBe(false);
-  await panel.getByRole("checkbox").check();
-  await panel.getByRole("button", { name: "Start automatic import" }).click();
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Start automatic import" }).click();
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
   await expect(
     panel.getByText("#analytics-intake", { exact: true }),
   ).toBeVisible();
@@ -117,6 +120,7 @@ test("owners connect Slack and explicitly choose an intake channel before automa
     panel.getByText("Waiting for first sync", { exact: true }),
   ).toBeVisible();
   await page.screenshot({
+    animations: "disabled",
     path: "test-results-connected/sources-desktop.png",
     fullPage: true,
   });
@@ -148,14 +152,24 @@ test("Microsoft device sign-in shows a code without claiming an account is conne
   await page.goto("/app?view=settings");
   const panel = page.locator("#connected-sources");
   await panel
-    .getByRole("button", { name: "Connect Microsoft", exact: true })
+    .getByRole("button", { name: "Connect Microsoft Teams", exact: true })
     .click();
-  await expect(panel.getByText("ABCD-EFGH", { exact: true })).toBeVisible();
+  const dialog = page.getByRole("dialog");
+  await page
+    .context()
+    .route("https://microsoft.com/devicelogin", (route) =>
+      route.fulfill({ body: "Synthetic Microsoft sign-in page" }),
+    );
+  const popupPromise = page.waitForEvent("popup");
+  await dialog.getByRole("button", { name: "Sign in with Microsoft" }).click();
+  const popup = await popupPromise;
+  await popup.waitForURL("https://microsoft.com/devicelogin");
+  await expect(dialog.getByText("ABCD-EFGH", { exact: true })).toBeVisible();
   await expect(
-    panel.getByRole("link", { name: "Continue to Microsoft" }),
+    dialog.getByRole("link", { name: "Continue to Microsoft" }),
   ).toHaveAttribute("href", "https://microsoft.com/devicelogin");
   await expect(
-    panel.getByRole("button", { name: "Disconnect Microsoft" }),
+    panel.getByRole("button", { name: "Manage Microsoft Teams" }),
   ).toHaveCount(0);
   expect(
     await page.evaluate(
@@ -163,6 +177,7 @@ test("Microsoft device sign-in shows a code without claiming an account is conne
     ),
   ).toBe(true);
   await page.screenshot({
+    animations: "disabled",
     path: "test-results-connected/sources-mobile.png",
     fullPage: true,
   });
@@ -193,26 +208,26 @@ test("SharePoint library selection shares references only after explicit source 
   await account(page);
   await page.goto("/app?view=settings");
   const panel = page.locator("#connected-sources");
+  await panel.getByRole("button", { name: "Manage SharePoint" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Choose source" }).click();
+  await dialog.getByLabel("Find a site", { exact: true }).fill("Analytics");
+  await dialog.getByRole("button", { name: "Find sites", exact: true }).click();
   await selectOption(
-    panel.getByRole("combobox", { name: "Service", exact: true }),
-    "sharepoint",
-  );
-  await panel.getByLabel("Find a site", { exact: true }).fill("Analytics");
-  await panel.getByRole("button", { name: "Find sites", exact: true }).click();
-  await selectOption(
-    panel.getByRole("combobox", { name: "Site", exact: true }),
+    dialog.getByRole("combobox", { name: "Site", exact: true }),
     "SITE",
   );
   await selectOption(
-    panel.getByRole("combobox", { name: "Document library", exact: true }),
+    dialog.getByRole("combobox", { name: "Document library", exact: true }),
     "DRIVE",
   );
-  await panel.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Review import" }).click();
+  await dialog.getByRole("checkbox").check();
   await panel
     .getByRole("button", { name: "Start automatic import", exact: true })
     .click();
   await expect(
-    panel.getByText("Source added. Sync starts while Loom is running."),
+    dialog.getByRole("heading", { name: "Import queued" }),
   ).toBeVisible();
   expect(selection).toEqual({
     provider: "sharepoint",
@@ -304,6 +319,7 @@ test("general-chat review stays compact and supports importing or dismissing a c
   ).toHaveCount(2);
   await panel.scrollIntoViewIfNeeded();
   await page.screenshot({
+    animations: "disabled",
     path: "test-results-connected/request-review-desktop.png",
   });
   await panel
@@ -318,6 +334,7 @@ test("general-chat review stays compact and supports importing or dismissing a c
     .getByText("Review 1 possible request", { exact: true })
     .scrollIntoViewIfNeeded();
   await page.screenshot({
+    animations: "disabled",
     path: "test-results-connected/request-review-mobile.png",
   });
   expect(
@@ -331,4 +348,187 @@ test("general-chat review stays compact and supports importing or dismissing a c
   ).toBeVisible();
   await expect(panel.getByText(/Review \d possible/)).toHaveCount(0);
   expect(decisions).toEqual(["accept", "dismiss"]);
+});
+
+test("GitHub setup explains code import, recovers from errors, and keeps selection explicit", async ({
+  page,
+}) => {
+  let snapshot = initial(),
+    fail = true;
+  let selection: unknown;
+  await page.route("**/api/workspaces/sources", async (route) => {
+    if (route.request().method() === "GET")
+      return route.fulfill({ json: snapshot });
+    const input = route.request().postDataJSON();
+    if (input.action === "connect-github") {
+      if (fail) {
+        fail = false;
+        return route.fulfill({
+          status: 422,
+          json: {
+            error: {
+              code: "SOURCE_ACCESS",
+              message: "Token needs organization approval.",
+            },
+          },
+        });
+      }
+      snapshot = {
+        ...snapshot,
+        connections: [
+          { provider: "github", name: "fixture-admin", version: 1 },
+        ],
+      };
+      return route.fulfill({ json: snapshot });
+    }
+    if (input.action === "browse")
+      return route.fulfill({
+        json: { options: [{ id: "123", name: "fixture/analytics" }] },
+      });
+    if (input.action === "select") {
+      selection = input.selection;
+      return route.fulfill({ json: snapshot });
+    }
+    throw new Error(`Unexpected action ${input.action}`);
+  });
+  await account(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/app?view=settings");
+  const trigger = page.getByRole("button", {
+    name: "Connect GitHub",
+    exact: true,
+  });
+  await trigger.click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "Choose your repositories" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("link", { name: "Open GitHub" }),
+  ).toHaveAttribute("target", "_blank");
+  await page.screenshot({
+    animations: "disabled",
+    path: "test-results-connected/github-guide-desktop.png",
+  });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await dialog.getByRole("button", { name: "Next step" }).click();
+  await expect(
+    dialog.getByText("Contents · Read-only", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Next step" }).click();
+  await dialog
+    .getByLabel("Fine-grained token")
+    .fill("github_pat_synthetic_ui_token");
+  await dialog.getByRole("button", { name: "Verify connection" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "organization approval",
+  );
+  await dialog.getByRole("button", { name: "Verify connection" }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "GitHub connected" }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Choose source" }).click();
+  await selectOption(
+    dialog.getByRole("combobox", { name: "Repository", exact: true }),
+    "123",
+  );
+  await dialog.getByRole("button", { name: "Answer", exact: true }).click();
+  await expect(
+    dialog.getByText("Revenue excludes refunds. [revenue.sql]", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(selection).toBeUndefined();
+  await page.screenshot({
+    animations: "disabled",
+    path: "test-results-connected/github-choose-desktop.png",
+  });
+  await dialog.getByRole("button", { name: "Review import" }).click();
+  await expect(dialog.getByText(/Default-branch code/)).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Start automatic import" }),
+  ).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    animations: "disabled",
+    path: "test-results-connected/github-review-mobile.png",
+  });
+  expect(
+    await dialog.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Start automatic import" }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "Import queued" }),
+  ).toBeVisible();
+  expect(selection).toMatchObject({
+    provider: "github",
+    rootId: "123",
+    parentId: "",
+    shareWithWorkspace: true,
+  });
+});
+
+test("Discord walks through bot setup and selects only a chosen server and channel", async ({
+  page,
+}) => {
+  let snapshot = initial();
+  let selection: unknown;
+  await page.route("**/api/workspaces/sources", async (route) => {
+    if (route.request().method() === "GET")
+      return route.fulfill({ json: snapshot });
+    const input = route.request().postDataJSON();
+    if (input.action === "connect-discord")
+      snapshot = {
+        ...snapshot,
+        connections: [{ provider: "discord", name: "Loom bot", version: 1 }],
+      };
+    if (input.action === "browse")
+      return route.fulfill({
+        json: {
+          options: input.parentId
+            ? [{ id: "123456789012345678", name: "#analytics" }]
+            : [{ id: "223456789012345678", name: "Analytics team" }],
+        },
+      });
+    if (input.action === "select") selection = input.selection;
+    return route.fulfill({ json: snapshot });
+  });
+  await account(page);
+  await page.goto("/app?view=settings");
+  await page.getByRole("button", { name: "Connect Discord" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("Message Content Intent · On", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "I already have a token" }).click();
+  await dialog.getByLabel("Bot token").fill("synthetic_discord_token");
+  await dialog.getByRole("button", { name: "Verify connection" }).click();
+  await dialog.getByRole("button", { name: "Choose source" }).click();
+  await selectOption(
+    dialog.getByRole("combobox", { name: "Server", exact: true }),
+    "223456789012345678",
+  );
+  await selectOption(
+    dialog.getByRole("combobox", { name: "Channel", exact: true }),
+    "123456789012345678",
+  );
+  await dialog.getByRole("button", { name: "Review import" }).click();
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Start automatic import" }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "Import queued" }),
+  ).toBeVisible();
+  expect(selection).toMatchObject({
+    provider: "discord",
+    parentId: "223456789012345678",
+    rootId: "123456789012345678",
+    requestMode: "detect",
+    shareWithWorkspace: true,
+  });
 });

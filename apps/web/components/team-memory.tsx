@@ -200,8 +200,8 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                 </p>
                 {!snapshot.entries.length && (
                   <p className="memory-empty">
-                    No sources found. Connect SharePoint in Settings or add team
-                    guidance.
+                    No sources found. Connect GitHub or SharePoint in Settings
+                    or add team guidance.
                   </p>
                 )}
                 {snapshot.entries.map(({ entry }) => (
@@ -226,7 +226,9 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                             Open original
                             {entry.externalSource.page
                               ? ` · page ${entry.externalSource.page}`
-                              : " in SharePoint"}
+                              : entry.externalSource.provider === "github"
+                                ? " in GitHub"
+                                : " in SharePoint"}
                           </a>
                           {entry.externalSource.truncated && (
                             <span>Document excerpt</span>

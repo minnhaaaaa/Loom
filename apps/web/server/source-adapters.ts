@@ -27,6 +27,13 @@ import {
   type RequestDetection,
 } from "./request-detection";
 
+import {
+  discordOptions,
+  discordChannel,
+  discordApplication,
+  discordPage,
+} from "./discord-source";
+
 export type SourceConfig = {
   rootId: string;
   parentId: string;
@@ -34,7 +41,14 @@ export type SourceConfig = {
   accountId: string;
   requestMode?: "detect" | "all";
 };
-export type SourceCursor = { next?: string; oldest?: string; latest?: string };
+export type SourceCursor = {
+  next?: string;
+  oldest?: string;
+  latest?: string;
+  github?:
+    | { phase: "code"; commit: string; tree: string; offset: number }
+    | { phase: "issues"; page: number };
+};
 export type SourceItem = {
   id: string;
   title: string;
@@ -51,7 +65,12 @@ export type SourceItem = {
     version: string;
   };
 };
-export type SourcePage = { items: SourceItem[]; cursor: SourceCursor | null };
+export type SourcePage = {
+  items: SourceItem[];
+  cursor: SourceCursor | null;
+  reconcileDocuments?: string[];
+};
+import { githubOptions, githubRepository, githubPage } from "./github-source";
 const enc = encodeURIComponent;
 function options(
   items: Record<string, unknown>[],
@@ -70,6 +89,8 @@ export async function sourceOptions(
   parentId = "",
   query = "",
 ) {
+  if (provider === "github") return githubOptions(token);
+  if (provider === "discord") return discordOptions(token, parentId);
   if (provider === "slack") {
     const channels: Record<string, unknown>[] = [];
     let cursor = "";
@@ -146,6 +167,13 @@ export async function validateSource(
         "Choose a public intake channel that the connected Slack app can read.",
         422,
       );
+    name = `#${string(channel.name)}`;
+  } else if (provider === "github") {
+    const repo = await githubRepository(token, rootId);
+    name = string(repo.full_name);
+  } else if (provider === "discord") {
+    await discordApplication(token);
+    const channel = await discordChannel(token, rootId, parentId, accountId);
     name = `#${string(channel.name)}`;
   } else if (provider === "teams") {
     if (!parentId)
@@ -283,6 +311,8 @@ export async function fetchSourcePage(
   config: SourceConfig,
   cursor: SourceCursor | null,
 ): Promise<SourcePage> {
+  if (provider === "github") return githubPage(token, config, cursor);
+  if (provider === "discord") return discordPage(token, config, cursor);
   if (provider === "slack") {
     // Re-scan a bounded 30-day window, including edits and recently active threads.
     const oldest =

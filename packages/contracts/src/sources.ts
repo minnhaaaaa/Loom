@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const sourceProviderSchema = z.enum(["slack", "teams", "sharepoint"]);
+export const sourceProviderSchema = z.enum([
+  "slack",
+  "teams",
+  "sharepoint",
+  "discord",
+  "github",
+]);
 export type SourceProvider = z.infer<typeof sourceProviderSchema>;
 export const externalSourceSchema = z
   .object({
@@ -54,7 +60,7 @@ export type SourceSnapshot = {
   microsoftAvailable: boolean;
   syncEnabled: boolean;
   connections: {
-    provider: "slack" | "microsoft";
+    provider: "slack" | "microsoft" | "discord" | "github";
     name: string;
     version: number;
   }[];

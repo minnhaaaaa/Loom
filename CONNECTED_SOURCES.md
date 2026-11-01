@@ -1,8 +1,14 @@
 # Connected sources
 
-Loom can automatically import requests from selected Slack and Microsoft Teams channels, and searchable document passages from selected SharePoint document libraries. Staff keep posting and maintaining documents in their existing tools. A company owner connects each service and selects the sources once, in **Settings → Connected sources**.
+Loom can automatically import requests from selected Slack, Microsoft Teams and Discord channels, plus searchable code and document passages from GitHub repositories and SharePoint document libraries. Staff keep posting and maintaining documents in their existing tools. A company owner connects each service and selects the sources once, in **Settings → Connected sources**.
 
-The connectors are read-only. They do not send Slack/Teams messages, modify SharePoint files, or make AI calls. General channels use a local English-language detector. Clear analytics asks become requests, uncertain matches appear in a compact owner review list, and ordinary chatter is ignored. No model key or subscription is needed. Dedicated intake channels can still import every post.
+The connectors are read-only. They never post messages, write repository changes, modify documents, or make AI calls. General channels use a local English-language detector. Clear analytics asks become requests, uncertain matches appear in a compact owner review list, and ordinary chatter is ignored. No model key or subscription is needed. Dedicated intake channels can still import every post.
+
+## Guided connection flow
+
+Open **Settings → Connected sources** and choose a service. A dark modal guides you through **Connect → Choose → Import**, with one setup step at a time, provider links, and an interactive example of a message becoming a request or a file becoming a cited passage. Illustrations are labeled and never inserted into your workspace. Existing token holders can skip the setup guide.
+
+The **Connect** step verifies the account. **Choose source** loads the available repositories/channels/libraries. **Review import** shows the actual selected source, limits, and workspace-sharing checkbox before **Start automatic import** queues it. Microsoft opens a sign-in popup with a code; a fallback link works if popups are blocked. Closing the popup alone never marks the account connected. Each provider card also opens account management, including disconnecting and adding another source. Teams and SharePoint share one Microsoft connection.
 
 ## Local server
 
@@ -12,10 +18,10 @@ Configure `LOOM_PROVIDER_ENCRYPTION_KEY` with a stable 64-character hexadecimal 
 
 ## Slack
 
-1. Create an internal Slack app at [Slack app management](https://api.slack.com/apps).
-2. Give the app read permissions `channels:read` and `channels:history`, install it in the workspace, and invite it to a public channel intended to be shared with this Loom workspace.
-3. Copy the installed app's OAuth token into **Settings → Connected sources → Slack app token**. Loom supports `xoxb-` and `xoxp-` tokens. The token must be allowed to read thread replies; if the app's bot token cannot do that in your Slack installation, use an explicitly authorized user OAuth token with the same read permissions. Do not paste tokens into chat or source files.
-4. Choose **Load channels**, select a channel and **Detect analytics requests** (or **Every post** for a dedicated intake channel), authorize sharing with this Loom workspace, and choose **Start automatic import**.
+1. Choose **Slack** in Connected sources. The popup links to [Slack app management](https://api.slack.com/apps).
+2. Create an internal app, then add `channels:read` and `channels:history` under **User Token Scopes** in OAuth & Permissions.
+3. Install the app into your workspace. Copy the **User OAuth Token** (`xoxp-`) into Loom and choose **Verify connection**. User tokens support public-channel thread replies; bot tokens remain accepted for existing installations but may lack thread access. Join the public channels you want to share. Do not paste tokens into chat or source files.
+4. Choose **Choose source**, select a channel, then **Review import**. Choose **Detect analytics requests** or **Every post** for a dedicated intake channel, confirm sharing, and start the import.
 
 Loom verifies the token and resolves channel names through Slack before accepting a selection. Private channels, DMs, Slack Connect/private-channel permission replication, bot posts, and system events are outside this version. Replies are attached to their root request rather than imported as duplicate requests. Slack user IDs are retained as the source author when a display name is unavailable.
 
@@ -29,12 +35,38 @@ Primary references: [Slack OAuth](https://docs.slack.dev/authentication/installi
 2. Enable **Allow public client flows** in the app's authentication settings. The device-code flow needs no callback URL or client secret.
 3. Add these **delegated** Microsoft Graph permissions: `User.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, and `Sites.Read.All`. The flow also requests `offline_access` for renewal. Have the tenant administrator grant consent where required. Organizational conditional-access rules can restrict device sign-in.
 4. Set the application's client ID and tenant ID in the local `.env` as `LOOM_MICROSOFT_CLIENT_ID` and `LOOM_MICROSOFT_TENANT_ID`. Restart Loom.
-5. Choose **Connect Microsoft**, open Microsoft's sign-in page, and enter the code shown in Loom. Sign in using a company account with access to the intended sources. Loom shows the account as connected only after Microsoft issues and validates its token.
-6. For Teams, choose **Load teams**, select a team and a standard channel. For SharePoint, search for a site and select its document library. Confirm sharing and start the import.
+5. Choose **Microsoft Teams** or **SharePoint**, then **Sign in with Microsoft**. A popup opens; enter the code shown in Loom. Sign in using a company account with access to the intended sources. Loom shows the account as connected only after Microsoft issues and validates its token.
+6. Choose **Choose source**. For Teams, select a team and a standard channel. For SharePoint, search for a site and select its document library. Confirm sharing and start the import.
 
 Teams private/shared channels and direct chats are excluded. This version selects entire SharePoint document libraries; folder-level selection is pending. Use a library containing only material intended for this Loom workspace.
 
 Primary references: [Microsoft device sign-in](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code), [Teams channel messages](https://learn.microsoft.com/en-us/graph/api/channel-list-messages?view=graph-rest-1.0), [SharePoint/drive changes](https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0), [file downloads](https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0).
+
+## GitHub
+
+1. Choose **GitHub** in Connected sources. Follow the guide to [create a fine-grained personal access token](https://github.com/settings/personal-access-tokens/new).
+2. Set the resource owner and **Only select repositories**. Grant repository **Contents**, **Issues**, and **Pull requests** permissions as **Read-only**; Metadata is included by GitHub. Your organization may require token approval or SSO authorization.
+3. Paste the `github_pat_` token into Loom and choose **Verify connection**. Tokens are encrypted with the existing workspace/provider-bound credential storage. This local connector does not pretend to offer GitHub OAuth without a registered application.
+4. Select a repository, review the scope and sharing, and start importing. Repeat to add another repository.
+
+Loom imports the selected repository's **default-branch source code and documents**, plus **open/closed issues, pull requests, and their discussion comments** into Knowledge. They are reference context, not a new task backlog. Source paths, issue numbers, authors, and original GitHub links remain available. Code links pin a commit; code is never executed. The assistant can answer questions such as “Where is net revenue calculated?” or “What did the refunds issue decide?” using retrieved passages.
+
+Each code scan pins one commit and processes 20 entries per page. After the complete tree scan, files no longer present retire their passages. Failed or incomplete trees never trigger removal. Up to 5,000 tree entries and 256 KB per file are supported. GitHub's truncated trees and oversized API responses produce explicit errors. Files are split into bounded passages using the existing document pipeline. UTF-8 source files, text, PDFs and DOCX are supported; binary assets, symlinks, submodules, generated/vendor directories and common credential filenames are excluded. A limited content check excludes recognizable private keys and some token patterns; it is not comprehensive secret detection. Select repositories appropriate to the Loom workspace audience. Per-file exclusions appear under **Import details**.
+
+Issues/PRs are paginated, with up to the first 100 discussion comments per item; omitted comments are reported. Their body and discussion become reference passages. Git history, other branches, PR review comments/diffs, Discussions, wikis, releases and Actions artifacts are not imported. Code-file deletion is reconciled; deleted/transferred issues and external ACL changes are not. Token expiration/revocation requires replacement. Provider rate limits delay sync and use retry headers. A repository rename is resolved through its stable repository ID.
+
+Primary references: [Git trees](https://docs.github.com/en/rest/git/trees#get-a-tree), [Git blobs](https://docs.github.com/en/rest/git/blobs#get-a-blob), [repository issues and pull requests](https://docs.github.com/en/rest/issues/issues#list-repository-issues), [fine-grained token creation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+
+## Discord
+
+1. Choose **Discord** in Connected sources. Open the [Discord Developer Portal](https://discord.com/developers/applications) from the guide and create an application.
+2. On its **Bot** page, enable **Message Content Intent**. If Discord requires approval for your app, obtain that before connecting.
+3. Under **OAuth2 → URL Generator**, choose the `bot` scope and **View Channels** / **Read Message History** permissions (integer `66560`). Open the generated link and install the bot into your server. No posting permission or Administrator permission is required.
+4. Copy the bot token into Loom and verify it. Personal-account tokens are rejected. Choose a server and a text/announcement channel, review sharing, and start importing.
+
+The connector checks intent and the bot's computed permissions for the selected channel before reading history. It reads human messages in a rolling 30-day scan; bot/system/webhook messages are excluded. Each message retains its own source identity and permalink. Included reply context is accepted only from the same selected channel; a “thanks” reply does not duplicate the referenced request. Native separate threads, forums, DMs, voice, attachments and remote deletion reconciliation are not supported. The bot must retain access to every selected channel. Rate limits apply per bot and defer subsequent reads.
+
+Primary references: [message history](https://docs.discord.com/developers/resources/message#get-channel-messages), [application intent flags](https://docs.discord.com/developers/resources/application), [computed channel permissions](https://docs.discord.com/developers/resources/channel#get-channel-member-permissions), [rate limits](https://docs.discord.com/developers/topics/rate-limits).
 
 ## What is imported
 
@@ -80,4 +112,4 @@ The assistant filters imported references by the query before ranking up to 500 
 
 ## Verification boundary
 
-Tests use synthetic provider responses and an isolated Exasol schema. They exercise authorization, encrypted storage, pagination restrictions, deduplication, preserving manual edits, document deletion, paused-run rejection, device-code ownership, general-chat review/dismissal, real PDF extraction, late-page retrieval, passage updates and deletion. Browser checks exercise the setup UI. Live Slack installation, Microsoft tenant consent, real file retrieval, and provider rate-limit behavior require validation with the administrator's actual accounts. No real source account is connected by the implementation itself.
+Tests use synthetic provider responses and an isolated Exasol schema. They exercise authorization, encrypted storage, pagination restrictions, deduplication, preserving manual edits, document deletion, paused-run rejection, device-code ownership, general-chat review/dismissal, real PDF extraction, late-page retrieval, passage updates and deletion. Browser checks exercise the setup UI. Live GitHub/Slack/Discord installation, Microsoft tenant consent, actual source retrieval, and provider rate-limit behavior require validation with the administrator's actual accounts. No real source account is connected by the implementation itself.

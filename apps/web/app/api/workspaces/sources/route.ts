@@ -12,6 +12,8 @@ import {
 } from "@/server/sources";
 import {
   connectSlack,
+  connectDiscord,
+  connectGithub,
   disconnectSourceConnection,
   pollMicrosoftSignin,
   startMicrosoftSignin,
@@ -38,7 +40,7 @@ const inputSchema = z.discriminatedUnion("action", [
     .strict(),
   z
     .object({
-      action: z.literal("connect-slack"),
+      action: z.enum(["connect-slack", "connect-discord", "connect-github"]),
       token: z.string().min(10).max(2000),
     })
     .strict(),
@@ -47,7 +49,7 @@ const inputSchema = z.discriminatedUnion("action", [
   z
     .object({
       action: z.literal("disconnect"),
-      provider: z.enum(["slack", "microsoft"]),
+      provider: z.enum(["slack", "microsoft", "discord", "github"]),
     })
     .strict(),
   z
@@ -82,6 +84,12 @@ export const POST = endpoint(async (request) => {
   const actor = await scopedActor(request),
     input = inputSchema.parse(await jsonBody(request, 8000));
   switch (input.action) {
+    case "connect-github":
+      await connectGithub(actor, input.token);
+      return sourceSnapshot(actor);
+    case "connect-discord":
+      await connectDiscord(actor, input.token);
+      return sourceSnapshot(actor);
     case "connect-slack":
       await connectSlack(actor, input.token);
       return sourceSnapshot(actor);

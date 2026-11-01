@@ -4,6 +4,8 @@ import { readDatabase, writeDatabase } from "@loom/db-exasol";
 import type { Actor } from "@loom/contracts";
 import {
   connectSlack,
+  connectGithub,
+  connectDiscord,
   disconnectSourceConnection,
   saveSourceConnection,
   startMicrosoftSignin,
@@ -636,6 +638,161 @@ it("imports all PDF pages, retrieves a late passage, replaces chunks, and retire
   await due(source.id);
   await syncOneSource(owner.workspaceId, source.id);
   expect(await corpus()).toEqual([]);
+});
+
+it("stores GitHub credentials encrypted and retires deleted code without duplicating repository history", async () => {
+  const token = "github_pat_synthetic_integration_token";
+  const commit = "a".repeat(40),
+    tree = "b".repeat(40),
+    blob = "c".repeat(40);
+  const text = "SELECT SUM(net_revenue) FROM github_orders;";
+  let files = true;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/user")
+        return Response.json({ id: 42, login: "github-fixture" });
+      if (path === "/user/repos")
+        return Response.json([{ id: 123, full_name: "fixture/analytics" }]);
+      if (path === "/repos/fixture/analytics")
+        return Response.json({
+          id: 123,
+          full_name: "fixture/analytics",
+          default_branch: "main",
+        });
+      if (path.endsWith("/commits"))
+        return Response.json([
+          { sha: commit, commit: { tree: { sha: tree } } },
+        ]);
+      if (path.includes("/trees/"))
+        return Response.json({
+          sha: tree,
+          truncated: false,
+          tree: files
+            ? [
+                {
+                  path: "revenue.sql",
+                  type: "blob",
+                  mode: "100644",
+                  sha: blob,
+                  size: text.length,
+                },
+              ]
+            : [],
+        });
+      if (path.includes("/blobs/"))
+        return Response.json({
+          sha: blob,
+          encoding: "base64",
+          size: text.length,
+          content: Buffer.from(text).toString("base64"),
+        });
+      if (path.endsWith("/issues"))
+        return Response.json([
+          {
+            id: 99,
+            number: 4,
+            title: "Repository refunds discussion",
+            body: "Githubfixture refunds guidance",
+            state: "closed",
+            comments: 0,
+            user: { login: "analyst" },
+            updated_at: "2026-11-01T00:00:00Z",
+          },
+        ]);
+      throw new Error("Unexpected GitHub fixture endpoint");
+    }),
+  );
+  await expect(connectGithub(requester, token)).rejects.toMatchObject({
+    code: "ACCESS_DENIED",
+  });
+  await connectGithub(owner, token);
+  const [stored] = await readDatabase((sql) =>
+    sql.query(
+      "SELECT CREDENTIAL FROM SOURCE_CONNECTIONS WHERE WORKSPACE_ID=? AND PROVIDER='github'",
+      [owner.workspaceId],
+    ),
+  );
+  expect(String(stored.CREDENTIAL)).not.toContain(token);
+  expect((await sourceRuntime(owner, "github")).token).toBe(token);
+  const source = await selectSource(owner, {
+    provider: "github",
+    rootId: "123",
+    shareWithWorkspace: true,
+  });
+  await syncOneSource(owner.workspaceId, source.id);
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  const corpus = () =>
+    readDatabase(async (sql) =>
+      (await approvedKnowledge(sql, owner)).filter(
+        (entry) => entry.externalSource?.sourceId === source.id,
+      ),
+    );
+  const first = await corpus();
+  expect(first).toHaveLength(2);
+  expect(
+    first.every((entry) => entry.externalSource?.provider === "github"),
+  ).toBe(true);
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  expect((await corpus()).map((entry) => entry.version)).toEqual(
+    first.map((entry) => entry.version),
+  );
+  files = false;
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  expect(await corpus()).toHaveLength(1);
+  expect((await corpus())[0].externalSource?.externalId).toBe("issue:99");
+  // Restoring an identical revision after deletion must restore its original passage ID.
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  files = true;
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  expect((await corpus()).map((entry) => entry.id).sort()).toEqual(
+    first.map((entry) => entry.id).sort(),
+  );
+});
+
+it("requires a Discord bot and keeps reconnect/disconnect isolated from other providers", async () => {
+  const token = "synthetic_discord_bot_token";
+  let botAccount = false;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      if (input.endsWith("users/@me"))
+        return Response.json({
+          id: "323456789012345678",
+          username: "Fixture bot",
+          bot: botAccount,
+        });
+      if (input.endsWith("applications/@me"))
+        return Response.json({ flags: 1 << 19, name: "Fixture bot" });
+      throw new Error("Unexpected Discord fixture endpoint");
+    }),
+  );
+  await expect(connectDiscord(requester, token)).rejects.toMatchObject({
+    code: "ACCESS_DENIED",
+  });
+  await expect(connectDiscord(owner, token)).rejects.toThrow("bot token");
+  botAccount = true;
+  await connectDiscord(owner, token);
+  expect((await sourceRuntime(owner, "discord")).token).toBe(token);
+  await disconnectSourceConnection(owner, "discord");
+  expect(
+    (await sourceSnapshot(owner)).sources.find(
+      (source) => source.provider === "github",
+    )?.active,
+  ).toBe(true);
+  expect(
+    (await sourceSnapshot(owner)).connections.some(
+      (connection) => connection.provider === "github",
+    ),
+  ).toBe(true);
 });
 
 it("retrieves a matching passage beyond 500 references while tracking unseen corpus changes", async () => {

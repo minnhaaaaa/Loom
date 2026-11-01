@@ -27,7 +27,10 @@ import {
 } from "./source-transport";
 import { limitCredentialAttempt } from "./auth-limits";
 
-export type ConnectionKind = "slack" | "microsoft";
+import { discord, discordApplication, discordId } from "./discord-source";
+import { object } from "./source-transport";
+import { github } from "./github-source";
+export type ConnectionKind = "slack" | "microsoft" | "discord" | "github";
 const credentialSchema = z.object({
   accessToken: z.string().min(10).max(16000),
   refreshToken: z.string().max(16000).optional(),
@@ -122,9 +125,32 @@ export async function saveSourceConnection(
     "UPDATE CONNECTED_SOURCES SET ACTIVE=FALSE,VERSION=VERSION+1,LEASE_ID=NULL,LEASE_UNTIL=NULL WHERE WORKSPACE_ID=? AND PROVIDER IN (?,?)",
     [
       actor.workspaceId,
-      provider === "slack" ? "slack" : "teams",
-      provider === "slack" ? "slack" : "sharepoint",
+      provider === "microsoft" ? "teams" : provider,
+      provider === "microsoft" ? "sharepoint" : provider,
     ],
+  );
+}
+export async function connectGithub(actor: Actor, token: string) {
+  await readDatabase((sql) => sourceOwner(sql, actor));
+  limitCredentialAttempt(`source-github:${actor.workspaceId}:${actor.userId}`);
+  const value = z
+    .string()
+    .trim()
+    .regex(/^github_pat_[A-Za-z0-9_]+$/)
+    .max(2000)
+    .parse(token);
+  const user = object(await github(value, "user"));
+  if (!Number.isSafeInteger(user.id) || !string(user.login))
+    throw new SourceError("GitHub did not identify this account.");
+  await writeDatabase((sql) =>
+    saveSourceConnection(
+      sql,
+      actor,
+      "github",
+      String(user.id),
+      string(user.login),
+      { accessToken: value },
+    ),
   );
 }
 export async function connectSlack(actor: Actor, token: string) {
@@ -150,6 +176,35 @@ export async function connectSlack(actor: Actor, token: string) {
     ),
   );
 }
+export async function connectDiscord(actor: Actor, token: string) {
+  await readDatabase((sql) => sourceOwner(sql, actor));
+  limitCredentialAttempt(`source-discord:${actor.workspaceId}:${actor.userId}`);
+  const value = z
+    .string()
+    .trim()
+    .min(20)
+    .max(2000)
+    .regex(/^[A-Za-z0-9._-]+$/)
+    .parse(token);
+  const me = object(await discord(value, "users/@me"));
+  if (me.bot !== true)
+    throw new SourceError(
+      "Use a Discord bot token from the Developer Portal, not a personal account token.",
+      900,
+      "SOURCE_ACCESS",
+    );
+  const app = await discordApplication(value);
+  await writeDatabase((sql) =>
+    saveSourceConnection(
+      sql,
+      actor,
+      "discord",
+      discordId(string(me.id)),
+      string(app.name) || string(me.username) || "Discord",
+      { accessToken: value },
+    ),
+  );
+}
 export async function disconnectSourceConnection(
   actor: Actor,
   provider: ConnectionKind,
@@ -164,8 +219,8 @@ export async function disconnectSourceConnection(
       "UPDATE CONNECTED_SOURCES SET ACTIVE=FALSE,VERSION=VERSION+1,LEASE_ID=NULL,LEASE_UNTIL=NULL WHERE WORKSPACE_ID=? AND PROVIDER IN (?,?)",
       [
         actor.workspaceId,
-        provider === "slack" ? "slack" : "teams",
-        provider === "slack" ? "slack" : "sharepoint",
+        provider === "microsoft" ? "teams" : provider,
+        provider === "microsoft" ? "sharepoint" : provider,
       ],
     );
     if (provider === "microsoft")

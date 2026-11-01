@@ -16,7 +16,10 @@ const action =
 const completed =
   /\b(already|completed|resolved|done|shipped|published)\b|\b(no longer need|don't need|do not need|never mind|nevermind)\b/i;
 
-export function detectRequest(messages: ChatMessage[]): RequestDetection {
+export function detectRequest(
+  messages: ChatMessage[],
+  candidateId?: string,
+): RequestDetection {
   let uncertain: ChatMessage | undefined;
   let explicit: ChatMessage | undefined;
   let closedAfterRequest = false;
@@ -30,6 +33,10 @@ export function detectRequest(messages: ChatMessage[]): RequestDetection {
       .join("\n")
       .trim();
     const subject = analytics.test(text);
+    if (candidateId && message.id !== candidateId) {
+      contextHasAnalytics ||= subject;
+      continue;
+    }
     const asking = ask.test(text);
     const cancel =
       /\b(no longer need|don't need|do not need|never mind|nevermind)\b/i.test(

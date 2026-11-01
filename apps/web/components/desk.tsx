@@ -1148,7 +1148,7 @@ export function Desk({
                       !preview &&
                       member?.role === "owner" && (
                         <Link href="/app?view=settings#connected-sources">
-                          Connect Slack or Teams
+                          Connect a source
                         </Link>
                       )}
                   </div>
@@ -1348,7 +1348,9 @@ export function Desk({
                         Open original in{" "}
                         {detail.request.externalSource.provider === "slack"
                           ? "Slack"
-                          : "Teams"}
+                          : detail.request.externalSource.provider === "discord"
+                            ? "Discord"
+                            : "Teams"}
                       </a>
                       {detail.request.externalSource.truncated && (
                         <span>Thread excerpt</span>

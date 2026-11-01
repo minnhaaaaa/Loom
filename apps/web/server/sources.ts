@@ -44,7 +44,7 @@ import { microsoftConfiguration, SourceError } from "./source-transport";
 
 const date = (time = Date.now()) => sqlTimestamp(new Date(time).toISOString());
 const kind = (provider: SourceProvider) =>
-  provider === "slack" ? "slack" : "microsoft";
+  provider === "teams" || provider === "sharepoint" ? "microsoft" : provider;
 export async function sourceSnapshot(actor: Actor): Promise<SourceSnapshot> {
   return readDatabase(async (sql) => {
     await sourceOwner(sql, actor);
@@ -107,7 +107,8 @@ export async function sourceSnapshot(actor: Actor): Promise<SourceSnapshot> {
       microsoftAvailable,
       syncEnabled: process.env.LOOM_SOURCE_SYNC !== "false",
       connections: connections.map((row) => ({
-        provider: row.PROVIDER as "slack" | "microsoft",
+        provider:
+          row.PROVIDER as SourceSnapshot["connections"][number]["provider"],
         name: String(row.DISPLAY_NAME),
         version: Number(row.VERSION),
       })),
@@ -331,14 +332,22 @@ async function persistItem(
     [actor.workspaceId, source.ID, input.id],
   );
   const hash = digest(input);
-  if (previous?.CONTENT_HASH === hash && !accept) return;
+  if (
+    previous?.CONTENT_HASH === hash &&
+    !accept &&
+    previous.RESOURCE_KIND !== "deleted"
+  )
+    return;
   const provider = source.PROVIDER as SourceProvider;
   let resourceId = previous?.RESOURCE_ID ? String(previous.RESOURCE_ID) : null;
-  let resourceKind = provider === "sharepoint" ? "knowledge" : "request";
+  let resourceKind =
+    provider === "sharepoint" || provider === "github"
+      ? "knowledge"
+      : "request";
   let lastValues: Intake | null = null;
   if (input.deleted || input.skip) {
     resourceKind = input.deleted ? "deleted" : "skipped";
-    if (provider === "sharepoint")
+    if (provider === "sharepoint" || provider === "github")
       await retireDocument(sql, actor, String(source.ID), input.id, resourceId);
   } else if (
     !resourceId &&
@@ -357,7 +366,7 @@ async function persistItem(
       updatedAt: input.updatedAt,
       truncated: input.truncated,
     };
-    if (provider === "sharepoint") {
+    if (provider === "sharepoint" || provider === "github") {
       resourceId = await storeDocument(
         sql,
         actor,
@@ -443,7 +452,8 @@ async function persistItem(
           ? JSON.stringify(input)
           : JSON.stringify({ title: input.title }),
         input.note ||
-          (input.truncated && provider === "sharepoint"
+          (input.truncated &&
+          (provider === "sharepoint" || provider === "github")
             ? "Import limit reached; only part of this document is searchable."
             : input.detection?.reason) ||
           null,
@@ -467,7 +477,8 @@ async function persistItem(
           ? JSON.stringify(input)
           : JSON.stringify({ title: input.title }),
         input.note ||
-          (input.truncated && provider === "sharepoint"
+          (input.truncated &&
+          (provider === "sharepoint" || provider === "github")
             ? "Import limit reached; only part of this document is searchable."
             : input.detection?.reason) ||
           null,
@@ -485,7 +496,7 @@ export async function setRequestMode(
       "SELECT * FROM CONNECTED_SOURCES WHERE WORKSPACE_ID=? AND ID=?",
       [actor.workspaceId, id],
     );
-    if (!source || source.PROVIDER === "sharepoint")
+    if (!source || ["sharepoint", "github"].includes(String(source.PROVIDER)))
       throw new DomainError(
         "SOURCE_SCOPE",
         "Choose a connected chat channel.",
@@ -614,6 +625,36 @@ export async function syncOneSource(workspaceId: string, id: string) {
         : null,
     );
     for (const item of page.items) await storeItem(claim, item);
+    if (claim.source.PROVIDER === "github" && page.reconcileDocuments) {
+      const present = new Set(page.reconcileDocuments);
+      // Reconcile only after a complete pinned tree scan; a partial/failed page never deletes references.
+      await writeDatabase(async (sql) => {
+        await assertClaim(sql, claim);
+        let after = "";
+        while (true) {
+          const rows = await sql.query(
+            `SELECT EXTERNAL_ID,RESOURCE_ID FROM SOURCE_ITEMS WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND RESOURCE_KIND='knowledge' AND EXTERNAL_ID LIKE 'code:%'${after ? " AND EXTERNAL_ID>?" : ""} ORDER BY EXTERNAL_ID LIMIT 500`,
+            [workspaceId, id, ...(after ? [after] : [])],
+          );
+          for (const row of rows)
+            if (!present.has(String(row.EXTERNAL_ID))) {
+              await retireDocument(
+                sql,
+                claim.actor,
+                id,
+                String(row.EXTERNAL_ID),
+                row.RESOURCE_ID ? String(row.RESOURCE_ID) : null,
+              );
+              await sql.execute(
+                "UPDATE SOURCE_ITEMS SET RESOURCE_KIND='deleted',DETAIL=NULL WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND EXTERNAL_ID=?",
+                [workspaceId, id, row.EXTERNAL_ID],
+              );
+            }
+          if (rows.length < 500) break;
+          after = String(rows.at(-1)!.EXTERNAL_ID);
+        }
+      });
+    }
     await writeDatabase(async (sql) => {
       await assertClaim(sql, claim);
       const [count] = await sql.query(
