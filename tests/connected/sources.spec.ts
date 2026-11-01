@@ -51,6 +51,7 @@ test("owners connect Slack and explicitly choose an intake channel before automa
         rootId: "CINTAKE",
         parentId: "",
         shareWithWorkspace: true,
+        requestMode: "detect",
       });
       selected = true;
       snapshot = {
@@ -67,6 +68,10 @@ test("owners connect Slack and explicitly choose an intake channel before automa
             imported: 0,
             skipped: 0,
             syncing: false,
+            requestMode: "detect",
+            reviewCount: 0,
+            review: [],
+            issues: [],
           },
         ],
       };
@@ -96,7 +101,7 @@ test("owners connect Slack and explicitly choose an intake channel before automa
     .getByRole("button", { name: "Load channels", exact: true })
     .click();
   await selectOption(
-    panel.getByRole("combobox", { name: "Intake channel", exact: true }),
+    panel.getByRole("combobox", { name: "Channel", exact: true }),
     "CINTAKE",
   );
   await expect(
@@ -214,5 +219,116 @@ test("SharePoint library selection shares references only after explicit source 
     parentId: "SITE",
     rootId: "DRIVE",
     shareWithWorkspace: true,
+    requestMode: "detect",
   });
+});
+
+test("general-chat review stays compact and supports importing or dismissing a candidate", async ({
+  page,
+}) => {
+  const sourceId = "11111111-1111-4111-8111-111111111111";
+  let snapshot: SourceSnapshot = {
+    ...initial(),
+    connections: [{ provider: "slack", name: "Example team", version: 1 }],
+    sources: [
+      {
+        id: sourceId,
+        provider: "slack",
+        name: "#general",
+        active: true,
+        lastSyncedAt: new Date().toISOString(),
+        nextSyncAt: new Date().toISOString(),
+        error: null,
+        imported: 1,
+        skipped: 0,
+        syncing: false,
+        requestMode: "detect",
+        reviewCount: 2,
+        issues: [],
+        review: [
+          {
+            externalId: "1.1",
+            hash: "a".repeat(64),
+            title: "Why did revenue drop?",
+            text: "Why did revenue drop?",
+            url: "https://fixture.slack.com/archives/GENERAL/p1",
+            reason: "Possible request",
+          },
+          {
+            externalId: "1.2",
+            hash: "b".repeat(64),
+            title: "Which metric should we use?",
+            text: "Which metric should we use?",
+            url: "https://fixture.slack.com/archives/GENERAL/p2",
+            reason: "Possible request",
+          },
+        ],
+      },
+    ],
+  };
+  const decisions: string[] = [];
+  await page.route("**/api/workspaces/sources", async (route) => {
+    if (route.request().method() === "GET")
+      return route.fulfill({ json: snapshot });
+    const input = route.request().postDataJSON();
+    if (input.action === "review") {
+      expect(input.id).toBe(sourceId);
+      expect(input.hash).toBe(
+        input.externalId === "1.1" ? "a".repeat(64) : "b".repeat(64),
+      );
+      decisions.push(input.decision);
+      snapshot = {
+        ...snapshot,
+        sources: snapshot.sources.map((source) => ({
+          ...source,
+          reviewCount: source.reviewCount - 1,
+          imported: source.imported + (input.decision === "accept" ? 1 : 0),
+          review: source.review.filter(
+            (candidate) => candidate.externalId !== input.externalId,
+          ),
+        })),
+      };
+    } else throw new Error("Unexpected review fixture action");
+    return route.fulfill({ json: snapshot });
+  });
+  await account(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/app?view=settings");
+  const panel = page.locator("#connected-sources");
+  await expect(
+    panel.getByText("Why did revenue drop?", { exact: true }).first(),
+  ).toBeHidden();
+  await panel.getByText("Review 2 possible requests", { exact: true }).click();
+  await expect(
+    panel.getByRole("button", { name: "Import request", exact: true }),
+  ).toHaveCount(2);
+  await panel.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: "test-results-connected/request-review-desktop.png",
+  });
+  await panel
+    .getByRole("button", { name: "Import request", exact: true })
+    .first()
+    .click();
+  await expect(
+    panel.getByText("Request imported.", { exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel
+    .getByText("Review 1 possible request", { exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: "test-results-connected/request-review-mobile.png",
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await panel.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await expect(
+    panel.getByText("Message dismissed.", { exact: true }),
+  ).toBeVisible();
+  await expect(panel.getByText(/Review \d possible/)).toHaveCount(0);
+  expect(decisions).toEqual(["accept", "dismiss"]);
 });

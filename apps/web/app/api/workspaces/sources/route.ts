@@ -7,6 +7,8 @@ import {
   changeSource,
   selectSource,
   sourceSnapshot,
+  reviewSourceItem,
+  setRequestMode,
 } from "@/server/sources";
 import {
   connectSlack,
@@ -18,6 +20,22 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const inputSchema = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("request-mode"),
+      id: z.uuid(),
+      mode: z.enum(["detect", "all"]),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("review"),
+      id: z.uuid(),
+      externalId: z.string().min(1).max(300),
+      hash: z.string().regex(/^[a-f0-9]{64}$/),
+      decision: z.enum(["accept", "dismiss"]),
+    })
+    .strict(),
   z
     .object({
       action: z.literal("connect-slack"),
@@ -76,6 +94,18 @@ export const POST = endpoint(async (request) => {
       return sourceSnapshot(actor);
     case "browse":
       return browseSources(actor, input.provider, input.parentId, input.query);
+    case "request-mode":
+      await setRequestMode(actor, input.id, input.mode);
+      return sourceSnapshot(actor);
+    case "review":
+      await reviewSourceItem(
+        actor,
+        input.id,
+        input.externalId,
+        input.hash,
+        input.decision,
+      );
+      return sourceSnapshot(actor);
     case "select":
       await selectSource(actor, input.selection);
       return sourceSnapshot(actor);

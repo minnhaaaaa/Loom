@@ -45,7 +45,7 @@ import {
   getKnowledge,
   requireOperator,
   approvedKnowledge,
-  knowledgeDigest,
+  approvedKnowledgeDigest,
   saveReceipt,
 } from "./knowledge";
 import {
@@ -232,8 +232,7 @@ async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
     member,
     run.requestIds[run.checkpoint],
   );
-  const knowledge = await approvedKnowledge(sql, actor),
-    members = await membersFor(sql, actor);
+  const members = await membersFor(sql, actor);
   const comments = await sql.query(
     "SELECT BODY,VISIBILITY,AUTHOR_ID,CREATED_AT FROM COMMENTS WHERE WORKSPACE_ID = ? AND REQUEST_ID = ? ORDER BY CREATED_AT DESC,ID DESC LIMIT 21",
     [actor.workspaceId, request.id],
@@ -256,6 +255,7 @@ async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
   ]
     .join(" ")
     .slice(0, 4000);
+  const knowledge = await approvedKnowledge(sql, actor, query);
   const matches = retrieveKnowledge(knowledge, query, {
     workspaceId: actor.workspaceId,
     limit: 12,
@@ -266,7 +266,7 @@ async function contextFor(sql: SqlSession, actor: Actor, run: TriageRun) {
     request,
     comments,
     knowledge: matches.map((match) => match.entry),
-    knowledgeDigest: knowledgeDigest(knowledge),
+    knowledgeDigest: await approvedKnowledgeDigest(sql, actor),
     retrieval: {
       method: "keyword-and-metadata-v1",
       availableSources: knowledge.length,
@@ -729,9 +729,10 @@ export async function reviewProposal(
           "The tool changed after triage. Reject this proposal and run triage again.",
           409,
         );
-      const knowledge = await approvedKnowledge(sql, actor),
-        today = new Date().toISOString().slice(0, 10);
-      if (knowledgeDigest(knowledge) !== content.knowledgeDigest)
+      const today = new Date().toISOString().slice(0, 10);
+      if (
+        (await approvedKnowledgeDigest(sql, actor)) !== content.knowledgeDigest
+      )
         throw new DomainError(
           "STALE_KNOWLEDGE",
           "Approved knowledge changed after inference. Run the model again.",

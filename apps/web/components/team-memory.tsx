@@ -215,11 +215,18 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                       {entry.externalSource && (
                         <div className="source-original">
                           <a
-                            href={entry.externalSource.url}
+                            href={
+                              entry.externalSource.page
+                                ? `${entry.externalSource.url.split("#")[0]}#page=${entry.externalSource.page}`
+                                : entry.externalSource.url
+                            }
                             target="_blank"
                             rel="noreferrer"
                           >
-                            Open original in SharePoint
+                            Open original
+                            {entry.externalSource.page
+                              ? ` · page ${entry.externalSource.page}`
+                              : " in SharePoint"}
                           </a>
                           {entry.externalSource.truncated && (
                             <span>Document excerpt</span>

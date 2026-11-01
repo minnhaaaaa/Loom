@@ -24,7 +24,11 @@ import {
   requestSelect,
   visibleRequest,
 } from "./desk";
-import { approvedKnowledge, knowledgeDigest } from "./knowledge";
+import {
+  approvedKnowledge,
+  approvedKnowledgeDigest,
+  getKnowledge,
+} from "./knowledge";
 import { publishedTool } from "./tool-definitions";
 import { analyticsInsights } from "@loom/analytics";
 
@@ -150,7 +154,7 @@ export async function conversationContext(
     `${requestSelect} WHERE R.WORKSPACE_ID=?${filter.sql} ORDER BY R.UPDATED_AT DESC,R.ID LIMIT 51`,
     [actor.workspaceId, ...filter.values],
   );
-  const knowledge = internal ? await approvedKnowledge(sql, actor) : [];
+  const knowledge = internal ? await approvedKnowledge(sql, actor, prompt) : [];
   const selected = retrieveKnowledge(knowledge, prompt, {
     workspaceId: actor.workspaceId,
     limit: 12,
@@ -166,7 +170,9 @@ export async function conversationContext(
       .map((record) => visibleRequest(member, record)),
     recordsHasMore: rows.length > 50,
     knowledge: selected.map((match) => match.entry),
-    knowledgeDigest: knowledgeDigest(knowledge),
+    knowledgeDigest: internal
+      ? await approvedKnowledgeDigest(sql, actor)
+      : digest([]),
     members: internal ? await membersFor(sql, actor) : [],
     history: history.slice(-8),
     prompt,
@@ -232,10 +238,11 @@ export async function assertConversationContext(
         409,
       );
   }
-  const knowledge = context.allowProposals
-    ? await approvedKnowledge(sql, actor)
-    : [];
-  if (knowledgeDigest(knowledge) !== context.knowledgeDigest)
+  if (
+    (context.allowProposals
+      ? await approvedKnowledgeDigest(sql, actor)
+      : digest([])) !== context.knowledgeDigest
+  )
     throw new DomainError(
       "STALE_KNOWLEDGE",
       "Approved team context changed while the agent was replying. Send the prompt again.",
@@ -250,6 +257,20 @@ export async function assertConversationContext(
       "Team membership changed while the agent was replying. Send the prompt again.",
       409,
     );
+  const knowledge = [];
+  for (const entry of context.knowledge) {
+    const current = await getKnowledge(sql, actor, entry.id);
+    if (
+      current.version !== entry.version ||
+      current.contentHash !== entry.contentHash
+    )
+      throw new DomainError(
+        "STALE_KNOWLEDGE",
+        "A cited passage changed. Send the prompt again.",
+        409,
+      );
+    knowledge.push(current);
+  }
   return { member, knowledge };
 }
 export async function conversationMessagesFor(

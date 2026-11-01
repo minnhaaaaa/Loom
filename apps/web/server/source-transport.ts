@@ -245,7 +245,7 @@ export function plainText(html: string): string {
     .trim();
 }
 export const supportedDocument = (name: string) =>
-  /\.(txt|md|markdown|html?|docx)$/i.test(name);
+  /\.(txt|md|markdown|html?|docx|pdf)$/i.test(name);
 export function documentText(data: Uint8Array, name: string) {
   if (/\.docx$/i.test(name)) {
     const files = unzipSync(data, {

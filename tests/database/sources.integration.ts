@@ -15,6 +15,8 @@ import {
   selectSource,
   sourceSnapshot,
   syncOneSource,
+  reviewSourceItem,
+  setRequestMode,
 } from "../../apps/web/server/sources";
 import {
   getRequest,
@@ -60,6 +62,7 @@ afterAll(async () => {
   await writeDatabase(async (sql) => {
     for (const table of [
       "SOURCE_SIGNINS",
+      "SOURCE_DOCUMENT_PARTS",
       "SOURCE_ITEMS",
       "CONNECTED_SOURCES",
       "SOURCE_CONNECTIONS",
@@ -404,4 +407,290 @@ it("completes Microsoft consent, renews tokens, and never exposes the device or 
       ]),
     ),
   ).toEqual([]);
+});
+
+it("detects general-chat requests, holds uncertain messages for scoped review, and remembers dismissals", async () => {
+  const baseline = (await records()).length;
+  let uncertain = "Why did revenue drop?";
+  const upstream = slackMock();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      if (new URL(input).pathname.endsWith("conversations.history"))
+        return Response.json({
+          ok: true,
+          messages: [
+            {
+              ts: "1800000001.1",
+              user: "U1",
+              text: "Can you analyze conversion by region?",
+            },
+            { ts: "1800000002.1", user: "U2", text: uncertain },
+            {
+              ts: "1800000003.1",
+              user: "U3",
+              text: "Good morning, the dashboard is published.",
+            },
+          ],
+        });
+      return upstream(input);
+    }),
+  );
+  await connectSlack(owner, slackToken);
+  const source = await selectSource(owner, {
+    provider: "slack",
+    rootId: "CINTAKE",
+    parentId: "",
+    shareWithWorkspace: true,
+    requestMode: "detect",
+  });
+  await syncOneSource(owner.workspaceId, source.id);
+  expect((await records()).length).toBe(baseline + 1);
+  let status = (await sourceSnapshot(owner)).sources.find(
+    (s) => s.id === source.id,
+  )!;
+  expect(status.reviewCount).toBe(1);
+  const candidate = status.review[0];
+  await expect(
+    reviewSourceItem(
+      requester,
+      source.id,
+      candidate.externalId,
+      candidate.hash,
+      "accept",
+    ),
+  ).rejects.toMatchObject({ code: "ACCESS_DENIED" });
+  await expect(
+    reviewSourceItem(
+      other,
+      source.id,
+      candidate.externalId,
+      candidate.hash,
+      "accept",
+    ),
+  ).rejects.toMatchObject({ code: "SOURCE_CHANGED" });
+  await expect(
+    reviewSourceItem(
+      owner,
+      source.id,
+      candidate.externalId,
+      "f".repeat(64),
+      "accept",
+    ),
+  ).rejects.toMatchObject({ code: "SOURCE_CHANGED" });
+  await reviewSourceItem(
+    owner,
+    source.id,
+    candidate.externalId,
+    candidate.hash,
+    "dismiss",
+  );
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  expect(
+    (await sourceSnapshot(owner)).sources.find((s) => s.id === source.id)
+      ?.reviewCount,
+  ).toBe(0);
+  uncertain = "Why did October revenue drop?";
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  status = (await sourceSnapshot(owner)).sources.find(
+    (s) => s.id === source.id,
+  )!;
+  expect(status.reviewCount).toBe(1);
+  const changed = status.review[0];
+  await reviewSourceItem(
+    owner,
+    source.id,
+    changed.externalId,
+    changed.hash,
+    "accept",
+  );
+  await reviewSourceItem(
+    owner,
+    source.id,
+    changed.externalId,
+    changed.hash,
+    "accept",
+  );
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  expect((await records()).length).toBe(baseline + 2);
+  expect(
+    (await sourceSnapshot(owner)).sources.find((s) => s.id === source.id)
+      ?.reviewCount,
+  ).toBe(0);
+  await setRequestMode(owner, source.id, "all");
+  await changeSource(owner, source.id, "pause");
+  await changeSource(owner, source.id, "resume");
+  expect(
+    (await sourceSnapshot(owner)).sources.find((s) => s.id === source.id)
+      ?.requestMode,
+  ).toBe("all");
+  await syncOneSource(owner.workspaceId, source.id);
+  expect((await records()).length).toBe(baseline + 3);
+});
+
+it("imports all PDF pages, retrieves a late passage, replaces chunks, and retires every deleted passage", async () => {
+  const { pdfFixture } = await import("../helpers/pdf");
+  const { readTeamMemory } = await import("../../apps/web/server/memory");
+  const { approvedKnowledgeDigest } =
+    await import("../../apps/web/server/knowledge");
+  await writeDatabase((sql) =>
+    saveSourceConnection(
+      sql,
+      owner,
+      "microsoft",
+      "microsoft-fixture",
+      "Synthetic Microsoft",
+      { accessToken: "synthetic-token", expiresAt: Date.now() + 3600000 },
+    ),
+  );
+  let pages = [
+    "Revenue glossary",
+    "Use the finance ledger",
+    "Zebracorn reconciliation excludes refunds",
+  ];
+  let deleted = false;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname.endsWith("/drives"))
+        return Response.json({
+          value: [
+            {
+              id: "PDFDRIVE",
+              name: "PDF references",
+              driveType: "documentLibrary",
+            },
+          ],
+        });
+      if (url.pathname.endsWith("/delta"))
+        return Response.json({
+          value: [
+            deleted
+              ? { id: "PDF", deleted: {} }
+              : {
+                  id: "PDF",
+                  name: "Finance.pdf",
+                  file: {},
+                  size: 1500,
+                  webUrl: "https://fixture.sharepoint.com/Finance.pdf",
+                  lastModifiedDateTime: "2026-11-01",
+                },
+          ],
+          "@odata.deltaLink":
+            "https://graph.microsoft.com/v1.0/drives/PDFDRIVE/root/delta?$deltatoken=fixture",
+        });
+      if (url.pathname.endsWith("/content"))
+        return new Response(Buffer.from(pdfFixture(pages)));
+      throw new Error("Unexpected PDF endpoint");
+    }),
+  );
+  const source = await selectSource(owner, {
+    provider: "sharepoint",
+    rootId: "PDFDRIVE",
+    parentId: "SITE",
+    shareWithWorkspace: true,
+  });
+  await syncOneSource(owner.workspaceId, source.id);
+  const corpus = () =>
+    readDatabase(async (sql) =>
+      (await approvedKnowledge(sql, owner)).filter(
+        (entry) => entry.externalSource?.sourceId === source.id,
+      ),
+    );
+  const imported = await corpus();
+  expect(imported).toHaveLength(3);
+  expect(
+    (await sourceSnapshot(owner)).sources.find((s) => s.id === source.id)
+      ?.imported,
+  ).toBe(1);
+  const late = imported.find((entry) => entry.content.includes("Zebracorn"))!;
+  expect(late.externalSource?.page).toBe(3);
+  expect(late.title).toContain("p. 3");
+  const search = await readTeamMemory(owner, { q: "Zebracorn" });
+  expect(JSON.stringify(search)).toContain(late.id);
+  const firstDigest = await readDatabase((sql) =>
+    approvedKnowledgeDigest(sql, owner),
+  );
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  expect((await corpus()).map((entry) => entry.version)).toEqual([1, 1, 1]);
+  pages = ["Revenue glossary updated", "Revised finance ledger"];
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  const updated = await corpus();
+  expect(updated).toHaveLength(2);
+  expect(
+    updated.every((entry) => imported.some((before) => before.id === entry.id)),
+  ).toBe(true);
+  expect(
+    await readDatabase((sql) => approvedKnowledgeDigest(sql, owner)),
+  ).not.toBe(firstDigest);
+  expect(
+    JSON.stringify(await readTeamMemory(owner, { q: "Zebracorn" })),
+  ).not.toContain(late.content);
+  deleted = true;
+  await due(source.id);
+  await syncOneSource(owner.workspaceId, source.id);
+  expect(await corpus()).toEqual([]);
+});
+
+it("retrieves a matching passage beyond 500 references while tracking unseen corpus changes", async () => {
+  const { knowledgeInputSchema } = await import("@loom/contracts");
+  const { digest } = await import("../../apps/web/server/desk");
+  const { approvedKnowledgeDigest } =
+    await import("../../apps/web/server/knowledge");
+  const ids: string[] = [];
+  await writeDatabase(async (sql) => {
+    const values: string[] = [];
+    const tuples: string[] = [];
+    for (let i = 0; i < 502; i++) {
+      const id = randomUUID();
+      ids.push(id);
+      const content = knowledgeInputSchema.parse({
+        title: `Reference ${i}`,
+        kind: "reference",
+        content:
+          i === 501
+            ? "Quasarneedle settlement procedure"
+            : "Ordinary archived terminology",
+        effectiveFrom: "2020-01-01",
+      });
+      tuples.push(
+        "(?,?,1,'approved','reference',NULL,?,?,?,TIMESTAMP '2026-11-01 00:00:00',?)",
+      );
+      values.push(
+        owner.workspaceId,
+        id,
+        JSON.stringify(content),
+        digest(content),
+        owner.userId,
+        owner.userId,
+      );
+    }
+    await sql.execute(
+      `INSERT INTO KNOWLEDGE_ENTRIES (WORKSPACE_ID,ID,VERSION,LIFECYCLE,KIND,DATASET,CONTENT_JSON,CONTENT_HASH,CREATED_BY,CREATED_AT,APPROVED_BY) VALUES ${tuples.join(",")}`,
+      values,
+    );
+  });
+  const matches = await readDatabase((sql) =>
+    approvedKnowledge(sql, owner, "Quasarneedle"),
+  );
+  expect(matches).toHaveLength(1);
+  expect(matches[0].id).toBe(ids[501]);
+  const before = await readDatabase((sql) =>
+    approvedKnowledgeDigest(sql, owner),
+  );
+  await writeDatabase((sql) =>
+    sql.execute(
+      "UPDATE KNOWLEDGE_ENTRIES SET LIFECYCLE='retired',VERSION=VERSION+1 WHERE WORKSPACE_ID=? AND ID=?",
+      [owner.workspaceId, ids[0]],
+    ),
+  );
+  expect(
+    await readDatabase((sql) => approvedKnowledgeDigest(sql, owner)),
+  ).not.toBe(before);
 });

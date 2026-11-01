@@ -29,8 +29,9 @@ import {
 } from "./desk";
 import {
   approvedKnowledge,
+  approvedKnowledgeByIds,
   agentEvent,
-  knowledgeDigest,
+  approvedKnowledgeDigest,
   requireOperator,
   saveReceipt,
 } from "./knowledge";
@@ -47,7 +48,6 @@ export async function externalWorkspace(token: string) {
       "SELECT NAME FROM WORKSPACES WHERE ID=?",
       [actor.workspaceId],
     );
-    const knowledge = await approvedKnowledge(sql, actor);
     return {
       workspace: {
         id: actor.workspaceId,
@@ -61,7 +61,7 @@ export async function externalWorkspace(token: string) {
       actingAs: member,
       tool: await publishedTool(sql, actor),
       members: await membersFor(sql, actor),
-      knowledgeDigest: knowledgeDigest(knowledge),
+      knowledgeDigest: await approvedKnowledgeDigest(sql, actor),
       allowedTransitions: transitions,
       actionCatalog: z.toJSONSchema(commandSchema, { io: "input" }),
       capabilities: [
@@ -103,7 +103,6 @@ export async function externalRequest(token: string, id: string) {
       "SELECT ID,BODY,VISIBILITY,AUTHOR_ID,CREATED_AT FROM COMMENTS WHERE WORKSPACE_ID=? AND REQUEST_ID=? ORDER BY CREATED_AT DESC,ID DESC LIMIT 21",
       [actor.workspaceId, id],
     );
-    const knowledge = await approvedKnowledge(sql, actor);
     return {
       request,
       comments: rows.slice(0, 20).map((row) => ({
@@ -115,7 +114,7 @@ export async function externalRequest(token: string, id: string) {
       })),
       commentsHasMore: rows.length > 20,
       tool: await publishedTool(sql, actor),
-      knowledgeDigest: knowledgeDigest(knowledge),
+      knowledgeDigest: await approvedKnowledgeDigest(sql, actor),
     };
   });
 }
@@ -124,9 +123,9 @@ export async function externalKnowledge(token: string, input: unknown) {
   return readDatabase(async (sql) => {
     const { actor } = await authenticateAgentToken(token, sql);
     await requireOperator(sql, actor);
-    const knowledge = await approvedKnowledge(sql, actor);
+    const knowledge = await approvedKnowledge(sql, actor, query.q);
     return {
-      knowledgeDigest: knowledgeDigest(knowledge),
+      knowledgeDigest: await approvedKnowledgeDigest(sql, actor),
       entries: retrieveKnowledge(knowledge, query.q, {
         workspaceId: actor.workspaceId,
         kind: query.kind === "all" ? undefined : query.kind,
@@ -137,7 +136,7 @@ export async function externalKnowledge(token: string, input: unknown) {
         limit: 20,
       }),
       availableSources: knowledge.length,
-      note: "Search covers the authorized current approved corpus (at most 50 sources). Results are keyword/metadata matches, not evidence of correctness. Requested historical applicability is not used by agent proposals.",
+      note: "Search ranks up to 500 matching passages in the authorized current approved corpus. Results are keyword/metadata matches, not evidence of correctness. Requested historical applicability is not used by agent proposals.",
     };
   });
 }
@@ -202,8 +201,12 @@ export async function createExternalProposal(
         "The record changed. Read it again before proposing changes.",
         409,
       );
-    const knowledge = await approvedKnowledge(sql, actor);
-    const contextDigest = knowledgeDigest(knowledge);
+    const knowledge = await approvedKnowledgeByIds(
+      sql,
+      actor,
+      values.evidenceIds,
+    );
+    const contextDigest = await approvedKnowledgeDigest(sql, actor);
     if (contextDigest !== values.knowledgeDigest)
       throw new DomainError(
         "STALE_KNOWLEDGE",

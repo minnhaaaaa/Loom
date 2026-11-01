@@ -5,7 +5,6 @@ import {
   type Actor,
   type ExternalSource,
   type Intake,
-  type KnowledgeInput,
   type SourceProvider,
   type SourceSelection,
   type SourceSnapshot,
@@ -27,7 +26,7 @@ import {
   insertRequest,
   recordChange,
 } from "./desk";
-import { agentEvent, getKnowledge } from "./knowledge";
+import { retireDocument, storeDocument } from "./source-documents";
 import {
   connectionRow,
   sourceOwner,
@@ -54,9 +53,49 @@ export async function sourceSnapshot(actor: Actor): Promise<SourceSnapshot> {
       [actor.workspaceId],
     );
     const sources = await sql.query(
-      "SELECT S.*, (SELECT COUNT(*) FROM SOURCE_ITEMS I WHERE I.WORKSPACE_ID=S.WORKSPACE_ID AND I.SOURCE_ID=S.ID AND I.RESOURCE_ID IS NOT NULL AND I.RESOURCE_KIND<>'deleted') AS IMPORTED_COUNT FROM CONNECTED_SOURCES S WHERE S.WORKSPACE_ID=? ORDER BY S.DISPLAY_NAME LIMIT 25",
+      "SELECT S.*, (SELECT COUNT(*) FROM SOURCE_ITEMS I WHERE I.WORKSPACE_ID=S.WORKSPACE_ID AND I.SOURCE_ID=S.ID AND I.RESOURCE_ID IS NOT NULL AND I.RESOURCE_KIND IN ('request','knowledge')) AS IMPORTED_COUNT FROM CONNECTED_SOURCES S WHERE S.WORKSPACE_ID=? ORDER BY S.DISPLAY_NAME LIMIT 25",
       [actor.workspaceId],
     );
+    const details = new Map<
+      string,
+      {
+        reviewCount: number;
+        review: SourceSnapshot["sources"][number]["review"];
+        issues: SourceSnapshot["sources"][number]["issues"];
+      }
+    >();
+    for (const source of sources) {
+      const [count] = await sql.query(
+        "SELECT COUNT(*) AS TOTAL FROM SOURCE_ITEMS WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND RESOURCE_KIND='review'",
+        [actor.workspaceId, source.ID],
+      );
+      const candidates = await sql.query(
+        "SELECT EXTERNAL_ID,CONTENT_HASH,ITEM_JSON,DETAIL FROM SOURCE_ITEMS WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND RESOURCE_KIND='review' ORDER BY EXTERNAL_ID LIMIT 10",
+        [actor.workspaceId, source.ID],
+      );
+      const issues = await sql.query(
+        "SELECT ITEM_JSON,DETAIL FROM SOURCE_ITEMS WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND DETAIL IS NOT NULL AND RESOURCE_KIND IN ('knowledge','skipped') ORDER BY EXTERNAL_ID LIMIT 10",
+        [actor.workspaceId, source.ID],
+      );
+      details.set(String(source.ID), {
+        reviewCount: Number(count.TOTAL),
+        review: candidates.map((row) => {
+          const item = JSON.parse(String(row.ITEM_JSON)) as SourceItem;
+          return {
+            externalId: String(row.EXTERNAL_ID),
+            hash: String(row.CONTENT_HASH),
+            title: item.title,
+            text: item.text,
+            url: item.url,
+            reason: String(row.DETAIL),
+          };
+        }),
+        issues: issues.map((row) => ({
+          title: JSON.parse(String(row.ITEM_JSON || "{}")).title || "Document",
+          reason: String(row.DETAIL),
+        })),
+      });
+    }
     let microsoftAvailable = false;
     try {
       microsoftConfiguration();
@@ -74,6 +113,8 @@ export async function sourceSnapshot(actor: Actor): Promise<SourceSnapshot> {
       })),
       sources: sources.map((row) => ({
         id: String(row.ID),
+        ...details.get(String(row.ID))!,
+        requestMode: JSON.parse(String(row.CONFIG_JSON)).requestMode ?? "all",
         provider: row.PROVIDER as SourceProvider,
         name: String(row.DISPLAY_NAME),
         active: Boolean(row.ACTIVE),
@@ -138,12 +179,14 @@ export async function selectSource(actor: Actor, input: SourceSelection) {
       accountId: runtime.accountId,
     });
     const [existing] = await sql.query(
-      "SELECT ID,ACTIVE,CONNECTION_VERSION FROM CONNECTED_SOURCES WHERE WORKSPACE_ID=? AND SOURCE_KEY=?",
+      "SELECT ID,ACTIVE,CONNECTION_VERSION,CONFIG_JSON FROM CONNECTED_SOURCES WHERE WORKSPACE_ID=? AND SOURCE_KEY=?",
       [actor.workspaceId, key],
     );
     if (
       existing?.ACTIVE &&
-      Number(existing.CONNECTION_VERSION) === runtime.version
+      Number(existing.CONNECTION_VERSION) === runtime.version &&
+      (JSON.parse(String(existing.CONFIG_JSON)).requestMode ?? "all") ===
+        config.requestMode
     )
       return { id: String(existing.ID) };
     // The deterministic source identity is protected by the Exasol primary key.
@@ -220,6 +263,7 @@ export async function changeSource(
       rootId: config.rootId,
       parentId: config.parentId,
       shareWithWorkspace: true,
+      requestMode: config.requestMode ?? "all",
     });
   }
   await writeDatabase(async (sql) => {
@@ -270,193 +314,253 @@ async function assertClaim(sql: SqlSession, claim: Claim) {
 }
 async function storeItem(claim: Claim, input: SourceItem) {
   await writeDatabase(async (sql) => {
-    const member = await assertClaim(sql, claim),
-      { actor, source } = claim;
-    const [previous] = await sql.query(
-      "SELECT * FROM SOURCE_ITEMS WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND EXTERNAL_ID=?",
-      [actor.workspaceId, source.ID, input.id],
-    );
-    const hash = digest(input);
-    if (previous?.CONTENT_HASH === hash) return;
-    const provider = source.PROVIDER as SourceProvider;
-    let resourceId = previous?.RESOURCE_ID
-      ? String(previous.RESOURCE_ID)
-      : null;
-    let resourceKind = provider === "sharepoint" ? "knowledge" : "request";
-    let lastValues: Intake | null = null;
-    if (input.deleted || input.skip) {
-      resourceKind = input.deleted ? "deleted" : "skipped";
-      if (resourceId && provider === "sharepoint") {
-        const current = await getKnowledge(sql, actor, resourceId);
-        if (current.state === "approved") {
-          await sql.execute(
-            "UPDATE KNOWLEDGE_ENTRIES SET LIFECYCLE='retired',VERSION=VERSION+1 WHERE WORKSPACE_ID=? AND ID=?",
-            [actor.workspaceId, resourceId],
-          );
-          await agentEvent(
-            sql,
-            actor,
-            resourceId,
-            "source_removed",
-            current.version + 1,
-          );
-        }
-      }
+    await assertClaim(sql, claim);
+    await persistItem(sql, claim.actor, claim.source, input);
+  });
+}
+async function persistItem(
+  sql: SqlSession,
+  actor: Actor,
+  source: Row,
+  input: SourceItem,
+  accept = false,
+) {
+  const member = await sourceOwner(sql, actor);
+  const [previous] = await sql.query(
+    "SELECT * FROM SOURCE_ITEMS WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND EXTERNAL_ID=?",
+    [actor.workspaceId, source.ID, input.id],
+  );
+  const hash = digest(input);
+  if (previous?.CONTENT_HASH === hash && !accept) return;
+  const provider = source.PROVIDER as SourceProvider;
+  let resourceId = previous?.RESOURCE_ID ? String(previous.RESOURCE_ID) : null;
+  let resourceKind = provider === "sharepoint" ? "knowledge" : "request";
+  let lastValues: Intake | null = null;
+  if (input.deleted || input.skip) {
+    resourceKind = input.deleted ? "deleted" : "skipped";
+    if (provider === "sharepoint")
+      await retireDocument(sql, actor, String(source.ID), input.id, resourceId);
+  } else if (
+    !resourceId &&
+    !accept &&
+    input.detection &&
+    input.detection.decision !== "request"
+  ) {
+    resourceKind = input.detection.decision;
+  } else {
+    const externalSource: ExternalSource = {
+      provider,
+      sourceId: String(source.ID),
+      externalId: input.id,
+      url: input.url,
+      author: input.author,
+      updatedAt: input.updatedAt,
+      truncated: input.truncated,
+    };
+    if (provider === "sharepoint") {
+      resourceId = await storeDocument(
+        sql,
+        actor,
+        input,
+        externalSource,
+        resourceId,
+        ["deleted", "skipped"].includes(String(previous?.RESOURCE_KIND)),
+      );
     } else {
-      const externalSource: ExternalSource = {
-        provider,
-        sourceId: String(source.ID),
-        externalId: input.id,
-        url: input.url,
-        author: input.author,
-        updatedAt: input.updatedAt,
-        truncated: input.truncated,
+      const values: Intake = {
+        title: input.title,
+        businessQuestion: `${input.text}${input.truncated ? "\n\n[Excerpt — open the original thread for full context.]" : ""}`,
+        reportingPeriod: "",
+        dataset: "",
       };
-      if (provider === "sharepoint") {
-        const values: KnowledgeInput = {
-          title: input.title,
-          kind: "reference",
-          content: input.text,
-          dataset: "",
-          ownerId: null,
-          effectiveFrom: new Date().toISOString().slice(0, 10),
-          effectiveUntil: null,
-          supersedesId: null,
-          externalSource,
-        };
-        if (resourceId) {
-          const current = await getKnowledge(sql, actor, resourceId);
-          values.effectiveFrom = current.effectiveFrom;
-          // Respect a teammate's retirement; restore only when a remotely removed item returns.
-          const state =
-            current.state === "retired" &&
-            previous?.RESOURCE_KIND !== "deleted" &&
-            previous?.RESOURCE_KIND !== "skipped"
-              ? "retired"
-              : "approved";
-          await sql.execute(
-            "UPDATE KNOWLEDGE_ENTRIES SET VERSION=VERSION+1,LIFECYCLE=?,CONTENT_JSON=?,CONTENT_HASH=? WHERE WORKSPACE_ID=? AND ID=?",
-            [
-              state,
-              JSON.stringify(values),
-              digest(values),
-              actor.workspaceId,
-              resourceId,
-            ],
-          );
-          await agentEvent(
-            sql,
-            actor,
-            resourceId,
-            "source_updated",
-            current.version + 1,
-          );
-        } else {
-          resourceId = randomUUID();
-          await sql.execute(
-            "INSERT INTO KNOWLEDGE_ENTRIES (WORKSPACE_ID,ID,VERSION,LIFECYCLE,KIND,DATASET,CONTENT_JSON,CONTENT_HASH,CREATED_BY,CREATED_AT,APPROVED_BY) VALUES (?,?,1,'approved','reference',NULL,?,?,?,?,?)",
-            [
-              actor.workspaceId,
-              resourceId,
-              JSON.stringify(values),
-              digest(values),
-              actor.userId,
-              date(),
-              actor.userId,
-            ],
-          );
-          await agentEvent(sql, actor, resourceId, "source_imported", 1);
-        }
+      lastValues = values;
+      if (!resourceId) {
+        const request = await insertRequest(
+          sql,
+          actor,
+          member,
+          randomUUID(),
+          hash,
+          values,
+          true,
+        );
+        resourceId = request.id;
+        await sql.execute(
+          "UPDATE REQUESTS SET SOURCE_JSON=? WHERE WORKSPACE_ID=? AND ID=?",
+          [JSON.stringify(externalSource), actor.workspaceId, resourceId],
+        );
       } else {
-        const values: Intake = {
-          title: input.title,
-          businessQuestion: `${input.text}${input.truncated ? "\n\n[Excerpt — open the original thread for full context.]" : ""}`,
-          reportingPeriod: "",
-          dataset: "",
+        const current = await getRequest(sql, actor, member, resourceId);
+        const old = JSON.parse(
+          String(previous?.LAST_VALUES_JSON || "{}"),
+        ) as Partial<Intake>;
+        const next = {
+          ...current,
+          externalSource,
+          title: current.title === old.title ? values.title : current.title,
+          businessQuestion:
+            current.businessQuestion === old.businessQuestion
+              ? values.businessQuestion
+              : current.businessQuestion,
+          version: current.version + 1,
+          updatedAt: new Date().toISOString(),
         };
-        lastValues = values;
-        if (!resourceId) {
-          const request = await insertRequest(
-            sql,
-            actor,
-            member,
-            randomUUID(),
-            hash,
-            values,
-            true,
-          );
-          resourceId = request.id;
-          await sql.execute(
-            "UPDATE REQUESTS SET SOURCE_JSON=? WHERE WORKSPACE_ID=? AND ID=?",
-            [JSON.stringify(externalSource), actor.workspaceId, resourceId],
-          );
-        } else {
-          const current = await getRequest(sql, actor, member, resourceId);
-          const old = JSON.parse(
-            String(previous?.LAST_VALUES_JSON || "{}"),
-          ) as Partial<Intake>;
-          const next = {
-            ...current,
-            externalSource,
-            title: current.title === old.title ? values.title : current.title,
-            businessQuestion:
-              current.businessQuestion === old.businessQuestion
-                ? values.businessQuestion
-                : current.businessQuestion,
-            version: current.version + 1,
-            updatedAt: new Date().toISOString(),
-          };
-          assertRecordSize(next);
-          await sql.execute(
-            "UPDATE REQUESTS SET TITLE=?,BUSINESS_QUESTION=?,SOURCE_JSON=?,VERSION=?,UPDATED_AT=? WHERE WORKSPACE_ID=? AND ID=? AND VERSION=?",
-            [
-              next.title,
-              next.businessQuestion,
-              JSON.stringify(externalSource),
-              next.version,
-              sqlTimestamp(next.updatedAt),
-              actor.workspaceId,
-              resourceId,
-              current.version,
-            ],
-          );
-          await recordChange(
-            sql,
-            actor,
-            next,
-            randomUUID(),
-            hash,
-            "source_updated",
-            false,
-          );
-        }
+        assertRecordSize(next);
+        await sql.execute(
+          "UPDATE REQUESTS SET TITLE=?,BUSINESS_QUESTION=?,SOURCE_JSON=?,VERSION=?,UPDATED_AT=? WHERE WORKSPACE_ID=? AND ID=? AND VERSION=?",
+          [
+            next.title,
+            next.businessQuestion,
+            JSON.stringify(externalSource),
+            next.version,
+            sqlTimestamp(next.updatedAt),
+            actor.workspaceId,
+            resourceId,
+            current.version,
+          ],
+        );
+        await recordChange(
+          sql,
+          actor,
+          next,
+          randomUUID(),
+          hash,
+          "source_updated",
+          false,
+        );
       }
     }
-    if (previous)
+  }
+  if (previous)
+    await sql.execute(
+      "UPDATE SOURCE_ITEMS SET CONTENT_HASH=?,RESOURCE_ID=?,RESOURCE_KIND=?,LAST_VALUES_JSON=?,ITEM_JSON=?,DETAIL=? WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND EXTERNAL_ID=?",
+      [
+        hash,
+        resourceId,
+        resourceKind,
+        lastValues ? JSON.stringify(lastValues) : previous.LAST_VALUES_JSON,
+        resourceKind === "review"
+          ? JSON.stringify(input)
+          : JSON.stringify({ title: input.title }),
+        input.note ||
+          (input.truncated && provider === "sharepoint"
+            ? "Import limit reached; only part of this document is searchable."
+            : input.detection?.reason) ||
+          null,
+        actor.workspaceId,
+        source.ID,
+        input.id,
+      ],
+    );
+  else
+    await sql.execute(
+      "INSERT INTO SOURCE_ITEMS (WORKSPACE_ID,SOURCE_ID,EXTERNAL_ID,CONTENT_HASH,RESOURCE_ID,RESOURCE_KIND,LAST_VALUES_JSON,ITEM_JSON,DETAIL) VALUES (?,?,?,?,?,?,?,?,?)",
+      [
+        actor.workspaceId,
+        source.ID,
+        input.id,
+        hash,
+        resourceId,
+        resourceKind,
+        lastValues ? JSON.stringify(lastValues) : null,
+        resourceKind === "review"
+          ? JSON.stringify(input)
+          : JSON.stringify({ title: input.title }),
+        input.note ||
+          (input.truncated && provider === "sharepoint"
+            ? "Import limit reached; only part of this document is searchable."
+            : input.detection?.reason) ||
+          null,
+      ],
+    );
+}
+export async function setRequestMode(
+  actor: Actor,
+  id: string,
+  mode: "detect" | "all",
+) {
+  return writeDatabase(async (sql) => {
+    await sourceOwner(sql, actor);
+    const [source] = await sql.query(
+      "SELECT * FROM CONNECTED_SOURCES WHERE WORKSPACE_ID=? AND ID=?",
+      [actor.workspaceId, id],
+    );
+    if (!source || source.PROVIDER === "sharepoint")
+      throw new DomainError(
+        "SOURCE_SCOPE",
+        "Choose a connected chat channel.",
+        422,
+      );
+    const config = JSON.parse(String(source.CONFIG_JSON)) as SourceConfig;
+    if ((config.requestMode ?? "all") === mode) return;
+    await sql.execute(
+      "UPDATE CONNECTED_SOURCES SET CONFIG_JSON=?,VERSION=VERSION+1,CURSOR_JSON=NULL,LEASE_ID=NULL,LEASE_UNTIL=NULL,NEXT_SYNC_AT=? WHERE WORKSPACE_ID=? AND ID=?",
+      [
+        JSON.stringify({ ...config, requestMode: mode }),
+        date(),
+        actor.workspaceId,
+        id,
+      ],
+    );
+  });
+}
+export async function reviewSourceItem(
+  actor: Actor,
+  sourceId: string,
+  externalId: string,
+  hash: string,
+  decision: "accept" | "dismiss",
+) {
+  return writeDatabase(async (sql) => {
+    await sourceOwner(sql, actor);
+    const [source] = await sql.query(
+      "SELECT * FROM CONNECTED_SOURCES WHERE WORKSPACE_ID=? AND ID=? AND ACTIVE=TRUE",
+      [actor.workspaceId, sourceId],
+    );
+    if (!source)
+      throw new DomainError(
+        "SOURCE_CHANGED",
+        "Resume this source before reviewing requests.",
+        409,
+      );
+    const connection = await connectionRow(
+      sql,
+      actor,
+      kind(source.PROVIDER as SourceProvider),
+    );
+    if (
+      !connection?.ACTIVE ||
+      Number(connection.VERSION) !== Number(source.CONNECTION_VERSION) ||
+      connection.OWNER_ID !== actor.userId
+    )
+      throw new DomainError(
+        "SOURCE_CHANGED",
+        "Reconnect this source before reviewing requests.",
+        409,
+      );
+    const [item] = await sql.query(
+      "SELECT * FROM SOURCE_ITEMS WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND EXTERNAL_ID=?",
+      [actor.workspaceId, sourceId, externalId],
+    );
+    if (!item || item.CONTENT_HASH !== hash)
+      throw new DomainError(
+        "SOURCE_CHANGED",
+        "This message changed. Reload and review the current text.",
+        409,
+      );
+    if (item.RESOURCE_KIND !== "review") return;
+    if (decision === "dismiss")
       await sql.execute(
-        "UPDATE SOURCE_ITEMS SET CONTENT_HASH=?,RESOURCE_ID=?,RESOURCE_KIND=?,LAST_VALUES_JSON=? WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND EXTERNAL_ID=?",
-        [
-          hash,
-          resourceId,
-          resourceKind,
-          lastValues ? JSON.stringify(lastValues) : previous.LAST_VALUES_JSON,
-          actor.workspaceId,
-          source.ID,
-          input.id,
-        ],
+        "UPDATE SOURCE_ITEMS SET RESOURCE_KIND='dismissed',ITEM_JSON=NULL WHERE WORKSPACE_ID=? AND SOURCE_ID=? AND EXTERNAL_ID=?",
+        [actor.workspaceId, sourceId, externalId],
       );
     else
-      await sql.execute(
-        "INSERT INTO SOURCE_ITEMS (WORKSPACE_ID,SOURCE_ID,EXTERNAL_ID,CONTENT_HASH,RESOURCE_ID,RESOURCE_KIND,LAST_VALUES_JSON) VALUES (?,?,?,?,?,?,?)",
-        [
-          actor.workspaceId,
-          source.ID,
-          input.id,
-          hash,
-          resourceId,
-          resourceKind,
-          lastValues ? JSON.stringify(lastValues) : null,
-        ],
+      await persistItem(
+        sql,
+        actor,
+        source,
+        JSON.parse(String(item.ITEM_JSON)) as SourceItem,
+        true,
       );
   });
 }

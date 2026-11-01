@@ -6,7 +6,6 @@ import type {
 } from "@loom/contracts";
 import { DomainError } from "@loom/domain";
 import {
-  documentText,
   downloadDocument,
   graph,
   graphCollection,
@@ -20,11 +19,20 @@ import {
   supportedDocument,
 } from "./source-transport";
 
+import { extractDocument, type DocumentPart } from "./document-ingestion";
+import {
+  detectRequest,
+  detectionVersion,
+  type ChatMessage,
+  type RequestDetection,
+} from "./request-detection";
+
 export type SourceConfig = {
   rootId: string;
   parentId: string;
   name: string;
   accountId: string;
+  requestMode?: "detect" | "all";
 };
 export type SourceCursor = { next?: string; oldest?: string; latest?: string };
 export type SourceItem = {
@@ -37,6 +45,11 @@ export type SourceItem = {
   truncated: boolean;
   deleted?: boolean;
   skip?: boolean;
+  note?: string;
+  parts?: DocumentPart[];
+  detection?: Pick<RequestDetection, "decision" | "reason"> & {
+    version: string;
+  };
 };
 export type SourcePage = { items: SourceItem[]; cursor: SourceCursor | null };
 const enc = encodeURIComponent;
@@ -113,7 +126,8 @@ export async function validateSource(
   selection: SourceSelection,
   accountId: string,
 ): Promise<SourceConfig> {
-  const { provider, rootId, parentId } = selection;
+  const { provider, rootId } = selection;
+  const parentId = selection.parentId ?? "";
   let name: string;
   if (provider === "slack") {
     const channel = object(
@@ -169,7 +183,13 @@ export async function validateSource(
       );
     name = string(drive.name);
   }
-  return { rootId, parentId, name: name.slice(0, 160) || provider, accountId };
+  return {
+    rootId,
+    parentId,
+    name: name.slice(0, 160) || provider,
+    accountId,
+    requestMode: selection.requestMode ?? "detect",
+  };
 }
 function safeLink(value: string, provider: SourceProvider) {
   let url: URL;
@@ -209,7 +229,9 @@ function item(
     id,
     title:
       title.replace(/\s+/g, " ").trim().slice(0, 160) || "Untitled request",
-    text: text.slice(0, 3800),
+    text: text
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
+      .slice(0, 3800),
     url,
     author: author.slice(0, 160),
     updatedAt: updatedAt.slice(0, 80),
@@ -224,6 +246,36 @@ function slackText(value: unknown) {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
+}
+function detectedItem(
+  value: SourceItem,
+  messages: ChatMessage[],
+  config: SourceConfig,
+) {
+  if (config.requestMode !== "detect") return value;
+  const result = detectRequest(messages);
+  if (result.evidence) {
+    value.title = result.evidence.text
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160);
+    value.author = result.evidence.author.slice(0, 160);
+    // Keep the actual ask visible even when it occurs beyond the thread excerpt.
+    if (!value.text.includes(result.evidence.text)) {
+      value.text =
+        `${result.evidence.text.slice(0, 2400)}\n\nThread context:\n${value.text}`.slice(
+          0,
+          3800,
+        );
+      value.truncated = true;
+    }
+  }
+  value.detection = {
+    decision: result.decision,
+    reason: result.reason,
+    version: detectionVersion,
+  };
+  return value;
 }
 export async function fetchSourcePage(
   provider: SourceProvider,
@@ -257,6 +309,9 @@ export async function fetchSourcePage(
       const id = string(message.ts);
       if (!/^\d+\.\d+$/.test(id)) continue;
       const rootText = slackText(message.text);
+      const messages: ChatMessage[] = [
+        { id, text: rootText, author: string(message.user) },
+      ];
       let text = rootText,
         truncated = false;
       if (Number(message.reply_count) > 0) {
@@ -265,6 +320,21 @@ export async function fetchSourcePage(
           ts: id,
           limit: "100",
         });
+        messages.push(
+          ...objects(replies.messages)
+            .filter(
+              (reply) =>
+                reply.ts !== id &&
+                !reply.bot_id &&
+                !reply.subtype &&
+                string(reply.user),
+            )
+            .map((reply) => ({
+              id: string(reply.ts),
+              text: slackText(reply.text),
+              author: string(reply.user),
+            })),
+        );
         text += objects(replies.messages)
           .filter((reply) => reply.ts !== id && !reply.bot_id && !reply.subtype)
           .map((reply) => `\n\n${string(reply.user)}: ${slackText(reply.text)}`)
@@ -279,16 +349,20 @@ export async function fetchSourcePage(
         message_ts: id,
       });
       items.push(
-        item(
-          id,
-          rootText,
-          text,
-          safeLink(string(permalink.permalink), "slack"),
-          string(message.user),
-          string(object(message.edited).ts) ||
-            string(message.latest_reply) ||
+        detectedItem(
+          item(
             id,
-          { truncated: truncated || text.length > 3800 },
+            rootText,
+            text,
+            safeLink(string(permalink.permalink), "slack"),
+            string(message.user),
+            string(object(message.edited).ts) ||
+              string(message.latest_reply) ||
+              id,
+            { truncated: truncated || text.length > 3800 },
+          ),
+          messages,
+          config,
         ),
       );
     }
@@ -324,7 +398,9 @@ export async function fetchSourcePage(
             : string(body.content);
       if (!rootText.trim()) continue;
       const replies = objects(message.replies).filter(
-        (reply) => !reply.deletedDateTime,
+        (reply) =>
+          !reply.deletedDateTime &&
+          !!string(object(object(reply.from).user).id),
       );
       const text =
         rootText +
@@ -335,17 +411,33 @@ export async function fetchSourcePage(
           )
           .join("");
       items.push(
-        item(
-          string(message.id),
-          string(message.subject) || rootText,
-          text,
-          safeLink(string(message.webUrl), "teams"),
-          string(user.displayName),
-          string(message.lastModifiedDateTime),
-          {
-            truncated:
-              text.length > 3800 || Boolean(message["replies@odata.nextLink"]),
-          },
+        detectedItem(
+          item(
+            string(message.id),
+            string(message.subject) || rootText,
+            text,
+            safeLink(string(message.webUrl), "teams"),
+            string(user.displayName),
+            string(message.lastModifiedDateTime),
+            {
+              truncated:
+                text.length > 3800 ||
+                Boolean(message["replies@odata.nextLink"]),
+            },
+          ),
+          [
+            {
+              id: string(message.id),
+              text: rootText,
+              author: string(user.displayName),
+            },
+            ...replies.map((reply) => ({
+              id: string(reply.id),
+              text: plainText(string(object(reply.body).content)),
+              author: string(object(object(reply.from).user).displayName),
+            })),
+          ],
+          config,
         ),
       );
     }
@@ -365,29 +457,46 @@ export async function fetchSourcePage(
     }
     if (!file.file) continue;
     if (!supportedDocument(name) || Number(file.size) > 5_000_000) {
-      items.push(item(id, name, "", "", "", "", { skip: true }));
+      items.push(
+        item(id, name, "", "", "", "", {
+          skip: true,
+          note:
+            Number(file.size) > 5_000_000
+              ? "File exceeds 5 MB."
+              : "Unsupported file type.",
+        }),
+      );
       continue;
     }
     const data = await downloadDocument(token, config.rootId, id);
-    let text: string;
+    let document;
     try {
-      text = documentText(data, name);
-    } catch {
-      items.push(item(id, name, "", "", "", "", { skip: true }));
-      continue;
-    }
-    if (!text) {
-      items.push(item(id, name, "", "", "", "", { skip: true }));
+      document = await extractDocument(data, name);
+    } catch (error) {
+      items.push(
+        item(id, name, "", "", "", "", {
+          skip: true,
+          note:
+            error instanceof SourceError
+              ? error.message
+              : "Document could not be read.",
+        }),
+      );
       continue;
     }
     items.push(
       item(
         id,
         name,
-        text,
+        document.parts[0].text,
         safeLink(string(file.webUrl), "sharepoint"),
         string(object(object(file.lastModifiedBy).user).displayName),
         string(file.lastModifiedDateTime),
+        {
+          parts: document.parts,
+          truncated: document.truncated,
+          note: document.note,
+        },
       ),
     );
   }

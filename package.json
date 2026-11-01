@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.31.0",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "node --env-file-if-exists=.env apps/web/node_modules/next/dist/bin/next dev apps/web --hostname 127.0.0.1",

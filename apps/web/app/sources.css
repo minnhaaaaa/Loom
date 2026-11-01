@@ -110,6 +110,15 @@
   margin: 24px 0 12px;
   padding: 0;
 }
+.source-list li {
+  align-items: flex-start;
+}
+.source-list li > div:first-child {
+  flex: 1;
+}
+.source-list .loom-select {
+  max-width: 300px;
+}
 .source-list .source-error {
   color: var(--danger);
 }
@@ -143,4 +152,36 @@
   .source-connection > button {
     align-self: start;
   }
+}
+
+.source-review {
+  margin-top: 10px;
+  max-width: 650px;
+}
+.source-review summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.source-review article {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--dashboard-line);
+}
+.source-review article > strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.source-review p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  color: var(--dashboard-muted);
+  max-height: 200px;
+  overflow: auto;
+}
+.source-review a {
+  font-size: 12px;
+}
+.source-review .source-actions {
+  margin-top: 12px;
+  flex-wrap: wrap;
 }

@@ -11,7 +11,12 @@ import {
   proposalKnowledgeSchema,
   type Membership,
 } from "@loom/contracts";
-import { canOperate, DomainError, activeKnowledge } from "@loom/domain";
+import {
+  canOperate,
+  DomainError,
+  activeKnowledge,
+  knowledgeQueryTerms,
+} from "@loom/domain";
 import {
   fromTimestamp,
   readDatabase,
@@ -115,15 +120,23 @@ export async function listKnowledge(actor: Actor) {
     };
   });
 }
-export async function approvedKnowledge(sql: SqlSession, actor: Actor) {
+export async function approvedKnowledge(
+  sql: SqlSession,
+  actor: Actor,
+  query?: string,
+) {
+  const terms = query === undefined ? [] : knowledgeQueryTerms(query);
+  const filter = terms.length
+    ? ` AND (KIND<>'reference' OR ${terms.map(() => "INSTR(LOWER(CONTENT_JSON),LOWER(?))>0").join(" OR ")})`
+    : "";
   const rows = await sql.query(
-    "SELECT * FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID = ? AND LIFECYCLE = 'approved' ORDER BY ID LIMIT 501",
-    [actor.workspaceId],
+    `SELECT * FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID = ? AND LIFECYCLE = 'approved'${filter} ORDER BY ID LIMIT 501`,
+    [actor.workspaceId, ...terms],
   );
   if (rows.length > 500)
     throw new DomainError(
       "KNOWLEDGE_LIMIT",
-      "Retrieval currently supports at most 500 approved sources. Narrow the connected libraries before continuing.",
+      "More than 500 passages match. Use a specific document name or distinctive search terms.",
       422,
     );
   return rows
@@ -132,14 +145,52 @@ export async function approvedKnowledge(sql: SqlSession, actor: Actor) {
       activeKnowledge(entry, new Date().toISOString().slice(0, 10)),
     );
 }
-export function knowledgeDigest(entries: KnowledgeEntry[]) {
-  return digest(
-    entries.map((entry) => ({
-      id: entry.id,
-      version: entry.version,
-      hash: entry.contentHash,
-    })),
+export async function approvedKnowledgeByIds(
+  sql: SqlSession,
+  actor: Actor,
+  ids: string[],
+) {
+  if (!ids.length) return [];
+  const rows = await sql.query(
+    `SELECT * FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID=? AND LIFECYCLE='approved' AND ID IN (${ids.map(() => "?").join(",")}) ORDER BY ID`,
+    [actor.workspaceId, ...ids],
   );
+  return rows
+    .map(mapKnowledge)
+    .filter((entry) =>
+      activeKnowledge(entry, new Date().toISOString().slice(0, 10)),
+    );
+}
+// The entire approved corpus remains a dependency even when retrieval reads only
+// matching passages. Including the date conservatively expires cached decisions.
+export async function approvedKnowledgeDigest(sql: SqlSession, actor: Actor) {
+  const rows: Row[] = [];
+  let after = "";
+  // Stay inside the database driver's 501-row response boundary. Exasol keeps
+  // these keyset pages in the same read transaction.
+  for (;;) {
+    const page = await sql.query(
+      `SELECT ID,VERSION,CONTENT_HASH FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID=? AND LIFECYCLE='approved'${after ? " AND ID>?" : ""} ORDER BY ID LIMIT 500`,
+      after ? [actor.workspaceId, after] : [actor.workspaceId],
+    );
+    rows.push(...page);
+    if (rows.length > 10000)
+      throw new DomainError(
+        "KNOWLEDGE_LIMIT",
+        "This workspace exceeds 10,000 approved passages. Narrow the connected libraries.",
+        422,
+      );
+    if (page.length < 500) break;
+    after = String(page[page.length - 1].ID);
+  }
+  return digest({
+    day: new Date().toISOString().slice(0, 10),
+    entries: rows.map((row) => ({
+      id: row.ID,
+      version: Number(row.VERSION),
+      hash: row.CONTENT_HASH,
+    })),
+  });
 }
 async function eligibleOwner(
   sql: SqlSession,

@@ -21,7 +21,7 @@ import {
 import { digest, receipt } from "./desk";
 import {
   agentEvent,
-  approvedKnowledge,
+  approvedKnowledgeByIds,
   requireOperator,
   saveReceipt,
 } from "./knowledge";
@@ -258,7 +258,11 @@ export async function replyExternalTask(
       );
       return { ...response, replayed: false };
     }
-    const knowledge = await approvedKnowledge(sql, task.author);
+    const knowledge = await approvedKnowledgeByIds(
+      sql,
+      task.author,
+      values.evidenceIds,
+    );
     const today = new Date().toISOString().slice(0, 10);
     const citations = values.evidenceIds.map((id) => {
       const source = knowledge.find(

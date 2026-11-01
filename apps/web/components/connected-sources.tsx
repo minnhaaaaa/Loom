@@ -39,6 +39,7 @@ function SourceSettings({ workspaceId }: { workspaceId: string }) {
   const [parents, setParents] = useState<SourceOption[]>([]),
     [options, setOptions] = useState<SourceOption[]>([]),
     [query, setQuery] = useState("");
+  const [requestMode, setRequestMode] = useState<"detect" | "all">("detect");
   const [shared, setShared] = useState(false),
     [notice, setNotice] = useState("");
   const call = useCallback(
@@ -348,6 +349,7 @@ function SourceSettings({ workspaceId }: { workspaceId: string }) {
                           parentId,
                           rootId,
                           shareWithWorkspace: shared,
+                          requestMode,
                         },
                       }),
                     );
@@ -436,7 +438,7 @@ function SourceSettings({ workspaceId }: { workspaceId: string }) {
                     <label>
                       {provider === "sharepoint"
                         ? "Document library"
-                        : "Intake channel"}
+                        : "Channel"}
                       <LoomSelect
                         value={rootId}
                         disabled={busy}
@@ -455,6 +457,27 @@ function SourceSettings({ workspaceId }: { workspaceId: string }) {
                         ))}
                       </LoomSelect>
                     </label>
+                    {provider !== "sharepoint" && (
+                      <label>
+                        Import
+                        <LoomSelect
+                          value={requestMode}
+                          disabled={busy}
+                          onChange={(event) =>
+                            setRequestMode(
+                              event.target.value as "detect" | "all",
+                            )
+                          }
+                        >
+                          <option value="detect">
+                            Detect analytics requests
+                          </option>
+                          <option value="all">
+                            Every post (dedicated intake)
+                          </option>
+                        </LoomSelect>
+                      </label>
+                    )}
                     <label className="source-share">
                       <input
                         type="checkbox"
@@ -466,8 +489,8 @@ function SourceSettings({ workspaceId }: { workspaceId: string }) {
                     </label>
                     <p className="hint">
                       {provider === "sharepoint"
-                        ? "Word, text, Markdown and HTML documents become reference excerpts for owners and analysts. Select a library they may all read."
-                        : "Human posts in this dedicated channel become requests visible to owners, analysts and viewers. Private channel permissions are not copied."}
+                        ? "PDF, Word and text documents become searchable references. Choose a library all owners and analysts may read."
+                        : "Imported requests are visible to owners, analysts and viewers. Detection uses English rules; uncertain matches wait for review."}
                     </p>
                     <button disabled={busy || !rootId || !shared}>
                       Start automatic import
@@ -498,6 +521,110 @@ function SourceSettings({ workspaceId }: { workspaceId: string }) {
                             ? `Last sync ${new Date(source.lastSyncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                             : "Waiting for first sync"}
                     </span>
+                    {source.provider !== "sharepoint" && (
+                      <LoomSelect
+                        aria-label={`Import mode for ${source.name}`}
+                        value={source.requestMode}
+                        disabled={busy}
+                        onChange={(event) =>
+                          void act(async () => {
+                            setSnapshot(
+                              await call<SourceSnapshot>({
+                                action: "request-mode",
+                                id: source.id,
+                                mode: event.target.value,
+                              }),
+                            );
+                          })
+                        }
+                      >
+                        <option value="detect">
+                          Detect analytics requests
+                        </option>
+                        <option value="all">
+                          Every post (dedicated intake)
+                        </option>
+                      </LoomSelect>
+                    )}
+                    {!!source.reviewCount && (
+                      <details className="source-review">
+                        <summary>
+                          Review {source.reviewCount} possible request
+                          {source.reviewCount === 1 ? "" : "s"}
+                        </summary>
+                        {source.review.map((candidate) => (
+                          <article key={candidate.externalId}>
+                            <strong>{candidate.title}</strong>
+                            {candidate.text !== candidate.title && (
+                              <p>{candidate.text}</p>
+                            )}
+                            <a
+                              href={candidate.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open thread
+                            </a>
+                            <div className="source-actions">
+                              {(["accept", "dismiss"] as const).map(
+                                (decision) => (
+                                  <button
+                                    key={decision}
+                                    disabled={busy || !source.active}
+                                    onClick={() =>
+                                      void act(async () => {
+                                        setSnapshot(
+                                          await call<SourceSnapshot>({
+                                            action: "review",
+                                            id: source.id,
+                                            externalId: candidate.externalId,
+                                            hash: candidate.hash,
+                                            decision,
+                                          }),
+                                        );
+                                        setNotice(
+                                          decision === "accept"
+                                            ? "Request imported."
+                                            : "Message dismissed.",
+                                        );
+                                      })
+                                    }
+                                  >
+                                    {decision === "accept"
+                                      ? "Import request"
+                                      : "Dismiss"}
+                                  </button>
+                                ),
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                        {source.reviewCount > source.review.length && (
+                          <p className="hint">
+                            Showing the first {source.review.length}. Review
+                            these to see more.
+                          </p>
+                        )}
+                      </details>
+                    )}
+                    {source.issues?.length > 0 && (
+                      <details className="source-review">
+                        <summary>Import details</summary>
+                        {source.issues.map((issue, index) => (
+                          <p key={index}>
+                            <strong>{issue.title}</strong>
+                            <br />
+                            {issue.reason}
+                          </p>
+                        ))}
+                        {source.skipped > source.issues.length && (
+                          <p className="hint">
+                            Showing the first {source.issues.length} files with
+                            issues.
+                          </p>
+                        )}
+                      </details>
+                    )}
                     {source.error && (
                       <span className="source-error">{source.error}</span>
                     )}

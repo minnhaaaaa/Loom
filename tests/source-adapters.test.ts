@@ -128,7 +128,7 @@ it("normalizes Teams HTML and marks bounded reply excerpts", async () => {
             replies: [
               {
                 body: { content: "<p>Use October</p>" },
-                from: { user: { displayName: "Bob" } },
+                from: { user: { id: "u2", displayName: "Bob" } },
               },
             ],
             "replies@odata.nextLink": "https://graph.microsoft.com/v1.0/more",
@@ -245,3 +245,71 @@ it("bounds streaming response sizes and treats markup as plain text", async () =
     plainText("<p>A &#x26; B</p><style>bad</style><p>&lt;example&gt;</p>"),
   ).toBe("A & B\n<example>");
 });
+
+it.each(["slack", "teams"] as const)(
+  "detects an analytics ask in a human %s reply and retains its author",
+  async (provider) => {
+    const ask = "Can you analyze conversion by region?";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const path = new URL(input).pathname;
+        if (provider === "teams")
+          return Response.json({
+            value: [
+              {
+                id: "m1",
+                messageType: "message",
+                from: { user: { id: "u1", displayName: "Alice" } },
+                body: { contentType: "text", content: "Morning everyone" },
+                webUrl: "https://teams.microsoft.com/l/message/m1",
+                replies: [
+                  {
+                    id: "r1",
+                    from: { user: { id: "u2", displayName: "Bob" } },
+                    body: { content: ask },
+                  },
+                ],
+              },
+            ],
+          });
+        if (path.endsWith("conversations.history"))
+          return Response.json({
+            ok: true,
+            messages: [
+              {
+                ts: "1800000001.1",
+                user: "U1",
+                text: "Morning everyone",
+                reply_count: 1,
+              },
+            ],
+          });
+        if (path.endsWith("conversations.replies"))
+          return Response.json({
+            ok: true,
+            messages: [
+              { ts: "1800000001.1", user: "U1", text: "Morning everyone" },
+              { ts: "1800000002.1", user: "U2", text: ask },
+            ],
+          });
+        return Response.json({
+          ok: true,
+          permalink: "https://fixture.slack.com/archives/CINTAKE/p1800000001",
+        });
+      }),
+    );
+    const page = await fetchSourcePage(
+      provider,
+      "synthetic-token",
+      { ...config, parentId: "TEAM", requestMode: "detect" },
+      null,
+    );
+    expect(page.items[0]).toMatchObject({
+      title: ask,
+      author: provider === "slack" ? "U2" : "Bob",
+      detection: { decision: "request" },
+    });
+    expect(page.items[0].text).toContain(ask);
+  },
+);
