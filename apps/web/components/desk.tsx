@@ -9,6 +9,7 @@ import { PromptWorkspace } from "./prompt-workspace";
 import { TeamMemory } from "./team-memory";
 import { AnalyticsInsights } from "./analytics-insights";
 import { ProviderSettings } from "./provider-settings";
+import { ConnectedSources } from "./connected-sources";
 import { workspaceFetch } from "./workspace-fetch";
 import { WorkspaceSetup } from "./workspace-setup";
 import { ToolFields, ToolTable, ToolSummary } from "./tool-renderer";
@@ -839,6 +840,12 @@ export function Desk({
               )}
             </div>
           )}
+          {view === "settings" &&
+            !preview &&
+            member?.role === "owner" &&
+            desk.workspace && (
+              <ConnectedSources workspaceId={desk.workspace.id} />
+            )}
           {view === "settings" && !preview && member?.role === "owner" && (
             <div
               className="settings-ai-shortcuts"
@@ -1132,8 +1139,18 @@ export function Desk({
                     <p>
                       {search || status !== "all"
                         ? "Try a different search or status."
-                        : "Create a request to start collecting work in one place."}
+                        : member?.role === "owner"
+                          ? "Connect an intake channel to import requests automatically."
+                          : "Requests will appear when your team connects an intake channel or adds work."}
                     </p>
+                    {!search &&
+                      status === "all" &&
+                      !preview &&
+                      member?.role === "owner" && (
+                        <Link href="/app?view=settings#connected-sources">
+                          Connect Slack or Teams
+                        </Link>
+                      )}
                   </div>
                 )}
                 <div className="table-footer">
@@ -1310,7 +1327,8 @@ export function Desk({
                     />
                     <span>
                       Version {detail.request.version} ·{" "}
-                      {detail.request.requesterName}
+                      {detail.request.externalSource?.author ||
+                        detail.request.requesterName}
                     </span>
                     <button
                       className="quiet"
@@ -1320,6 +1338,23 @@ export function Desk({
                       Refresh details
                     </button>
                   </div>
+                  {detail.request.externalSource && (
+                    <div className="source-original">
+                      <a
+                        href={detail.request.externalSource.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open original in{" "}
+                        {detail.request.externalSource.provider === "slack"
+                          ? "Slack"
+                          : "Teams"}
+                      </a>
+                      {detail.request.externalSource.truncated && (
+                        <span>Thread excerpt</span>
+                      )}
+                    </div>
+                  )}
                   {descriptionConflict && (
                     <section
                       className="alert"

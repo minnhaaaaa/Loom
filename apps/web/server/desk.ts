@@ -13,6 +13,7 @@ import {
   type RequestDetails,
   type RequestRecord,
   dataRequestTemplate,
+  externalSourceSchema,
 } from "@loom/contracts";
 import { sampleRequests } from "@loom/contracts/fixtures";
 import {
@@ -80,6 +81,13 @@ export function mapRequest(row: Row): RequestRecord {
     reportingPeriod: String(row.REPORTING_PERIOD ?? ""),
     dataset: String(row.DATASET ?? ""),
     customValues: JSON.parse(String(row.CUSTOM_VALUES_JSON || "{}")),
+    ...(row.SOURCE_JSON
+      ? {
+          externalSource: externalSourceSchema.parse(
+            JSON.parse(String(row.SOURCE_JSON)),
+          ),
+        }
+      : {}),
     requesterId: String(row.REQUESTER_ID),
     requesterName: String(row.REQUESTER_NAME),
     ownerId: row.OWNER_ID ? String(row.OWNER_ID) : null,
@@ -309,7 +317,7 @@ export async function receipt<T = RequestRecord>(
     );
   return JSON.parse(String(row.RESULT_JSON)) as T;
 }
-async function recordChange(
+export async function recordChange(
   sql: SqlSession,
   actor: Actor,
   request: RequestRecord,

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { PublishedTool } from "./tools";
 import type { WorkspaceSettings } from "./settings";
+import { externalSourceSchema, type ExternalSource } from "./sources";
 
 export const statuses = [
   "new",
@@ -105,6 +106,7 @@ export const mutationSchema = z
   })
   .strict();
 export type RequestRecord = Intake & {
+  externalSource?: ExternalSource;
   id: string;
   workspaceId: string;
   requesterId: string;
@@ -165,6 +167,7 @@ export * from "./memory";
 export * from "./conversation";
 export * from "./agents";
 export * from "./settings";
+export * from "./sources";
 export type AnalyticsResult = {
   queryId: "queue-summary-v1";
   queriedAt: string;
@@ -216,7 +219,7 @@ export type KnowledgeProvenance = z.infer<typeof knowledgeProvenanceSchema>;
 export const knowledgeInputSchema = z
   .object({
     title: z.string().trim().min(1).max(160),
-    kind: z.enum(["procedure", "glossary", "routing"]),
+    kind: z.enum(["procedure", "glossary", "routing", "reference"]),
     content: z.string().trim().min(1).max(4000),
     dataset: z.string().trim().max(200).default(""),
     ownerId: z.uuid().nullable().default(null),
@@ -224,6 +227,7 @@ export const knowledgeInputSchema = z
     effectiveUntil: z.iso.date().nullable().default(null),
     supersedesId: z.uuid().nullable().default(null),
     provenance: knowledgeProvenanceSchema.optional(),
+    externalSource: externalSourceSchema.optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

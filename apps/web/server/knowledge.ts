@@ -117,13 +117,13 @@ export async function listKnowledge(actor: Actor) {
 }
 export async function approvedKnowledge(sql: SqlSession, actor: Actor) {
   const rows = await sql.query(
-    "SELECT * FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID = ? AND LIFECYCLE = 'approved' ORDER BY ID LIMIT 51",
+    "SELECT * FROM KNOWLEDGE_ENTRIES WHERE WORKSPACE_ID = ? AND LIFECYCLE = 'approved' ORDER BY ID LIMIT 501",
     [actor.workspaceId],
   );
-  if (rows.length > 50)
+  if (rows.length > 500)
     throw new DomainError(
       "KNOWLEDGE_LIMIT",
-      "Model context currently supports at most 50 approved sources. Narrow the knowledge corpus before continuing.",
+      "Retrieval currently supports at most 500 approved sources. Narrow the connected libraries before continuing.",
       422,
     );
   return rows
@@ -162,7 +162,7 @@ export async function createKnowledge(
 ) {
   const values = knowledgeInputSchema.parse(input),
     hash = digest({ type: "knowledge-create", values });
-  if (values.provenance)
+  if (values.provenance || values.externalSource)
     throw new DomainError(
       "KNOWLEDGE_PROVENANCE",
       "Create decision-backed knowledge from its reviewed proposal so the server can verify its source.",

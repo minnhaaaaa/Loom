@@ -19,6 +19,7 @@
     "@next/env": "16.4.2",
     "@phosphor-icons/react": "^2.1.10",
     "csv-parse": "^7.0.3",
+    "fflate": "0.8.3",
     "gsap": "^3.15.0",
     "jose": "^6.2.14",
     "next": "16.4.2",

@@ -240,7 +240,7 @@ export function buildMemoryGraph(input: {
     addEdge(
       `knowledge:${entry.id}`,
       `person:${entry.createdBy}`,
-      "authored_by",
+      entry.externalSource ? "imported_by" : "authored_by",
       evidence,
     );
     if (entry.approvedBy)

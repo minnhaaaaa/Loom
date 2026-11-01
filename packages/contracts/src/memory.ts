@@ -4,7 +4,9 @@ import type { KnowledgeEntry } from "./index";
 export const memoryQuerySchema = z
   .object({
     q: z.string().trim().max(200).default(""),
-    kind: z.enum(["all", "procedure", "glossary", "routing"]).default("all"),
+    kind: z
+      .enum(["all", "procedure", "glossary", "routing", "reference"])
+      .default("all"),
     dataset: z.string().trim().max(200).default(""),
     ownerId: z.uuid().optional(),
     asOf: z.iso.date().optional(),
@@ -32,6 +34,7 @@ export type MemoryEdge = {
     | "assigned_to"
     | "owner_context"
     | "authored_by"
+    | "imported_by"
     | "approved_by"
     | "cites"
     | "proposes_for"

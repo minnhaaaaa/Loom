@@ -137,6 +137,7 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                   <option value="procedure">Procedures</option>
                   <option value="routing">Routing guidance</option>
                   <option value="glossary">Glossary</option>
+                  <option value="reference">Imported references</option>
                 </LoomSelect>
               </label>
               <label>
@@ -199,7 +200,8 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                 </p>
                 {!snapshot.entries.length && (
                   <p className="memory-empty">
-                    No approved sources found. Add one in Manage knowledge.
+                    No sources found. Connect SharePoint in Settings or add team
+                    guidance.
                   </p>
                 )}
                 {snapshot.entries.map(({ entry }) => (
@@ -210,6 +212,20 @@ export function TeamMemory({ refreshKey }: { refreshKey: string }) {
                     </summary>
                     <div className="memory-source-content">
                       <p className="source-text">{entry.content}</p>
+                      {entry.externalSource && (
+                        <div className="source-original">
+                          <a
+                            href={entry.externalSource.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open original in SharePoint
+                          </a>
+                          {entry.externalSource.truncated && (
+                            <span>Document excerpt</span>
+                          )}
+                        </div>
+                      )}
                       <p className="hint">
                         v{entry.version} · {entry.effectiveFrom}
                         {entry.effectiveUntil

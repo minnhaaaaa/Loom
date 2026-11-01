@@ -9,6 +9,7 @@ const relations: Record<MemoryEdge["relation"], string> = {
   assigned_to: "Assigned to",
   owner_context: "Owner context",
   authored_by: "Authored by",
+  imported_by: "Imported by",
   approved_by: "Approved by",
   cites: "Cites source",
   proposes_for: "Proposes changes for",
