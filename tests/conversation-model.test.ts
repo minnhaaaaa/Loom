@@ -47,6 +47,29 @@ it("answers an arbitrary prompt with no selected records and no forced change", 
     max_price: { prompt: 0, completion: 0, request: 0 },
   });
   expect(request.response_format.json_schema.strict).toBe(true);
+  expect(
+    request.response_format.json_schema.schema.properties.evidenceIds.maxItems,
+  ).toBe(0);
+  expect(request.messages[0].content).toContain("never request IDs");
+});
+it("limits citation schema to knowledge IDs, excluding visible request IDs", async () => {
+  configure();
+  const fetch = vi.fn().mockResolvedValue(envelope(JSON.stringify(answer)));
+  vi.stubGlobal("fetch", fetch);
+  const knowledgeId = "10000000-0000-4000-8000-000000000001";
+  await inferConversation(
+    {
+      knowledge: [{ id: knowledgeId }],
+      records: [{ id: "20000000-0000-4000-8000-000000000002" }],
+    },
+    "fixture/conversation:free",
+  );
+  const schema = JSON.parse(fetch.mock.calls[0][1].body).response_format
+    .json_schema.schema;
+  expect(schema.properties.evidenceIds.items.enum).toEqual([knowledgeId]);
+  expect(
+    schema.properties.proposals.items.properties.evidenceIds.items.enum,
+  ).toEqual([knowledgeId]);
 });
 it("decodes model-chosen tool design and direct command choices without keyword routing", () => {
   const parameters = Object.fromEntries(

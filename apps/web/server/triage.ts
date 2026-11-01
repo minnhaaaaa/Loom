@@ -1,4 +1,5 @@
 import "server-only";
+import { conversationPromptVersion } from "./conversation-model";
 import { workspaceProvider, assertProviderCurrent } from "./provider-config";
 import { modelIdentity } from "./provider-transport";
 import { randomUUID } from "node:crypto";
@@ -188,11 +189,13 @@ export async function startRun(
     return getRun(sql, actor, id);
   });
 }
-function supportedRun(run: TriageRun, allowExternal = false) {
+export function supportedRun(run: TriageRun, allowExternal = false) {
   if (
     allowExternal &&
     run.engine === "conversation-v1" &&
-    ["conversation-v1", "conversation-v2"].includes(run.promptVersion || "") &&
+    ["conversation-v1", "conversation-v2", conversationPromptVersion].includes(
+      run.promptVersion || "",
+    ) &&
     run.model &&
     /^request-desk-v[1-9]\d*$/.test(run.toolRevision)
   )

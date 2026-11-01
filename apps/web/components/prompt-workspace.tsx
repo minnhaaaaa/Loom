@@ -2,6 +2,8 @@
 import { workspaceFetch } from "./workspace-fetch";
 
 import Link from "next/link";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   useCallback,
   useEffect,
@@ -68,6 +70,23 @@ function relativeTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function ThinkingIndicator() {
+  return (
+    <div
+      className="prompt-waiting prompt-thinking"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="prompt-thinking-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span>Thinking…</span>
+    </div>
+  );
 }
 
 function ProposalCard({
@@ -137,8 +156,14 @@ function ProposalCard({
     >
       <div className="prompt-result-heading">
         <div>
-          <span className="prompt-result-kind">Suggested change</span>
-          <h4>{before.title}</h4>
+          <span className="prompt-result-kind">Request update</span>
+          <h4>
+            {pending
+              ? "Review suggested changes"
+              : proposal.state === "applied"
+                ? "Changes applied"
+                : "Changes rejected"}
+          </h4>
         </div>
         <span
           className={`prompt-proposal-state prompt-proposal-${proposal.state}`}
@@ -150,20 +175,45 @@ function ProposalCard({
               : "Rejected"}
         </span>
       </div>
-      {proposal.content.reasons.length > 0 && (
-        <p>{proposal.content.reasons.join(" ")}</p>
+      <p className="prompt-proposal-request">{before.title}</p>
+      {pending && (
+        <p className="prompt-proposal-intro">
+          Review the new details below. Nothing changes until you approve.
+        </p>
       )}
       {changes.length > 0 && (
-        <dl className="prompt-change-list">
+        <dl className="prompt-proposed-values">
           {changes.map((change) => (
-            <div key={change.id}>
-              <dt>{change.label}</dt>
-              <dd>
-                <span>{change.before || "Empty"}</span>
-                <span className="prompt-change-arrow" aria-label="changes to">
-                  →
+            <div
+              key={change.id}
+              className={
+                change.id === "system:status"
+                  ? "prompt-proposed-status"
+                  : undefined
+              }
+            >
+              <dt>
+                {change.label}
+                <span>
+                  {!change.after ? "Remove" : change.before ? "Update" : "Add"}
                 </span>
-                <strong>{change.after || "Empty"}</strong>
+              </dt>
+              <dd>
+                {change.id === "system:status" && (
+                  <>
+                    <span className="prompt-previous-status">
+                      {change.before}
+                    </span>
+                    <span
+                      className="prompt-change-arrow"
+                      aria-label="changes to"
+                    >
+                      {" "}
+                      →{" "}
+                    </span>
+                  </>
+                )}
+                <span>{change.after || "Not set"}</span>
               </dd>
             </div>
           ))}
@@ -206,13 +256,33 @@ function ProposalCard({
           ))}
         </div>
       )}
-      <details className="prompt-exact-changes">
-        <summary>View exact proposal</summary>
-        <pre>{JSON.stringify(proposal.content.commands, null, 2)}</pre>
-        <p>
-          Record version {proposal.content.expectedVersion} · review{" "}
-          {proposal.hash}
-        </p>
+      <details className="prompt-proposal-comparison">
+        <summary>Compare with current request</summary>
+        <dl className="prompt-change-list">
+          {changes.map((change) => (
+            <div key={change.id}>
+              <dt>{change.label}</dt>
+              <dd>
+                <span>Current: {change.before || "Not set"}</span>
+                <span>Proposed: {change.after || "Not set"}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {proposal.content.reasons.length > 0 && (
+          <div className="prompt-proposal-reason">
+            <strong>Why these changes?</strong>
+            <p>{proposal.content.reasons.join(" ")}</p>
+          </div>
+        )}
+        <details className="prompt-exact-changes">
+          <summary>Technical details</summary>
+          <pre>{JSON.stringify(proposal.content.commands, null, 2)}</pre>
+          <p>
+            Record version {proposal.content.expectedVersion} · review{" "}
+            {proposal.hash}
+          </p>
+        </details>
       </details>
       {pending && canReview && (
         <div className="prompt-review-actions">
@@ -511,6 +581,9 @@ export function PromptWorkspace({
     const command = pendingSend.current;
     working.current = true;
     setBusy("sending");
+    requestAnimationFrame(() =>
+      messagesEnd.current?.scrollIntoView({ block: "nearest" }),
+    );
     setError("");
     setNotice("");
     const current = ++generation.current;
@@ -648,17 +721,25 @@ export function PromptWorkspace({
           </time>
         </div>
         {message.content && (
-          <div className="prompt-message-content">
-            {message.content.split(/\n{2,}/).map((paragraph, index) => (
-              <p key={index}>{paragraph}</p>
-            ))}
+          <div
+            className={`prompt-message-content${message.role === "assistant" ? " prompt-markdown" : ""}`}
+          >
+            {message.role === "assistant" ? (
+              <Markdown
+                remarkPlugins={[remarkGfm]}
+                skipHtml
+                components={{ img: () => null }}
+              >
+                {message.content}
+              </Markdown>
+            ) : (
+              message.content
+                .split(/\n{2,}/)
+                .map((paragraph, index) => <p key={index}>{paragraph}</p>)
+            )}
           </div>
         )}
-        {message.state === "pending" && (
-          <p className="prompt-waiting" role="status">
-            Request saved. Waiting for a response.
-          </p>
-        )}
+        {message.state === "pending" && <ThinkingIndicator />}
         {message.state === "failed" &&
           snapshot?.configuration.provider === "codex" && (
             <a
@@ -755,9 +836,33 @@ export function PromptWorkspace({
           Showing your most recent conversation. Earlier messages remain saved.
         </p>
       )}
-      {messages.length > 0 && (
+      {(messages.length > 0 || busy === "sending") && (
         <div className="prompt-conversation" aria-label="Your conversation">
           {messages.map(renderMessage)}
+          {busy === "sending" && !waiting && (
+            <>
+              <article
+                className="prompt-message prompt-message-user"
+                aria-label="Your message"
+              >
+                <div className="prompt-message-heading">
+                  <strong>You</strong>
+                </div>
+                <div className="prompt-message-content">
+                  <p>{prompt.trim()}</p>
+                </div>
+              </article>
+              <article
+                className="prompt-message prompt-message-assistant"
+                aria-label="Assistant is thinking"
+              >
+                <div className="prompt-message-heading">
+                  <strong>Assistant</strong>
+                </div>
+                <ThinkingIndicator />
+              </article>
+            </>
+          )}
           <div ref={messagesEnd} />
         </div>
       )}

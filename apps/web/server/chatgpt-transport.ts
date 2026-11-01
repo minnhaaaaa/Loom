@@ -142,11 +142,12 @@ function completedResponse(value: unknown, response: Response) {
 }
 
 async function consumeStream(response: Response, signal: AbortSignal) {
+  const contentType = response.headers.get("content-type");
+  // Some plan responses omit Content-Type. Still require valid SSE events and
+  // a validated terminal response below; never accept arbitrary HTTP 200 bodies.
   if (
     !response.body ||
-    !/^text\/event-stream(?:;|$)/i.test(
-      response.headers.get("content-type") || "",
-    )
+    (contentType && !/^text\/event-stream(?:;|$)/i.test(contentType))
   )
     throw new Error("ChatGPT did not return an event stream");
   const reader = response.body.getReader();
@@ -156,6 +157,7 @@ async function consumeStream(response: Response, signal: AbortSignal) {
     data: string[] = [],
     eventName = "";
   let terminal: Response | undefined;
+  const completedItems = new Map<number, unknown>();
   const cancel = () => {
     void reader.cancel(signal.reason).catch(() => {});
   };
@@ -179,8 +181,32 @@ async function consumeStream(response: Response, signal: AbortSignal) {
       const event = object(value);
       if (typeof event.type !== "string" || (name && name !== event.type))
         throw new Error("Invalid ChatGPT stream event");
-      if (event.type === "response.completed") {
-        terminal = completedResponse(event.response, response);
+      if (event.type === "response.output_item.done") {
+        const index = event.output_index;
+        if (
+          typeof index !== "number" ||
+          !Number.isInteger(index) ||
+          index < 0 ||
+          index > 1024 ||
+          completedItems.has(index)
+        )
+          throw new Error("Invalid completed ChatGPT output index");
+        completedItems.set(index, event.item);
+      } else if (event.type === "response.completed") {
+        const result = object(event.response);
+        // Some plan streams deliver final items only in output_item.done.
+        // Never reconstruct from deltas or accept items without completion.
+        terminal = completedResponse(
+          Array.isArray(result.output) && result.output.length === 0
+            ? {
+                ...result,
+                output: [...completedItems]
+                  .sort(([a], [b]) => a - b)
+                  .map(([, item]) => item),
+              }
+            : result,
+          response,
+        );
       } else if (event.type === "response.failed") {
         terminal = failedResponse(
           object(event.response).error,
@@ -270,18 +296,19 @@ export async function chatgptFetch(
       model: config.model,
       store: false,
       stream: true,
-      max_output_tokens: config.maxTokens,
+      // ChatGPT plan usage rejects max_output_tokens and system message items.
+      // Loom schemas include dynamic custom-field maps, outside strict Outputs'
+      // supported subset. Callers validate the full schema before using results.
+      instructions: request.system,
       input: [
-        { role: "system", content: request.system },
+        {
+          role: "developer",
+          content: `Return only a JSON object matching this schema:\n${JSON.stringify(request.schema)}`,
+        },
         { role: "user", content: request.input },
       ],
       text: {
-        format: {
-          type: "json_schema",
-          name: request.schemaName,
-          strict: true,
-          schema: request.schema,
-        },
+        format: { type: "json_object" },
       },
     }),
     signal,

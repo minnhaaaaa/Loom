@@ -1,5 +1,7 @@
 # Loom architecture
 
+See the [current architecture diagram and Mermaid source](docs/architecture/README.md) for the submission overview.
+
 Status: implementation resumed; this document combines implemented foundation and planned later capabilities. Research reviewed: 2026-10-21.
 
 Loom is a shared internal-tool workspace. The first workflow is a data-request desk: collect requirements, clarify missing details, retrieve team guidance, propose ownership, and track resolution. The design preserves a reusable request-and-review engine while limiting the first product to one workflow family.

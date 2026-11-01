@@ -1,8 +1,7 @@
 "use client";
 import { workspaceFetch } from "./workspace-fetch";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
-import type { AccountContext } from "@loom/contracts";
+import { useId, useState, type FormEvent } from "react";
 
 export class AccessError extends Error {
   constructor(
@@ -37,13 +36,14 @@ export function AccountAccess({
   onAuthenticated,
   initialMode = "login",
   minimalPublic = false,
+  registrationEnabled = false,
 }: {
   onAuthenticated: () => Promise<void>;
   initialMode?: "login" | "register";
   minimalPublic?: boolean;
+  registrationEnabled?: boolean;
 }) {
   const id = useId();
-  const [context, setContext] = useState<AccountContext | null>(null);
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [name, setName] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
@@ -52,24 +52,9 @@ export function AccountAccess({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void accessRequest<AccountContext>("/api/account", {
-      signal: controller.signal,
-    })
-      .then((next) => {
-        if (!controller.signal.aborted) setContext(next);
-      })
-      .catch((reason) => {
-        if (!controller.signal.aborted) setError(reason.message);
-      });
-    return () => controller.abort();
-  }, []);
-
   async function authenticate(event: FormEvent) {
     event.preventDefault();
-    if (busy || (mode === "register" && !context?.registrationEnabled)) return;
+    if (busy || (mode === "register" && !registrationEnabled)) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -141,7 +126,7 @@ export function AccountAccess({
             >
               Sign in
             </button>
-            {context?.registrationEnabled && (
+            {registrationEnabled && (
               <button
                 type="button"
                 role="tab"
@@ -242,11 +227,7 @@ export function AccountAccess({
             {notice}
           </p>
           <button
-            disabled={
-              busy ||
-              !context ||
-              (mode === "register" && !context.registrationEnabled)
-            }
+            disabled={busy || (mode === "register" && !registrationEnabled)}
             type="submit"
           >
             {busy
@@ -255,16 +236,11 @@ export function AccountAccess({
                 ? "Create company and account"
                 : "Sign in to company"}
           </button>
-          {context && !context.registrationEnabled && (
+          {!registrationEnabled && (
             <p className="hint">
               {mode === "register"
                 ? "New company registration is not enabled on this deployment. Existing staff can sign in or use an invitation from their company admin."
                 : "Joining a company? Open the invitation link your company admin shared."}
-            </p>
-          )}
-          {!context && !error && (
-            <p className="hint" role="status">
-              Checking account access…
             </p>
           )}
         </form>

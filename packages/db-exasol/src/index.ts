@@ -98,13 +98,23 @@ export async function openConnection(useSchema = true) {
     },
   );
   let timedOut = false;
+  let rejectDeadline!: (error: Error) => void;
+  const deadline = new Promise<never>((_, reject) => {
+    rejectDeadline = reject;
+  });
+  // A closed socket does not always settle an outstanding driver command.
+  // Bound callers as well, so one stalled transaction cannot hold the writer queue.
+  void deadline.catch(() => undefined);
+  const bounded = <T>(operation: Promise<T>): Promise<T> =>
+    Promise.race([operation, deadline]);
   const timer = setTimeout(() => {
     timedOut = true;
+    rejectDeadline(new DatabaseUnavailable("The Exasol operation timed out."));
     socket.current?.terminate();
   }, 20_000);
   timer.unref();
   try {
-    await driver.connect();
+    await bounded(driver.connect());
   } catch (error) {
     connectionCode ??=
       error instanceof Error
@@ -112,7 +122,7 @@ export async function openConnection(useSchema = true) {
         : "LOGIN_ERROR";
     clearTimeout(timer);
     socket.current?.terminate();
-    await driver.close().catch(() => undefined);
+    if (!timedOut) void driver.close().catch(() => undefined);
     throw new DatabaseUnavailable(
       "Cannot connect to Exasol. Check the server, credentials, and trusted TLS certificate.",
       connectionCode,
@@ -227,13 +237,13 @@ export async function openConnection(useSchema = true) {
   }
   const session: SqlSession = {
     async query(sql, values) {
-      const result = (await run(sql, values)).results[0];
+      const result = (await bounded(run(sql, values))).results[0];
       if (result?.resultType !== "resultSet")
         throw new DatabaseError("EXPECTED_ROWS", "Expected a query result.");
       return new QueryResult(result.resultSet).getRows();
     },
     async execute(sql, values) {
-      const result = (await run(sql, values)).results[0];
+      const result = (await bounded(run(sql, values))).results[0];
       if (result?.resultType !== "rowCount" || result.rowCount === undefined)
         throw new DatabaseError(
           "EXPECTED_ROW_COUNT",
@@ -245,14 +255,25 @@ export async function openConnection(useSchema = true) {
   return {
     session,
     async commit() {
-      ensureOk(await driver.query("COMMIT", undefined, undefined, "raw"));
+      if (timedOut)
+        throw new DatabaseUnavailable("The Exasol operation timed out.");
+      ensureOk(
+        await bounded(driver.query("COMMIT", undefined, undefined, "raw")),
+      );
     },
     async rollback() {
-      ensureOk(await driver.query("ROLLBACK", undefined, undefined, "raw"));
+      if (timedOut) return;
+      ensureOk(
+        await bounded(driver.query("ROLLBACK", undefined, undefined, "raw")),
+      );
     },
     async close() {
-      clearTimeout(timer);
-      await driver.close().catch(() => undefined);
+      try {
+        if (!timedOut) await bounded(driver.close()).catch(() => undefined);
+      } finally {
+        clearTimeout(timer);
+        socket.current?.terminate();
+      }
     },
   };
 }

@@ -119,10 +119,16 @@ export function WorkspaceSetup({
   onPreview: (branding: WorkspaceBranding | null) => void;
   onSaved: (settings: WorkspaceSettings) => void;
 }) {
+  function setupBranding(branding: WorkspaceBranding): WorkspaceBranding {
+    return {
+      ...structuredClone(branding),
+      companyName: branding.companyName.trim() || workspaceName.trim(),
+    };
+  }
   const [open, setOpen] = useState(initiallyOpen && !settings.setupCompletedAt);
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<WorkspaceBranding>(() =>
-    structuredClone(settings.branding),
+    setupBranding(settings.branding),
   );
   const draftRef = useRef(draft);
   const [logoLoading, setLogoLoading] = useState(false);
@@ -281,9 +287,9 @@ export function WorkspaceSetup({
   function useSaved() {
     ++logoGeneration.current;
     setLogoLoading(false);
-    draftRef.current = structuredClone(settings.branding);
+    draftRef.current = setupBranding(settings.branding);
     setBase(settings);
-    setDraft(structuredClone(settings.branding));
+    setDraft(setupBranding(settings.branding));
     setAgent(settings.preferredAgent);
     setError("");
     onPreview(null);
@@ -325,9 +331,9 @@ export function WorkspaceSetup({
           completeSetup,
         },
       );
-      draftRef.current = structuredClone(next.branding);
+      draftRef.current = setupBranding(next.branding);
       setBase(next);
-      setDraft(structuredClone(next.branding));
+      setDraft(setupBranding(next.branding));
       setAgent(next.preferredAgent);
       onSaved(next);
       onPreview(null);
@@ -966,6 +972,18 @@ export function WorkspaceSetup({
                       Agent access is ready when your client makes its first
                       authenticated request. Finishing setup does not launch an
                       agent session.
+                    </p>
+                  )}
+                  {!draft.companyName.trim() && (
+                    <p className="hint">
+                      Add your company name in step 1 to finish setup.{" "}
+                      <button
+                        type="button"
+                        className="quiet"
+                        onClick={() => setStep(0)}
+                      >
+                        Go to company name
+                      </button>
                     </p>
                   )}
                   <button

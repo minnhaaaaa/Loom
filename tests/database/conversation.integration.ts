@@ -20,6 +20,7 @@ import {
   sendConversation,
 } from "../../apps/web/server/conversation";
 import { reviewProposal } from "../../apps/web/server/triage";
+import { conversationPromptVersion } from "../../apps/web/server/conversation-model";
 import {
   getConversationTurn,
   type ConversationContext,
@@ -48,7 +49,7 @@ const inference: ModelInference = {
   requestedModel: "fixture/conversation:free",
   actualModel: "fixture/actual:free",
   generationId: "fixture",
-  promptVersion: "conversation-v1",
+  promptVersion: conversationPromptVersion,
   promptTokens: 10,
   completionTokens: 20,
   durationMs: 1,

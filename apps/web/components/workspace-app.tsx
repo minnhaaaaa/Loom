@@ -129,7 +129,10 @@ export function WorkspaceApp({
                 )}
               </>
             ) : (
-              <AccountAccess onAuthenticated={reload} />
+              <AccountAccess
+                onAuthenticated={reload}
+                registrationEnabled={account.registrationEnabled}
+              />
             )}
             {error && (
               <p role="alert" className="alert">

@@ -14,7 +14,7 @@ import { DomainError } from "@loom/domain";
 import { modelConfiguration, parseModelOutput, modelInput } from "./openrouter";
 import { modelResponseError } from "./model-errors";
 
-export const conversationPromptVersion = "conversation-v2";
+export const conversationPromptVersion = "conversation-v3";
 export const conversationOutputSchema = z
   .object({
     reply: z.string().trim().min(1).max(8000),
@@ -85,6 +85,26 @@ export async function inferConversation(
       "The configured agent changed while this reply was starting. Send the prompt again.",
       409,
     );
+  const knowledge = z
+    .object({ knowledge: z.array(z.object({ id: z.uuid() })) })
+    .safeParse(context);
+  const citationIds = knowledge.success
+    ? knowledge.data.knowledge.map((entry) => entry.id)
+    : [];
+  const evidenceSchema = citationIds.length
+    ? z.array(z.enum(citationIds as [string, ...string[]])).max(20)
+    : z.array(z.uuid()).max(0);
+  const outputSchema = conversationOutputSchema.extend({
+    evidenceIds: evidenceSchema,
+    proposals: z
+      .array(
+        conversationOutputSchema.shape.proposals.element.extend({
+          evidenceIds: evidenceSchema,
+        }),
+      )
+      .max(6),
+  });
+  const citationInstructions = `Evidence IDs are exclusively IDs from context.knowledge, never request IDs, Discord message IDs, user IDs, or analytics query IDs. The complete allowed evidenceIds list for this turn is ${JSON.stringify(citationIds)}. Use each cited ID at most once. If this list is empty, every evidenceIds array MUST be empty. You may still discuss context.records and identify requests by their titles in reply prose; that does not require an evidence ID.`;
   const input = modelInput(context);
   if (Buffer.byteLength(input, "utf8") > 120_000)
     throw new DomainError(
@@ -99,10 +119,10 @@ export async function inferConversation(
       config,
       {
         model: config.model,
-        system: systemPrompt,
+        system: `${systemPrompt}\n${citationInstructions}`,
         input,
         schemaName: "loom_conversation",
-        schema: z.toJSONSchema(conversationOutputSchema, { io: "output" }),
+        schema: z.toJSONSchema(outputSchema, { io: "output" }),
       },
       signal,
     );

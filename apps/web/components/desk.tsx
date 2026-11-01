@@ -880,7 +880,7 @@ export function Desk({
               key={`setup/${desk.workspace?.id || "preview"}/${member?.userId || "preview"}`}
               settings={companySettings}
               workspaceId={desk.workspace?.id}
-              workspaceName={desk.workspace?.name || "Your company"}
+              workspaceName={desk.workspace?.name || ""}
               preview={preview}
               initiallyOpen={setupInitiallyOpen}
               onPreview={setBrandPreview}

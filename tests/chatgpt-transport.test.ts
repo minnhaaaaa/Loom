@@ -78,6 +78,44 @@ function fixture(chunks: (string | Uint8Array)[], holdOpen = false) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("ChatGPT plan Responses transport (synthetic streams only)", () => {
+  it("uses finalized items when the terminal event omits their contents", async () => {
+    const done = completed();
+    fixture([
+      event({
+        type: "response.output_item.done",
+        output_index: 0,
+        item: done.response.output[0],
+      }),
+      event({ ...done, response: { ...done.response, output: [] } }),
+    ]);
+    const result = await providerFetch(config, request);
+    expect((await result.json()).choices[0].message.content).toBe(reply);
+  });
+
+  it("rejects finalized items without response.completed", async () => {
+    fixture([
+      event({
+        type: "response.output_item.done",
+        output_index: 0,
+        item: completed().response.output[0],
+      }),
+    ]);
+    await expect(providerFetch(config, request)).rejects.toThrow();
+  });
+
+  it("validates completed SSE even when the provider omits Content-Type", async () => {
+    const { response } = fixture([event(completed())]);
+    response.headers.delete("content-type");
+    const result = await providerFetch(config, request);
+    expect((await result.json()).choices[0].message.content).toBe(reply);
+  });
+
+  it("rejects a headerless body without a completed event", async () => {
+    const { response } = fixture(['{"reply":"not an event"}']);
+    response.headers.delete("content-type");
+    await expect(providerFetch(config, request)).rejects.toThrow();
+  });
+
   it("preserves reconnect classification through conversation and tool generation", async () => {
     const fetch = vi
       .fn()
@@ -145,18 +183,16 @@ describe("ChatGPT plan Responses transport (synthetic streams only)", () => {
       model: config.model,
       store: false,
       stream: true,
-      max_output_tokens: 4096,
+      instructions: request.system,
       input: [
-        { role: "system", content: request.system },
+        {
+          role: "developer",
+          content: `Return only a JSON object matching this schema:\n${JSON.stringify(request.schema)}`,
+        },
         { role: "user", content: request.input },
       ],
       text: {
-        format: {
-          type: "json_schema",
-          name: request.schemaName,
-          strict: true,
-          schema: request.schema,
-        },
+        format: { type: "json_object" },
       },
     });
     expect(options.body).not.toContain(config.key);

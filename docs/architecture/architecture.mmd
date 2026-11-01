@@ -1,0 +1,34 @@
+flowchart TB
+  sources["Discord / Slack / Teams<br/>Selected chat channels"]
+  references["GitHub / SharePoint<br/>Selected reference sources"]
+  browser["Browser<br/>Requests · Assistant · Knowledge · Insights"]
+  subgraph server["Loom · one local Next.js server"]
+    auth["Accounts + workspace authorization"]
+    sync["Background sync<br/>Read-only imports + deduplication"]
+    assistant["Assistant orchestration<br/>Authorized context + output validation"]
+    review["Human review<br/>Version checks + approved mutations"]
+    insights["Analytics queries<br/>Stage time · flow · owner workload"]
+  end
+  db[("Exasol<br/>Canonical records, events, accounts,<br/>knowledge, proposals + conversations")]
+  model["Optional AI provider<br/>Company API or owner's ChatGPT plan"]
+  sources -->|read-only pull| sync
+  references -->|read-only pull| sync
+  browser --> auth
+  auth --> assistant
+  auth --> review
+  auth --> insights
+  sync --> db
+  db -->|scoped context| assistant
+  assistant <-->|inference| model
+  assistant -->|validated proposal| review
+  review -->|approved write| db
+  insights <-->|SQL + measured results| db
+  db -->|authorized records| auth
+  classDef blue fill:#2574A9,color:#FFFFFF,stroke:#2574A9
+  classDef green fill:#075B47,color:#FFFFFF,stroke:#075B47
+  classDef red fill:#BF2806,color:#FFFFFF,stroke:#BF2806
+  classDef black fill:#101110,color:#FFFFFF,stroke:#101110
+  class sources,references,browser blue
+  class db,insights green
+  class review red
+  class auth,sync,assistant,model black

@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { AccountAccess } from "./account-access";
 
-export function CompanyEntry({ mode }: { mode: "login" | "register" }) {
+export function CompanyEntry({
+  mode,
+  registrationEnabled,
+}: {
+  mode: "login" | "register";
+  registrationEnabled: boolean;
+}) {
   return (
     <main className="company-entry">
       <nav aria-label="Account navigation">
@@ -22,6 +28,7 @@ export function CompanyEntry({ mode }: { mode: "login" | "register" }) {
         <h1>{mode === "register" ? "Create your company" : "Sign in"}</h1>
       </div>
       <AccountAccess
+        registrationEnabled={registrationEnabled}
         minimalPublic
         initialMode={mode}
         onAuthenticated={async () => {
