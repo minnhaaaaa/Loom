@@ -426,6 +426,10 @@
   padding: 48px 24px;
   color: var(--dashboard-muted);
 }
+.app-shell .empty.login {
+  background: var(--dashboard-surface);
+  border: 1px solid var(--dashboard-line);
+}
 .app-shell .empty h2 {
   font-size: 16px;
 }
